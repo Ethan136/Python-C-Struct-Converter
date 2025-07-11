@@ -211,7 +211,19 @@ class StructParserApp(tk.Tk):
             messagebox.showwarning("No Struct", "Please load a struct definition file first.")
             return
 
-        hex_parts = [entry.get().strip() for entry in self.hex_entries]
+        # 取得每個欄位的 hex 輸入，支援 0x/0X 並自動補零
+        hex_parts = []
+        for entry, item in zip(self.hex_entries, self.struct_layout):
+            raw = entry.get().strip()
+            # 去除 0x/0X
+            if raw.lower().startswith('0x'):
+                raw = raw[2:]
+            # 自動補零到欄位 size
+            size = item['size']
+            need_len = size * 2
+            raw = raw.zfill(need_len)
+            hex_parts.append(raw)
+
         hex_data = "".join(hex_parts)
 
         if not re.match(r"^[0-9a-fA-F]*$", hex_data):
