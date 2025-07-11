@@ -152,9 +152,22 @@ class StructParserApp(tk.Tk):
             self.struct_layout, self.total_size, struct_align = calculate_layout(members)
             
             info_str = f"Struct: {struct_name}\nAlignment: {struct_align} bytes\nTotal Size: {self.total_size} bytes\n\n"
-            info_str += "{:<18} {:<20} {:<6} {:<8}\n".format("Member", "Type", "Size", "Offset") + "-" * 55 + "\n"
+            info_str += "{:<18} {:<20} {:<6} {:<8} {:<12}\n".format("Member", "Type", "Size", "Offset", "Range") + "-" * 70 + "\n"
+            last_end = 0
             for item in self.struct_layout:
-                info_str += "{:<18} {:<20} {:<6} {:<8}\n".format(item['name'], item['type'], item['size'], item['offset'])
+                start = item['offset']
+                end = start + item['size']
+                # 如果有 padding
+                if start > last_end:
+                    info_str += "{:<18} {:<20} {:<6} {:<8} {:<12}\n".format(
+                        "<padding>", "-", str(start - last_end), str(last_end), f"{last_end}~{start}")
+                info_str += "{:<18} {:<20} {:<6} {:<8} {:<12}\n".format(
+                    item['name'], item['type'], item['size'], start, f"{start}~{end}")
+                last_end = end
+            # struct 結尾 padding
+            if last_end < self.total_size:
+                info_str += "{:<18} {:<20} {:<6} {:<8} {:<12}\n".format(
+                    "<padding>", "-", str(self.total_size - last_end), str(last_end), f"{last_end}~{self.total_size}")
             
             self.info_text.config(state=tk.NORMAL); self.info_text.delete('1.0', tk.END); self.info_text.insert(tk.END, info_str); self.info_text.config(state=tk.DISABLED)
             self.parse_button.config(state=tk.NORMAL)
