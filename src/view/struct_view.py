@@ -41,7 +41,8 @@ class StructView(tk.Tk):
         tk.Label(control_frame, text="Byte Order:").pack(side=tk.LEFT, padx=(20, 10))
         self.endian_var = tk.StringVar(value="Little Endian")
         endian_options = ["Little Endian", "Big Endian"]
-        endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options)
+        # Add command to trigger re-parsing when endianness changes
+        endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=self.presenter.on_endianness_change)
         endian_menu.pack(side=tk.LEFT)
 
         # Canvas with scrollbar for the entry grid
@@ -116,7 +117,8 @@ class StructView(tk.Tk):
         return self.endian_var.get()
 
     def get_hex_input_parts(self):
-        return [entry.get().strip() for entry in self.hex_entries]
+        # Returns a list of (raw_input_string, expected_chars_for_this_box)
+        return [(entry.get().strip(), expected_len) for entry, expected_len in self.hex_entries]
 
     def rebuild_hex_grid(self, total_size, unit_size):
         for widget in self.hex_grid_frame.winfo_children():
@@ -141,7 +143,8 @@ class StructView(tk.Tk):
         for i in range(num_boxes):
             entry = tk.Entry(self.hex_grid_frame, width=chars_per_box + 2, font=("Courier", 10))
             entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
-            self.hex_entries.append(entry)
+            # Store the entry widget along with its expected character length
+            self.hex_entries.append((entry, chars_per_box))
             entry.bind("<KeyRelease>", lambda e, length=chars_per_box: self._auto_focus(e, length))
 
     def _auto_focus(self, event, length):

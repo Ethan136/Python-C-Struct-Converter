@@ -9,7 +9,7 @@ class StructPresenter:
     def browse_file(self):
         file_path = filedialog.askopenfilename(
             title="Select a C++ header file",
-            filetypes=(("Header files", "*.h"), ("All files", "*.*"))
+            filetypes=(("Header files", "*.h"), ("All files", "*.*" ))
         )
         if not file_path:
             return
@@ -37,20 +37,65 @@ class StructPresenter:
             unit_size = self.view.get_selected_unit_size()
             self.view.rebuild_hex_grid(self.model.total_size, unit_size)
 
+    def on_endianness_change(self, *args):
+        # This method is called when the endianness dropdown changes
+        # Trigger re-parsing with the new endianness
+        self.parse_hex_data()
+
     def parse_hex_data(self):
         if not self.model.layout:
             self.view.show_warning("No Struct", "Please load a struct definition file first.")
             return
 
-        hex_parts = self.view.get_hex_input_parts()
-        hex_data = "".join(hex_parts)
-
-        if not hex_data: # Allow empty input to be parsed as all zeros
-            hex_data = ""
-        elif not all(re.match(r"^[0-9a-fA-F]*$", part) for part in hex_parts):
-            self.view.show_error("Invalid Input", "Input contains non-hexadecimal characters.")
-            return
+        hex_parts_with_expected_len = self.view.get_hex_input_parts()
         
+        # Determine the selected endianness for converting input values to bytes
+        byte_order_str = self.view.get_selected_endianness()
+        byte_order_for_conversion = 'little' if byte_order_str == "Little Endian" else 'big'
+
+        final_memory_hex_parts = []
+        for raw_part, expected_chars_in_box in hex_parts_with_expected_len:
+            # Validate input is hex
+            if not re.match(r"^[0-9a-fA-F]*$", raw_part):
+                self.view.show_error("Invalid Input", f"Input \'{raw_part}\' contains non-hexadecimal characters.")
+                return
+            
+            # Convert raw_part to integer value
+            try:
+                # Handle empty string as 0
+                int_value = int(raw_part, 16) if raw_part else 0
+            except ValueError:
+                self.view.show_error("Invalid Input", f"Could not convert \'{raw_part}\' to a number.")
+                return
+
+            # Determine the byte size of the current input chunk (e.g., 1, 4, or 8 bytes)
+            chunk_byte_size = expected_chars_in_box // 2
+
+            # Convert integer value to bytes using the selected endianness
+            try:
+                # Ensure the value fits within the chunk_byte_size
+                # Max value for N bytes is (2**(N*8)) - 1
+                max_val = (2**(chunk_byte_size * 8)) - 1
+                if int_value > max_val:
+                    self.view.show_error("Value Too Large", f"Value 0x{raw_part} is too large for a {chunk_byte_size}-byte field.")
+                    return
+
+                bytes_for_chunk = int_value.to_bytes(chunk_byte_size, byteorder=byte_order_for_conversion)
+                final_memory_hex_parts.append(bytes_for_chunk.hex())
+            except OverflowError:
+                self.view.show_error("Overflow Error", f"Value 0x{raw_part} is too large for a {chunk_byte_size}-byte field.")
+                return
+            except Exception as e:
+                self.view.show_error("Conversion Error", f"Error converting value 0x{raw_part} to bytes: {e}")
+                return
+
+        # Join all converted hex parts to form the complete hex_data string representing raw memory
+        hex_data = "".join(final_memory_hex_parts)
+
+        # The model's parse_hex_data will then use bytes.fromhex(hex_data) to get raw memory bytes.
+        # The model's int.from_bytes will then interpret these raw memory bytes using the selected byte_order.
+        # This ensures consistency: input value -> memory bytes (based on selected endian) -> parsed value (based on selected endian)
+
         # The model will handle padding if hex_data is shorter than total_size * 2
         # We only check if it's too long here
         if len(hex_data) > self.model.total_size * 2:
@@ -58,10 +103,8 @@ class StructPresenter:
             return
 
         try:
-            byte_order_str = self.view.get_selected_endianness()
-            byte_order = 'little' if byte_order_str == "Little Endian" else 'big'
-            parsed_values = self.model.parse_hex_data(hex_data, byte_order)
+            # Pass the selected byte_order_for_conversion to the model for final interpretation
+            parsed_values = self.model.parse_hex_data(hex_data, byte_order_for_conversion)
             self.view.show_parsed_values(parsed_values, byte_order_str)
         except Exception as e:
             self.view.show_error("Parsing Error", f"An error occurred during parsing: {e}")
-
