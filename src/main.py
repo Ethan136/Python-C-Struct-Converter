@@ -10,7 +10,7 @@ from presenter.struct_presenter import StructPresenter
 
 if __name__ == "__main__":
     model = StructModel()
-    view = StructView(None) # Presenter will be set after creation
-    presenter = StructPresenter(model, view)
-    view.presenter = presenter # Set the presenter reference in the view
+    presenter = StructPresenter(model, None) # Temporarily set view to None, will be set by view's __init__
+    view = StructView(presenter) # Pass the presenter to the view during initialization
+    presenter.view = view # Ensure presenter also has a reference to the view
     view.mainloop()

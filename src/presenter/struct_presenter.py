@@ -1,10 +1,10 @@
+import re
 from tkinter import filedialog
 
 class StructPresenter:
-    def __init__(self, model, view):
+    def __init__(self, model, view=None):
         self.model = model
-        self.view = view
-        self.view.presenter = self # Set presenter reference in view
+        self.view = view # This will be set by main.py after view is instantiated
 
     def browse_file(self):
         file_path = filedialog.askopenfilename(
