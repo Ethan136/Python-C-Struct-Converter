@@ -22,6 +22,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
   - The required memory padding between members.
   - The final total size of the struct.
 - **Chunked Hexadecimal Data Input**: Allows inputting hex data in user-defined chunks (1, 4, or 8 bytes) for better readability and ease of entry.
+- **Auto-Padding Hex Input**: Automatically pads shorter hexadecimal inputs with leading zeros to match the expected chunk size (e.g., `12` in a 4-byte field becomes `00000012`).
 - **Configurable Byte Order**: Choose between Little Endian and Big Endian for data interpretation.
 - **Clear Results Display**: Shows the parsed values for each member in both decimal and hexadecimal formats.
 
@@ -60,7 +61,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
 5.  **Input Hex Data**:
     - Choose your preferred "Input Unit Size" (1, 4, or 8 Bytes) and "Byte Order" (Little Endian or Big Endian).
     - The application will show how many hexadecimal characters are expected based on the struct's total size.
-    - Fill in the generated input fields with your hexadecimal data.
+    - Fill in the generated input fields with your hexadecimal data. Shorter inputs will be automatically padded with leading zeros.
 
 6.  **Parse and View Results**:
     - Click the **"Parse Data"** button.
