@@ -1,94 +1,54 @@
-# C++ Struct/Union 程式碼產生器
+# C++ Struct Memory Parser (GUI Version)
 
-這是一個 Python 腳本，提供了一個簡單的命令列介面，用於自動產生 C++ 的 `struct` 和 `union` 的定義及初始化程式碼。
+This project provides a graphical user interface (GUI) tool built with Python and Tkinter to parse the memory layout of a C++ struct. It can read a C++ header file, calculate the struct's memory layout including padding based on standard alignment rules, and then interpret a raw hexadecimal string to show the values of each member.
 
-## 功能
+## Features
 
-*   **互動式介面**: 透過問答方式引導使用者輸入必要的資訊。
-*   **C++ `struct` 產生**:
-    *   自訂 `struct` 名稱。
-    *   自訂成員變數的型別和名稱。
-    *   產生 `struct` 的定義。
-    *   產生一個實例變數並使用使用者提供的值進行初始化。
-*   **C++ `union` 產生**:
-    *   自訂 `union` 名稱。
-    *   自訂成員變數的型別和名稱。
-    *   產生 `union` 的定義。
-    *   產生一個實例變數並使用使用者提供的值初始化其第一個成員。
-*   **自動處理字串**: 在為 `std::string` 或 `char*` 型別賦值時，會自動加上雙引號。
+- **Graphical User Interface**: Easy-to-use window for all operations.
+- **File Browser**: Select C++ header (`.h`) files directly from your file system.
+- **Automatic Layout Calculation**: Parses a C++ `struct` definition and automatically calculates:
+  - The size and alignment of each member.
+  - The required memory padding between members.
+  - The final total size of the struct.
+- **Hexadecimal Data Parsing**: Takes a continuous string of hex data and maps it to the struct members according to the calculated layout.
+- **Little-Endian Conversion**: Correctly interprets the byte sequence for each member in little-endian format.
+- **Clear Results Display**: Shows the parsed values for each member in both decimal and hexadecimal formats.
 
-## 如何使用
+## Requirements
 
-1.  **環境要求**: 只需要一個可以執行 Python 的環境。
-2.  **執行腳本**: 在您的終端機中，導航到包含 `cpp_struct_generator.py` 的目錄，然後執行以下命令：
+- **Python 3**: The script is written for Python 3.
+- **Tkinter**: The GUI is built using the `tkinter` library, which is standard in most Python installations. If it's missing (which can happen on some macOS or Linux minimal installs), you may need to install it separately.
 
+  For macOS, if you encounter errors, you can install `python-tk` via Homebrew:
+  ```bash
+  brew install python-tk
+  ```
+
+## How to Use
+
+1.  **Run the Application**:
+    Open your terminal and execute the following command:
     ```bash
-    python cpp_struct_generator.py
+    python3 gui_parser.py
     ```
+    *(Note: Use `python3`. If that fails, try `python`)*
 
-3.  **遵循提示**: 程式會啟動一個選單，您可以選擇要產生 `struct` (輸入 1) 還是 `union` (輸入 2)。接著，只需按照終端中的提示輸入對應的資訊即可。
+2.  **Load a Struct Definition**:
+    - The application window will appear.
+    - Click the **"Browse..."** button.
+    - Select a C++ header file (e.g., the included `example.h`) that contains a valid `struct` definition.
 
-## 範例
+3.  **Review the Layout**:
+    - Once loaded, the "Struct Layout" area will display the parsed information: the struct's total size, alignment, and the offset, size, and type of each member.
 
-### 產生一個 C++ Struct
+4.  **Input Hex Data**:
+    - The application will show how many hexadecimal characters are expected based on the struct's total size.
+    - Paste your continuous hexadecimal string into the "Hex Data Input" field.
 
-假設您執行腳本並選擇 `1`，互動過程可能如下：
+5.  **Parse and View Results**:
+    - Click the **"Parse Data"** button.
+    - The "Parsed Values" area will populate with a table showing each member's name, its parsed value (in decimal or as `true`/`false` for booleans), and its original little-endian hex representation.
 
-```
---- C++ Struct Generator ---
-Enter the name for your struct (e.g., MyData): Student
-Enter the members of the struct, one per line, in the format 'type name' (e.g., 'int my_number').
-Press Enter on an empty line when you are done.
-Member for Student: std::string name
-Member for Student: int id
-Member for Student: 
-Enter a variable name for your Student instance (e.g., myInstance): newStudent
+## Example File
 
-Enter the values for each member:
-  std::string name: Alice
-  int id: 101
-```
-
-**產生的 C++ 程式碼:**
-
-```cpp
-// 1. Struct Definition
-struct Student {
-    std::string name;
-    int id;
-};
-
-// 2. Variable Initialization
-Student newStudent = {"Alice", 101};
-```
-
-### 產生一個 C++ Union
-
-假設您在主選單選擇 `2`，互動過程可能如下：
-
-```
---- C++ Union Generator ---
-Enter the name for your union (e.g., MyData): Data
-Enter the members of the union, one per line, in the format 'type name' (e.g., 'int my_number').
-Press Enter on an empty line when you are done.
-Member for Data: int i
-Member for Data: float f
-Member for Data: 
-Enter a variable name for your Data instance (e.g., myInstance): myData
-
-For a union, you can only initialize the first member.
-  Value for the first member (int i): 123
-```
-
-**產生的 C++ 程式碼:**
-
-```cpp
-// 1. Union Definition
-union Data {
-    int i;
-    float f;
-};
-
-// 2. Variable Initialization
-Data myData = {123};
-```
+An `example.h` file is included to demonstrate the functionality with a struct that requires memory padding.
