@@ -72,7 +72,11 @@ class StructView(tk.Tk):
         info_str = f"Struct: {struct_name}\nAlignment: {struct_align} bytes\nTotal Size: {total_size} bytes\n\n"
         info_str += "{:<18} {:<20} {:<6} {:<8}\n".format("Member", "Type", "Size", "Offset") + "-" * 55 + "\n"
         for item in layout:
-            info_str += "{:<18} {:<20} {:<6} {:<8}\n".format(item['name'], item['type'], item['size'], item['offset'])
+            # Display padding differently
+            if item['type'] == "padding":
+                info_str += "{:<18} {:<20} {:<6} {:<8}\n".format(item['name'], "-", item['size'], item['offset'])
+            else:
+                info_str += "{:<18} {:<20} {:<6} {:<8}\n".format(item['name'], item['type'], item['size'], item['offset'])
         
         self.info_text.config(state=tk.NORMAL); self.info_text.delete('1.0', tk.END); self.info_text.insert(tk.END, info_str); self.info_text.config(state=tk.DISABLED)
 

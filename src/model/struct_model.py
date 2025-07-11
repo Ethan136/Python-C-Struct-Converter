@@ -46,14 +46,46 @@ def calculate_layout(members):
     for member_type, member_name in members:
         info = TYPE_INFO[member_type]
         size, alignment = info["size"], info["align"]
+
+        # Update struct's max alignment
         if alignment > max_alignment:
             max_alignment = alignment
+
+        # Add padding to align the current member
         padding = (alignment - (current_offset % alignment)) % alignment
-        current_offset += padding
-        layout.append({"name": member_name, "type": member_type, "size": size, "offset": current_offset})
+        if padding > 0:
+            layout.append({
+                "name": "(padding)",
+                "type": "padding",
+                "size": padding,
+                "offset": current_offset
+            })
+            current_offset += padding
+
+        # Store member layout info
+        layout.append({
+            "name": member_name,
+            "type": member_type,
+            "size": size,
+            "offset": current_offset
+        })
+
+        # Move offset to the end of the current member
         current_offset += size
+
+    # Add final padding to align the whole struct
     final_padding = (max_alignment - (current_offset % max_alignment)) % max_alignment
-    total_size = current_offset + final_padding
+    if final_padding > 0:
+        layout.append({
+            "name": "(final padding)",
+            "type": "padding",
+            "size": final_padding,
+            "offset": current_offset
+        })
+        current_offset += final_padding
+
+    total_size = current_offset
+
     return layout, total_size, max_alignment
 
 class StructModel:
@@ -87,6 +119,15 @@ class StructModel:
         
         parsed_values = []
         for item in self.layout:
+            # Only parse actual members, skip padding entries
+            if item['type'] == "padding":
+                parsed_values.append({
+                    "name": item['name'],
+                    "value": "-", # No value for padding
+                    "hex_raw": data_bytes[item['offset'] : item['offset'] + item['size']].hex()
+                })
+                continue
+
             offset, size, name = item['offset'], item['size'], item['name']
             member_bytes = data_bytes[offset : offset + size]
             value = int.from_bytes(member_bytes, byte_order)
