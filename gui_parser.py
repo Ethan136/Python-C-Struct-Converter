@@ -1,3 +1,4 @@
+
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 import re
@@ -65,10 +66,11 @@ class StructParserApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("C++ Struct Parser")
-        self.geometry("700x750")
+        self.geometry("750x800")
 
         self.struct_layout = None
         self.total_size = 0
+        self.hex_entries = []
 
         # --- Widgets ---
         # Frame for file selection
@@ -88,14 +90,40 @@ class StructParserApp(tk.Tk):
         # Frame for hex input
         input_frame = tk.LabelFrame(self, text="Hex Data Input", padx=10, pady=10)
         input_frame.pack(fill=tk.X, padx=10, pady=5)
-        self.hex_entry = tk.Entry(input_frame, font=("Courier", 10))
-        self.hex_entry.pack(fill=tk.X, ipady=4)
-        self.hex_status_label = tk.Label(input_frame, text="Expected characters: 0", anchor="w", justify=tk.LEFT)
-        self.hex_status_label.pack(fill=tk.X)
+        
+        # Control sub-frame for unit selection and endianness
+        control_frame = tk.Frame(input_frame)
+        control_frame.pack(fill=tk.X, pady=(0, 5))
+        tk.Label(control_frame, text="Input Unit Size:").pack(side=tk.LEFT, padx=(0, 10))
+        self.unit_size_var = tk.StringVar(value="1 Byte")
+        unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
+        unit_menu = tk.OptionMenu(control_frame, self.unit_size_var, *unit_options, command=lambda _: self._rebuild_hex_grid())
+        unit_menu.pack(side=tk.LEFT)
+
+        tk.Label(control_frame, text="Byte Order:").pack(side=tk.LEFT, padx=(20, 10))
+        self.endian_var = tk.StringVar(value="Little Endian")
+        endian_options = ["Little Endian", "Big Endian"]
+        endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options)
+        endian_menu.pack(side=tk.LEFT)
+
+        # Canvas with scrollbar for the entry grid
+        canvas = tk.Canvas(input_frame, borderwidth=0, height=150)
+        self.hex_grid_frame = tk.Frame(canvas)
+        scrollbar = tk.Scrollbar(input_frame, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        canvas.create_window((4,4), window=self.hex_grid_frame, anchor="nw")
+        self.hex_grid_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
         # Parse Button
         self.parse_button = tk.Button(self, text="Parse Data", command=self.parse_hex_data, state=tk.DISABLED)
         self.parse_button.pack(pady=10)
+
+        # Test Data Button
+        self.test_button = tk.Button(self, text="填入測試資料", command=self.fill_test_data, state=tk.DISABLED)
+        self.test_button.pack(pady=5)
 
         # Frame for results
         result_frame = tk.LabelFrame(self, text="Parsed Values", padx=10, pady=10)
@@ -106,7 +134,7 @@ class StructParserApp(tk.Tk):
     def browse_file(self):
         file_path = filedialog.askopenfilename(
             title="Select a C++ header file",
-            filetypes=(("Header files", "*.h"), ("All files", "*.*"))
+            filetypes=(("Header files", "*.h"), ("All files", "*.*" ))
         )
         if not file_path:
             return
@@ -123,64 +151,107 @@ class StructParserApp(tk.Tk):
             self.file_label.config(text=file_path)
             self.struct_layout, self.total_size, struct_align = calculate_layout(members)
             
-            # Display layout info
-            info_str = f"Struct: {struct_name}\n"
-            info_str += f"Alignment: {struct_align} bytes\n"
-            info_str += f"Total Size: {self.total_size} bytes\n\n"
-            info_str += "{:<18} {:<20} {:<6} {:<8}\n".format("Member", "Type", "Size", "Offset")
-            info_str += "-" * 55 + "\n"
+            info_str = f"Struct: {struct_name}\nAlignment: {struct_align} bytes\nTotal Size: {self.total_size} bytes\n\n"
+            info_str += "{:<18} {:<20} {:<6} {:<8}\n".format("Member", "Type", "Size", "Offset") + "-" * 55 + "\n"
             for item in self.struct_layout:
                 info_str += "{:<18} {:<20} {:<6} {:<8}\n".format(item['name'], item['type'], item['size'], item['offset'])
             
-            self.info_text.config(state=tk.NORMAL)
-            self.info_text.delete('1.0', tk.END)
-            self.info_text.insert(tk.END, info_str)
-            self.info_text.config(state=tk.DISABLED)
-
-            # Update hex input status
-            self.hex_status_label.config(text=f"Expected characters: {self.total_size * 2}")
+            self.info_text.config(state=tk.NORMAL); self.info_text.delete('1.0', tk.END); self.info_text.insert(tk.END, info_str); self.info_text.config(state=tk.DISABLED)
             self.parse_button.config(state=tk.NORMAL)
-            self.result_text.config(state=tk.NORMAL)
-            self.result_text.delete('1.0', tk.END)
-            self.result_text.config(state=tk.DISABLED)
+            self.test_button.config(state=tk.NORMAL)
+            self.result_text.config(state=tk.NORMAL); self.result_text.delete('1.0', tk.END); self.result_text.config(state=tk.DISABLED)
+            
+            self._rebuild_hex_grid()
 
         except Exception as e:
             messagebox.showerror("File Error", f"An error occurred: {e}")
 
-    def parse_hex_data(self):
-        hex_data = self.hex_entry.get().strip()
+    def _rebuild_hex_grid(self):
+        for widget in self.hex_grid_frame.winfo_children():
+            widget.destroy()
+        self.hex_entries.clear()
 
+        if self.total_size == 0:
+            return
+
+        unit_str = self.unit_size_var.get()
+        unit_size = int(unit_str.split()[0])
+        chars_per_box = unit_size * 2
+        num_boxes = (self.total_size + unit_size - 1) // unit_size
+        cols = max(1, self.hex_grid_frame.winfo_width() // (chars_per_box * 8))
+
+        for i in range(num_boxes):
+            entry = tk.Entry(self.hex_grid_frame, width=chars_per_box + 2, font=("Courier", 10))
+            entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
+            self.hex_entries.append(entry)
+            entry.bind("<KeyRelease>", lambda e, length=chars_per_box: self._auto_focus(e, length))
+
+    def _auto_focus(self, event, length):
+        widget = event.widget
+        if len(widget.get()) >= length:
+            next_widget = widget.tk_focusNext()
+            if next_widget:
+                next_widget.focus()
+
+    def parse_hex_data(self):
         if not self.struct_layout:
             messagebox.showwarning("No Struct", "Please load a struct definition file first.")
             return
 
-        # Validate hex data
+        hex_parts = [entry.get().strip() for entry in self.hex_entries]
+        hex_data = "".join(hex_parts)
+
         if not re.match(r"^[0-9a-fA-F]*$", hex_data):
             messagebox.showerror("Invalid Input", "Input contains non-hexadecimal characters.")
             return
-        if len(hex_data) != self.total_size * 2:
-            messagebox.showerror("Invalid Length", f"Expected {self.total_size * 2} hex characters, but got {len(hex_data)}.")
+        if len(hex_data) > self.total_size * 2:
+            messagebox.showerror("Invalid Length", f"Input data ({len(hex_data)} chars) is longer than the expected total size ({self.total_size * 2} chars).")
             return
-
+        
+        hex_data = hex_data.ljust(self.total_size * 2, '0')
         data_bytes = bytes.fromhex(hex_data)
         
-        # Prepare result string
-        result_str = "{:<18} {:<25} {}\n".format("Member", "Value (Decimal/Bool)", "Hex (Little Endian)")
-        result_str += "-" * 70 + "\n"
+        byte_order_str = self.endian_var.get()
+        byte_order = 'little' if byte_order_str == "Little Endian" else 'big'
+
+        result_str = f"Parsed Values (using {byte_order_str})\n"
+        result_str += "{:<18} {:<25} {:<20} {}\n".format("Member", "Value (Decimal/Bool)", "Raw Bytes", "Hex (Raw Slice)")
+        result_str += "-" * 90 + "\n"
 
         for item in self.struct_layout:
             offset, size, name = item['offset'], item['size'], item['name']
             member_bytes = data_bytes[offset : offset + size]
-            value = int.from_bytes(member_bytes, 'little')
+            value = int.from_bytes(member_bytes, byte_order)
             hex_value = member_bytes.hex()
-
             display_value = str(bool(value)) if item['type'] == 'bool' else str(value)
-            result_str += "{:<18} {:<25} 0x{}\n".format(name, display_value, hex_value)
+            result_str += "{:<18} {:<25} {:<20} 0x{}\n".format(name, display_value, str(list(member_bytes)), hex_value)
 
-        self.result_text.config(state=tk.NORMAL)
-        self.result_text.delete('1.0', tk.END)
-        self.result_text.insert(tk.END, result_str)
-        self.result_text.config(state=tk.DISABLED)
+        self.result_text.config(state=tk.NORMAL); self.result_text.delete('1.0', tk.END); self.result_text.insert(tk.END, result_str); self.result_text.config(state=tk.DISABLED)
+
+    def fill_test_data(self):
+        """
+        根據 struct_layout 自動填入適合測試 endian 差異的 hex 資料。
+        int/short/long 會填 0x01000000...，char/bool 填 0x01。
+        """
+        if not self.struct_layout:
+            return
+        # 預設 little endian 測試值
+        test_bytes = bytearray(self.total_size)
+        for item in self.struct_layout:
+            offset, size, typ = item['offset'], item['size'], item['type']
+            if size == 1:
+                test_bytes[offset] = 0x01
+            else:
+                # 只針對 int/short/long 這類型，填 0x01 其餘 0x00
+                test_bytes[offset:offset+size] = (1).to_bytes(size, 'little')
+        # 依照 hex_entries 分割填入
+        unit_str = self.unit_size_var.get()
+        unit_size = int(unit_str.split()[0])
+        chars_per_box = unit_size * 2
+        hex_str = test_bytes.hex()
+        for i, entry in enumerate(self.hex_entries):
+            entry.delete(0, tk.END)
+            entry.insert(0, hex_str[i*chars_per_box:(i+1)*chars_per_box])
 
 if __name__ == "__main__":
     app = StructParserApp()
