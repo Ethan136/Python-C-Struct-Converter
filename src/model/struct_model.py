@@ -240,22 +240,31 @@ class StructModel:
         self.input_processor = InputFieldProcessor()
         self.manual_struct = None  # 新增屬性
 
-    def set_manual_struct(self, members, total_size):
+    def _merge_byte_and_bit_size(self, members):
         """
-        設定手動 struct 內容。
-        Args:
-            members (list): dicts, e.g. [{"name": str, "byte_size": int, "bit_size": int}, ...]
-            total_size (int): 結構體總大小（bytes）
+        將所有 member 做合併：只要 bit_size > 0，則 new_bit_size = byte_size*8 + bit_size，byte_size=0。
         """
-        # 兼容舊格式: 若 member 只有 length，轉為 bit_size
-        new_members = []
+        merged = []
         for m in members:
-            if "byte_size" in m or "bit_size" in m:
-                new_members.append(m)
-            elif "length" in m:
-                new_members.append({"name": m["name"], "byte_size": 0, "bit_size": m["length"]})
+            byte_size = m.get("byte_size", 0)
+            bit_size = m.get("bit_size", 0)
+            if bit_size > 0:
+                merged.append({
+                    "name": m["name"],
+                    "byte_size": 0,
+                    "bit_size": byte_size * 8 + bit_size
+                })
             else:
-                raise ValueError("manual struct member must have byte_size/bit_size or length")
+                merged.append({
+                    "name": m["name"],
+                    "byte_size": byte_size,
+                    "bit_size": 0
+                })
+        return merged
+
+    def set_manual_struct(self, members, total_size):
+        # 先合併 byte/bit size
+        new_members = self._merge_byte_and_bit_size(members)
         self.manual_struct = {"members": new_members, "total_size": total_size}
 
     def load_struct_from_file(self, file_path):
@@ -317,23 +326,7 @@ class StructModel:
         return parsed_values
 
     def validate_manual_struct(self, members, total_size):
-        """
-        驗證 struct 設定：
-        - byte_size/bit_size 需為正整數
-        - 名稱不可重複
-        - 結構體大小需為正整數
-        - member 總長度（byte_size*8+bit_size 累加）需等於 struct size*8
-        Returns: list of error string
-        """
-        # 兼容舊格式
-        new_members = []
-        for m in members:
-            if "byte_size" in m or "bit_size" in m:
-                new_members.append(m)
-            elif "length" in m:
-                new_members.append({"name": m["name"], "byte_size": 0, "bit_size": m["length"]})
-            else:
-                continue
+        new_members = self._merge_byte_and_bit_size(members)
         errors = []
         for m in new_members:
             if not isinstance(m["byte_size"], int) or m["byte_size"] < 0:
@@ -352,34 +345,11 @@ class StructModel:
         return errors
 
     def calculate_manual_layout(self, members, total_size):
-        """
-        計算無 padding 的 struct 記憶體排列，支援 byte/bit size。
-        Returns: layout list，每個 dict 含 name, size, offset, bit_offset, bit_size
-        """
-        # 兼容舊格式
-        new_members = []
-        for m in members:
-            if "byte_size" in m or "bit_size" in m:
-                new_members.append(m)
-            elif "length" in m:
-                new_members.append({"name": m["name"], "byte_size": 0, "bit_size": m["length"]})
-            else:
-                continue
+        new_members = self._merge_byte_and_bit_size(members)
         layout = []
         byte_offset = 0
         bit_offset = 0
         for m in new_members:
-            if m["byte_size"] > 0:
-                layout.append({
-                    "name": m["name"],
-                    "type": "byte",
-                    "size": m["byte_size"],
-                    "offset": byte_offset,
-                    "is_bitfield": False,
-                    "bit_offset": 0,
-                    "bit_size": m["byte_size"] * 8
-                })
-                byte_offset += m["byte_size"]
             if m["bit_size"] > 0:
                 layout.append({
                     "name": m["name"],
@@ -393,21 +363,43 @@ class StructModel:
                 bit_offset += m["bit_size"]
                 byte_offset += bit_offset // 8
                 bit_offset = bit_offset % 8
+            elif m["byte_size"] > 0:
+                layout.append({
+                    "name": m["name"],
+                    "type": "byte",
+                    "size": m["byte_size"],
+                    "offset": byte_offset,
+                    "is_bitfield": False,
+                    "bit_offset": 0,
+                    "bit_size": m["byte_size"] * 8
+                })
+                byte_offset += m["byte_size"]
+        # 補齊 struct 總大小
+        max_end = 0
+        for item in layout:
+            max_end = max(max_end, item["offset"] + item["size"])
+        if max_end < total_size:
+            layout.append({
+                "name": "(manual final padding)",
+                "type": "padding",
+                "size": total_size - max_end,
+                "offset": max_end,
+                "is_bitfield": False,
+                "bit_offset": 0,
+                "bit_size": (total_size - max_end) * 8
+            })
         return layout
 
     def export_manual_struct_to_h(self, struct_name=None):
-        """
-        產生對應的 C struct 語法（byte_size 以 unsigned char array，bit_size 以 bitfield 輸出）。
-        """
         members = self.manual_struct["members"] if self.manual_struct else []
         total_size = self.manual_struct["total_size"] if self.manual_struct else 0
         struct_name = struct_name or "MyStruct"
         lines = [f"struct {struct_name} {{"]
         for m in members:
-            if m["byte_size"] > 0:
-                lines.append(f"    unsigned char {m['name']}[{'%d' % m['byte_size']}] ;")
             if m["bit_size"] > 0:
-                lines.append(f"    unsigned int {m['name']}_bits : {m['bit_size']};")
+                lines.append(f"    unsigned int {m['name']} : {m['bit_size']};")
+            elif m["byte_size"] > 0:
+                lines.append(f"    unsigned char {m['name']}[%d];" % m['byte_size'])
         lines.append("};")
         lines.append(f"// total size: {total_size} bytes")
         return "\n".join(lines)
