@@ -56,11 +56,12 @@ class StructPresenter:
         byte_order_for_conversion = 'little' if byte_order_str == "Little Endian" else 'big'
 
         final_memory_hex_parts = []
+        debug_bytes_per_box = []  # 新增：收集每個 box 的 bytes
         for raw_part, expected_chars_in_box in hex_parts_with_expected_len:
             # Validate input is hex
             if not re.match(r"^[0-9a-fA-F]*$", raw_part):
                 self.view.show_error(get_string("dialog_invalid_input"),
-                                   f"Input \'{raw_part}\' contains non-hexadecimal characters.")
+                                   f"Input '{raw_part}' contains non-hexadecimal characters.")
                 return
             
             # Convert raw_part to integer value
@@ -69,7 +70,7 @@ class StructPresenter:
                 int_value = int(raw_part, 16) if raw_part else 0
             except ValueError:
                 self.view.show_error(get_string("dialog_invalid_input"),
-                                   f"Could not convert \'{raw_part}\' to a number.")
+                                   f"Could not convert '{raw_part}' to a number.")
                 return
 
             # Determine the byte size of the current input chunk (e.g., 1, 4, or 8 bytes)
@@ -87,6 +88,7 @@ class StructPresenter:
 
                 bytes_for_chunk = int_value.to_bytes(chunk_byte_size, byteorder=byte_order_for_conversion)
                 final_memory_hex_parts.append(bytes_for_chunk.hex())
+                debug_bytes_per_box.append(bytes_for_chunk)
             except OverflowError:
                 self.view.show_error(get_string("dialog_overflow_error"),
                                    f"Value 0x{raw_part} is too large for a {chunk_byte_size}-byte field.")
@@ -95,6 +97,23 @@ class StructPresenter:
                 self.view.show_error(get_string("dialog_conversion_error"),
                                    f"Error converting value 0x{raw_part} to bytes: {e}")
                 return
+
+        # --- 新增：格式化 debug bytes 並顯示 ---
+        # 依照 unit size 決定每行顯示幾個 byte
+        unit_size = self.view.get_selected_unit_size()
+        debug_lines = []
+        current_line = []
+        for i, chunk_bytes in enumerate(debug_bytes_per_box):
+            # 逐 byte 轉成 2位小寫 hex
+            for b in chunk_bytes:
+                current_line.append(f"{b:02x}")
+                if len(current_line) == unit_size:
+                    debug_lines.append(" ".join(current_line))
+                    current_line = []
+        if current_line:
+            debug_lines.append(" ".join(current_line))
+        self.view.show_debug_bytes(debug_lines)
+        # --- end debug ---
 
         # Join all converted hex parts to form the complete hex_data string representing raw memory
         hex_data = "".join(final_memory_hex_parts)

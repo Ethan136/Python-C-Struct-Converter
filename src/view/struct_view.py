@@ -56,16 +56,33 @@ class StructView(tk.Tk):
         endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=self.presenter.on_endianness_change)
         endian_menu.pack(side=tk.LEFT)
 
-        # Canvas with scrollbar for the entry grid
-        canvas = tk.Canvas(input_frame, borderwidth=0, height=150)
+        # --- 水平排列：左邊 hex input，右邊 debug ---
+        input_debug_frame = tk.Frame(input_frame)
+        input_debug_frame.pack(fill=tk.BOTH, expand=True)
+
+        # 左邊：Canvas with scrollbar for the entry grid
+        left_frame = tk.Frame(input_debug_frame)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        canvas = tk.Canvas(left_frame, borderwidth=0, height=150)
         self.hex_grid_frame = tk.Frame(canvas)
-        scrollbar = tk.Scrollbar(input_frame, orient="vertical", command=canvas.yview)
+        scrollbar = tk.Scrollbar(left_frame, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scrollbar.set)
         
         scrollbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
         canvas.create_window((4,4), window=self.hex_grid_frame, anchor="nw")
         self.hex_grid_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+        # 右邊：Debug Bytes Frame
+        right_frame = tk.Frame(input_debug_frame)
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=False, padx=(10, 0))
+        
+        debug_label = tk.Label(right_frame, text="Debug: Raw Bytes", font=("Arial", 10, "bold"))
+        debug_label.pack(anchor="w")
+        
+        self.debug_text = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, width=40, height=8, state=tk.DISABLED, font=("Courier", 10))
+        self.debug_text.pack(fill=tk.BOTH, expand=True)
 
         # Parse Button
         self.parse_button = tk.Button(self,
@@ -169,3 +186,14 @@ class StructView(tk.Tk):
             next_widget = widget.tk_focusNext()
             if next_widget:
                 next_widget.focus()
+
+    def show_debug_bytes(self, debug_lines):
+        """
+        Show the debug byte content for each input box.
+        debug_lines: list of str, each line is one row of bytes (already formatted)
+        """
+        self.debug_text.config(state=tk.NORMAL)
+        self.debug_text.delete('1.0', tk.END)
+        for line in debug_lines:
+            self.debug_text.insert(tk.END, line + '\n')
+        self.debug_text.config(state=tk.DISABLED)
