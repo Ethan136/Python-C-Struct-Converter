@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<struct_parsing_tests>
+    <!-- Test configuration for struct A -->
+    <test_case name="struct_a_test" 
+               struct_file="test_struct_a.h" 
+               description="Test struct A { char s; long long val; }">
+        <input_data>
+            <input index="0" value="12" unit_size="1" description="char s field"/>
+            <input index="1" value="123456789ABCDEF0" unit_size="8" description="long long val field"/>
+        </input_data>
+        <expected_results>
+            <endianness name="little">
+                <member name="s" expected_value="18" expected_hex="12" description="char s = 0x12"/>
+                <member name="val" expected_value="1311768467463790320" expected_hex="f0debc9a78563412" description="long long val in little endian"/>
+            </endianness>
+            <endianness name="big">
+                <member name="s" expected_value="18" expected_hex="12" description="char s = 0x12"/>
+                <member name="val" expected_value="1311768467463790320" expected_hex="123456789abcdef0" description="long long val in big endian"/>
+            </endianness>
+        </expected_results>
+    </test_case>
+
+    <!-- Test configuration for struct with padding -->
+    <test_case name="struct_with_padding_test" 
+               struct_file="test_struct_with_padding.h" 
+               description="Test struct with padding">
+        <input_data>
+            <input index="0" value="FF" unit_size="1" description="char field"/>
+            <input index="1" value="12345678" unit_size="4" description="int field"/>
+            <input index="2" value="ABCDEF01" unit_size="4" description="another int field"/>
+        </input_data>
+        <expected_results>
+            <endianness name="little">
+                <member name="a" expected_value="255" expected_hex="ff" description="char a = 0xFF"/>
+                <member name="b" expected_value="305419896" expected_hex="78563412" description="int b in little endian"/>
+                <member name="c" expected_value="2882400001" expected_hex="01efcdab" description="int c in little endian"/>
+            </endianness>
+            <endianness name="big">
+                <member name="a" expected_value="255" expected_hex="ff" description="char a = 0xFF"/>
+                <member name="b" expected_value="305419896" expected_hex="12345678" description="int b in big endian"/>
+                <member name="c" expected_value="2882400001" expected_hex="abcdef01" description="int c in big endian"/>
+            </endianness>
+        </expected_results>
+    </test_case>
+
+    <!-- Test configuration for empty input handling -->
+    <test_case name="empty_input_test" 
+               struct_file="test_struct_a.h" 
+               description="Test struct A with empty inputs">
+        <input_data>
+            <input index="0" value="" unit_size="1" description="empty char field"/>
+            <input index="1" value="" unit_size="8" description="empty long long field"/>
+        </input_data>
+        <expected_results>
+            <endianness name="little">
+                <member name="s" expected_value="0" expected_hex="00" description="char s = 0"/>
+                <member name="val" expected_value="0" expected_hex="0000000000000000" description="long long val = 0"/>
+            </endianness>
+            <endianness name="big">
+                <member name="s" expected_value="0" expected_hex="00" description="char s = 0"/>
+                <member name="val" expected_value="0" expected_hex="0000000000000000" description="long long val = 0"/>
+            </endianness>
+        </expected_results>
+    </test_case>
+
+    <!-- Test configuration for mixed input sizes -->
+    <test_case name="mixed_sizes_test" 
+               struct_file="test_mixed_struct.h" 
+               description="Test struct with mixed field sizes">
+        <input_data>
+            <input index="0" value="A" unit_size="1" description="char field"/>
+            <input index="1" value="1234" unit_size="2" description="short field"/>
+            <input index="2" value="12345678" unit_size="4" description="int field"/>
+            <input index="3" value="123456789ABCDEF0" unit_size="8" description="long long field"/>
+        </input_data>
+        <expected_results>
+            <endianness name="little">
+                <member name="a" expected_value="10" expected_hex="0a" description="char a = 0x0A"/>
+                <member name="b" expected_value="4660" expected_hex="3412" description="short b in little endian"/>
+                <member name="c" expected_value="305419896" expected_hex="78563412" description="int c in little endian"/>
+                <member name="d" expected_value="1311768467463790320" expected_hex="f0debc9a78563412" description="long long d in little endian"/>
+            </endianness>
+            <endianness name="big">
+                <member name="a" expected_value="10" expected_hex="0a" description="char a = 0x0A"/>
+                <member name="b" expected_value="4660" expected_hex="1234" description="short b in big endian"/>
+                <member name="c" expected_value="305419896" expected_hex="12345678" description="int c in big endian"/>
+                <member name="d" expected_value="1311768467463790320" expected_hex="123456789abcdef0" description="long long d in big endian"/>
+            </endianness>
+        </expected_results>
+    </test_case>
+</struct_parsing_tests> 

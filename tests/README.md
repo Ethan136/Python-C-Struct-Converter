@@ -4,6 +4,7 @@
 - 測試架構與檔案說明
 - 如何執行/擴充/自動化測試
 - XML array 格式自動化測試說明
+- 核心功能測試說明
 
 ## Test Files
 
@@ -23,6 +24,88 @@ Tests for the input conversion mechanism.
 - Tests invalid input handling
 - Tests integration with model parsing
 - **支援 XML array 格式自動化測試**
+
+### `test_struct_parsing_core.py`
+Tests for core struct parsing functionality without GUI.
+- Tests struct definition loading from .h files
+- Tests input data processing with InputFieldProcessor
+- Tests struct member parsing with both endianness
+- Tests padding handling in structs
+- Tests mixed field sizes (char, short, int, long long)
+- Tests empty input handling
+- **支援 XML 配置檔案自動化測試**
+
+## 核心功能測試 (Core Function Testing)
+
+### 概述
+`test_struct_parsing_core.py` 提供不開啟 GUI 的核心功能測試，專門測試 struct 解析的核心邏輯。
+
+### XML 配置檔案格式
+測試配置使用 `tests/data/struct_parsing_test_config.xml`：
+
+```xml
+<struct_parsing_tests>
+    <test_case name="struct_a_test" 
+               struct_file="test_struct_a.h" 
+               description="Test struct A { char s; long long val; }">
+        <input_data>
+            <input index="0" value="12" unit_size="1" description="char s field"/>
+            <input index="1" value="123456789ABCDEF0" unit_size="8" description="long long val field"/>
+        </input_data>
+        <expected_results>
+            <endianness name="little">
+                <member name="s" expected_value="18" expected_hex="12" description="char s = 0x12"/>
+                <member name="val" expected_value="1301540292310073344" expected_hex="f0debc9a78563412" description="long long val in little endian"/>
+            </endianness>
+            <endianness name="big">
+                <member name="s" expected_value="18" expected_hex="12" description="char s = 0x12"/>
+                <member name="val" expected_value="1311768467294899696" expected_hex="123456789abcdef0" description="long long val in big endian"/>
+            </endianness>
+        </expected_results>
+    </test_case>
+</struct_parsing_tests>
+```
+
+### 配置說明
+- `struct_file`: 要測試的 .h 檔案名稱（位於 tests/data/ 目錄）
+- `input_data`: 每個 input 代表一個輸入框的內容
+  - `index`: 輸入框索引
+  - `value`: 輸入的 hex 值
+  - `unit_size`: 輸入框的 byte 大小 (1, 2, 4, 8)
+  - `description`: 描述
+- `expected_results`: 預期結果
+  - `endianness`: 分別測試 little 和 big endian
+  - `member`: 每個 struct member 的預期值
+    - `expected_value`: 預期的十進位值
+    - `expected_hex`: 預期的 hex 表示
+    - `description`: 描述
+
+### 執行核心功能測試
+```bash
+# 執行所有核心功能測試
+python3 -m unittest tests.test_struct_parsing_core -v
+
+# 執行特定測試
+python3 -m unittest tests.test_struct_parsing_core.TestStructParsingCore.test_struct_a_parsing -v
+
+# 執行所有配置測試
+python3 -m unittest tests.test_struct_parsing_core.TestStructParsingCore.test_all_configurations -v
+```
+
+### 擴充核心功能測試
+1. 在 `tests/data/` 目錄新增 .h 檔案
+2. 在 `tests/data/struct_parsing_test_config.xml` 新增 `<test_case>` 區塊
+3. 設定 `struct_file`、`input_data`、`expected_results`
+4. 執行測試驗證
+
+### 測試覆蓋範圍
+- ✅ **Struct 定義解析**: 從 .h 檔案載入 struct 定義
+- ✅ **輸入處理**: 使用 InputFieldProcessor 處理輸入資料
+- ✅ **Endianness 轉換**: 支援 little/big endian
+- ✅ **Padding 處理**: 正確處理 struct padding
+- ✅ **混合欄位大小**: char, short, int, long long
+- ✅ **空輸入處理**: 空輸入轉換為零值
+- ✅ **數值驗證**: 驗證解析結果的正確性
 
 ## XML 測試自動化與簡化
 
@@ -80,10 +163,12 @@ python3 run_tests.py
 # From project root
 python3 -m unittest tests.test_input_conversion -v
 python3 -m unittest tests.test_string_parser -v
+python3 -m unittest tests.test_struct_parsing_core -v
 
 # Or use the test runner
 python3 run_tests.py --test test_input_conversion
 python3 run_tests.py --test test_string_parser
+python3 run_tests.py --test test_struct_parsing_core
 ```
 
 ### Run Specific Test Method
@@ -97,6 +182,7 @@ python3 -m unittest tests.test_input_conversion.TestInputConversion.test_4byte_f
 cd tests
 python3 -m unittest test_input_conversion -v
 python3 -m unittest test_string_parser -v
+python3 -m unittest test_struct_parsing_core -v
 ```
 
 ## Test Coverage
@@ -117,6 +203,15 @@ The tests cover the following areas:
 ### String Parser (`test_string_parser.py`)
 - ✅ **XML loading**: Loads UI strings from XML files
 - ✅ **String retrieval**: Gets strings with fallback handling
+
+### Core Struct Parsing (`test_struct_parsing_core.py`)
+- ✅ **Struct definition loading**: Loads struct definitions from .h files
+- ✅ **Input processing**: Processes input data with InputFieldProcessor
+- ✅ **Endianness handling**: Supports both little and big endian
+- ✅ **Padding handling**: Correctly handles struct padding
+- ✅ **Mixed field sizes**: Supports char, short, int, long long
+- ✅ **Empty input handling**: Converts empty inputs to zero values
+- ✅ **Value validation**: Validates parsed results against expected values
 
 ## Test Structure
 
