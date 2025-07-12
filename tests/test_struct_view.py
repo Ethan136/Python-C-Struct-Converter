@@ -31,14 +31,18 @@ class TestStructView(unittest.TestCase):
         self.root.destroy()
 
     def test_add_and_delete_member(self):
+        # 先設定一個舊格式的成員，確保後續新增的成員也是舊格式
+        self.view.members = [{"name": "", "byte_size": 0, "bit_size": 0}]
+        self.view._render_member_table()
+        
         self.view._add_member()
+        self.assertEqual(len(self.view.members), 2)
+        self.view.members[1]["name_var"].set("foo")
+        self.view.members[1]["byte_var"].set(7)
+        self.assertEqual(self.view.members[1]["name"], "foo")
+        self.assertEqual(self.view.members[1]["byte_size"], 7)
+        self.view._delete_member(1)
         self.assertEqual(len(self.view.members), 1)
-        self.view.members[0]["name_var"].set("foo")
-        self.view.members[0]["byte_var"].set(7)
-        self.assertEqual(self.view.members[0]["name"], "foo")
-        self.assertEqual(self.view.members[0]["byte_size"], 7)
-        self.view._delete_member(0)
-        self.assertEqual(len(self.view.members), 0)
 
     def test_get_manual_struct_definition(self):
         self.view.size_var.set(24)
