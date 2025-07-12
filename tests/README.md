@@ -47,7 +47,7 @@ Tests for the input conversion mechanism.
 - 舊的 `<value index=...>` 格式也可混用。
 
 ### 如何擴充
-1. 在 `tests/test_config.xml` 新增 `<test_config>` 區塊，設定 `unit_size`、`input_values`（可用 array）、`expected_results`。
+1. 在 `tests/data/test_config.xml` 新增 `<test_config>` 區塊，設定 `unit_size`、`input_values`（可用 array）、`expected_results`。
 2. 不需改動 Python 測試程式，會自動讀取所有 config 並驗證。
 
 ### 執行測試

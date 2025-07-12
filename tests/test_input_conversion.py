@@ -38,7 +38,7 @@ struct TestStruct {
             self.model.load_struct_from_file(self.tmp_file.name)
         
         # Load test configurations
-        config_file_path = os.path.join(os.path.dirname(__file__), 'test_config.xml')
+        config_file_path = os.path.join(os.path.dirname(__file__), 'data', 'test_config.xml')
         if os.path.exists(config_file_path):
             self.config_parser = TestConfigParser(config_file_path)
             self.test_configs = self.config_parser.parse()

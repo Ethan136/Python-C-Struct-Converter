@@ -37,20 +37,25 @@ This project provides a graphical user interface (GUI) tool built with Python an
 │       ├── __init__.py
 │       ├── ui_strings.py
 │       └── ui_strings.xml
+├── examples/                  # Example files
+│   └── example.h             # Example C++ struct file
+├── docs/                     # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── analysis/
+│   │   └── input_conversion_analysis.md  # Input conversion analysis
+│   └── development/
+│       └── string_refactor_plan.md
 ├── tests/                    # Test files
 │   ├── __init__.py
 │   ├── README.md             # Test documentation
+│   ├── data/
+│   │   └── test_config.xml   # Test configuration
 │   ├── test_string_parser.py
 │   └── test_input_conversion.py
-├── docs/                     # Documentation
-│   ├── ARCHITECTURE.md
-│   └── string_refactor_plan.md
-├── example.h                 # Example C++ struct file
 ├── run.py                    # Application launcher
 ├── run_tests.py              # Test runner
 ├── setup.py                  # Package configuration
 ├── requirements.txt          # Dependencies
-├── input_conversion_analysis.md  # Input conversion analysis
 └── README.md                 # This file
 ```
 
@@ -85,7 +90,7 @@ The application implements a robust input conversion mechanism that handles vari
 - **Little Endian**: Least significant byte first
 - Consistent application across all field sizes
 
-For detailed analysis, see [input_conversion_analysis.md](input_conversion_analysis.md).
+For detailed analysis, see [docs/analysis/input_conversion_analysis.md](docs/analysis/input_conversion_analysis.md).
 
 ## Requirements
 
@@ -129,7 +134,7 @@ python3 run.py
 2. **Load a Struct Definition**:
    - The application window will appear.
    - Click the **"Browse..."** button.
-   - Select a C++ header file (e.g., the `example.h` located in the project root) that contains a valid `struct` definition.
+   - Select a C++ header file (e.g., the `examples/example.h` located in the project) that contains a valid `struct` definition.
 
 3. **Review the Layout**:
    - Once loaded, the "Struct Layout" area will display the parsed information: the struct's total size, alignment, and the offset, size, and type of each member.
@@ -145,7 +150,7 @@ python3 run.py
 
 ## Example File
 
-An `example.h` file is included in the project root to demonstrate the functionality with a struct that requires memory padding.
+An `examples/example.h` file is included in the project to demonstrate the functionality with a struct that requires memory padding.
 
 ## Development
 
