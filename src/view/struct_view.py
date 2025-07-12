@@ -64,6 +64,11 @@ class StructView(tk.Tk):
         self.member_tree.heading("value", text="值")
         self.member_tree.heading("hex_value", text="Hex Value")
         self.member_tree.heading("hex_raw", text="Hex Raw")
+        # 設定欄位寬度
+        self.member_tree.column("name", width=120)
+        self.member_tree.column("value", width=100)
+        self.member_tree.column("hex_value", width=100)
+        self.member_tree.column("hex_raw", width=150)
         self.member_tree.pack(fill="x")
 
         # debug bytes 顯示區
@@ -168,6 +173,11 @@ class StructView(tk.Tk):
         self.manual_member_tree.heading("value", text="值")
         self.manual_member_tree.heading("hex_value", text="Hex Value")
         self.manual_member_tree.heading("hex_raw", text="Hex Raw")
+        # 設定欄位寬度（與載入.h檔一致）
+        self.manual_member_tree.column("name", width=120)
+        self.manual_member_tree.column("value", width=100)
+        self.manual_member_tree.column("hex_value", width=100)
+        self.manual_member_tree.column("hex_raw", width=150)
         self.manual_member_tree.pack(fill="x")
 
         # debug bytes 顯示區
