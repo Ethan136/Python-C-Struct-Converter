@@ -288,6 +288,20 @@ class TestCalculateLayout(unittest.TestCase):
         self.assertEqual(total_size, 4)
         self.assertEqual(max_alignment, 4)
 
+    def test_padding_layout_fields(self):
+        """Test that padding and final padding have correct bitfield-related fields."""
+        members = [("char", "a"), ("int", "b"), ("char", "c")]
+        layout, total_size, max_alignment = calculate_layout(members)
+        # 找出所有 padding 項
+        paddings = [item for item in layout if item["type"] == "padding"]
+        for pad in paddings:
+            self.assertIn("is_bitfield", pad)
+            self.assertIn("bit_offset", pad)
+            self.assertIn("bit_size", pad)
+            self.assertFalse(pad["is_bitfield"])
+            self.assertEqual(pad["bit_offset"], 0)
+            self.assertEqual(pad["bit_size"], pad["size"] * 8)
+
 
 class TestStructModel(unittest.TestCase):
     """Test cases for StructModel class."""
@@ -792,6 +806,20 @@ class TestStructModel(unittest.TestCase):
         h_content = self.model.export_manual_struct_to_h()
         self.assertIn("struct MyStruct", h_content)
         self.assertIn("// total size: 0 bits", h_content)
+
+    def test_export_manual_struct_to_h_with_custom_name(self):
+        # 測試 struct_name 參數自訂時的輸出
+        members = [
+            {"name": "a", "length": 3},
+            {"name": "b", "length": 5}
+        ]
+        total_size = 8
+        self.model.set_manual_struct(members, total_size)
+        h_content = self.model.export_manual_struct_to_h(struct_name="CustomStruct")
+        self.assertIn("struct CustomStruct", h_content)
+        self.assertIn("unsigned int a : 3;", h_content)
+        self.assertIn("unsigned int b : 5;", h_content)
+        self.assertIn("// total size: 8 bits", h_content)
 
 
 class TestCombinedExampleStruct(unittest.TestCase):
