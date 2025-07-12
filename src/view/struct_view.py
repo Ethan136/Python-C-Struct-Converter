@@ -3,7 +3,7 @@ from tkinter import filedialog, messagebox, scrolledtext
 from config import get_string
 
 class StructView(tk.Tk):
-    def __init__(self, presenter):
+    def __init__(self, presenter=None):
         super().__init__()
         self.presenter = presenter
         self.title(get_string("app_title"))
@@ -19,10 +19,10 @@ class StructView(tk.Tk):
                                     text=get_string("no_file_selected"),
                                     anchor="w", justify=tk.LEFT)
         self.file_label.pack(side=tk.LEFT, expand=True, fill=tk.X)
-        browse_button = tk.Button(file_frame,
+        self.browse_button = tk.Button(file_frame,
                                   text=get_string("browse_button"),
-                                  command=self.presenter.browse_file)
-        browse_button.pack(side=tk.RIGHT)
+                                  command=self.presenter.browse_file if self.presenter else None)
+        self.browse_button.pack(side=tk.RIGHT)
 
         # Frame for struct layout info
         info_frame = tk.LabelFrame(self,
@@ -45,16 +45,16 @@ class StructView(tk.Tk):
                  text=get_string("input_unit_size")).pack(side=tk.LEFT, padx=(0, 10))
         self.unit_size_var = tk.StringVar(value="1 Byte")
         unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
-        unit_menu = tk.OptionMenu(control_frame, self.unit_size_var, *unit_options, command=self.presenter.on_unit_size_change)
-        unit_menu.pack(side=tk.LEFT)
+        self.unit_menu = tk.OptionMenu(control_frame, self.unit_size_var, *unit_options, command=self._dispatch_on_unit_size_change)
+        self.unit_menu.pack(side=tk.LEFT)
 
         tk.Label(control_frame,
                  text=get_string("byte_order")).pack(side=tk.LEFT, padx=(20, 10))
         self.endian_var = tk.StringVar(value="Little Endian")
         endian_options = ["Little Endian", "Big Endian"]
         # Add command to trigger re-parsing when endianness changes
-        endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=self.presenter.on_endianness_change)
-        endian_menu.pack(side=tk.LEFT)
+        self.endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=self._dispatch_on_endianness_change)
+        self.endian_menu.pack(side=tk.LEFT)
 
         # --- 水平排列：左邊 hex input，右邊 debug ---
         input_debug_frame = tk.Frame(input_frame)
@@ -87,7 +87,7 @@ class StructView(tk.Tk):
         # Parse Button
         self.parse_button = tk.Button(self,
                                       text=get_string("parse_button"),
-                                      command=self.presenter.parse_hex_data,
+                                      command=self.presenter.parse_hex_data if self.presenter else None,
                                       state=tk.DISABLED)
         self.parse_button.pack(pady=10)
 
@@ -98,6 +98,19 @@ class StructView(tk.Tk):
         result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         self.result_text = scrolledtext.ScrolledText(result_frame, wrap=tk.WORD, height=10, state=tk.DISABLED, font=("Courier", 10))
         self.result_text.pack(fill=tk.BOTH, expand=True)
+
+    def _dispatch_on_unit_size_change(self, *args):
+        if self.presenter:
+            self.presenter.on_unit_size_change(*args)
+
+    def _dispatch_on_endianness_change(self, *args):
+        if self.presenter:
+            self.presenter.on_endianness_change(*args)
+
+    def set_presenter(self, presenter):
+        self.presenter = presenter
+        self.browse_button.config(command=self.presenter.browse_file)
+        self.parse_button.config(command=self.presenter.parse_hex_data)
 
     def show_file_path(self, path):
         self.file_label.config(text=path)

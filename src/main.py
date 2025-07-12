@@ -15,9 +15,9 @@ def main():
     load_ui_strings(strings_path)
 
     model = StructModel()
-    presenter = StructPresenter(model, None)  # View will set itself on init
-    view = StructView(presenter)
-    presenter.view = view
+    view = StructView()
+    presenter = StructPresenter(model, view)
+    view.set_presenter(presenter)
     view.mainloop()
 
 if __name__ == "__main__":
