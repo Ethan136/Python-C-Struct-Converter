@@ -99,19 +99,14 @@ class StructPresenter:
                 return
 
         # --- 新增：格式化 debug bytes 並顯示 ---
-        # 依照 unit size 決定每行顯示幾個 byte
-        unit_size = self.view.get_selected_unit_size()
+        # 根據每個 input 欄位的實際 byte 數來顯示
         debug_lines = []
-        current_line = []
         for i, chunk_bytes in enumerate(debug_bytes_per_box):
-            # 逐 byte 轉成 2位小寫 hex
+            # 將這個 chunk 的所有 bytes 轉成 hex 字串
+            hex_chars = []
             for b in chunk_bytes:
-                current_line.append(f"{b:02x}")
-                if len(current_line) == unit_size:
-                    debug_lines.append(" ".join(current_line))
-                    current_line = []
-        if current_line:
-            debug_lines.append(" ".join(current_line))
+                hex_chars.append(f"{b:02x}")
+            debug_lines.append(f"Box {i+1} ({len(chunk_bytes)} bytes): {' '.join(hex_chars)}")
         self.view.show_debug_bytes(debug_lines)
         # --- end debug ---
 
@@ -133,6 +128,9 @@ class StructPresenter:
             # Pass the selected byte_order_for_conversion to the model for final interpretation
             parsed_values = self.model.parse_hex_data(hex_data, byte_order_for_conversion)
             self.view.show_parsed_values(parsed_values, byte_order_str)
+            
+            # Show struct member debug information
+            self.view.show_struct_member_debug(parsed_values, self.model.layout)
         except Exception as e:
             self.view.show_error(get_string("dialog_parsing_error"),
                                f"An error occurred during parsing: {e}")

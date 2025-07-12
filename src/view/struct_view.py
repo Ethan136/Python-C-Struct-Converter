@@ -7,7 +7,7 @@ class StructView(tk.Tk):
         super().__init__()
         self.presenter = presenter
         self.title(get_string("app_title"))
-        self.geometry("750x800")
+        self.geometry("1200x800")
 
         self.hex_entries = []
 
@@ -59,10 +59,12 @@ class StructView(tk.Tk):
         # --- 水平排列：左邊 hex input，右邊 debug ---
         input_debug_frame = tk.Frame(input_frame)
         input_debug_frame.pack(fill=tk.BOTH, expand=True)
+        input_debug_frame.columnconfigure(0, weight=1)
+        input_debug_frame.columnconfigure(1, weight=1)
 
         # 左邊：Canvas with scrollbar for the entry grid
         left_frame = tk.Frame(input_debug_frame)
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        left_frame.grid(row=0, column=0, sticky="nsew")
         
         canvas = tk.Canvas(left_frame, borderwidth=0, height=150)
         self.hex_grid_frame = tk.Frame(canvas)
@@ -76,7 +78,7 @@ class StructView(tk.Tk):
 
         # 右邊：Debug Bytes Frame
         right_frame = tk.Frame(input_debug_frame)
-        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=False, padx=(10, 0))
+        right_frame.grid(row=0, column=1, sticky="nsew")
         
         debug_label = tk.Label(right_frame, text="Debug: Raw Bytes", font=("Arial", 10, "bold"))
         debug_label.pack(anchor="w")
@@ -96,8 +98,29 @@ class StructView(tk.Tk):
                                      text=get_string("parsed_values_title"),
                                      padx=10, pady=10)
         result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        self.result_text = scrolledtext.ScrolledText(result_frame, wrap=tk.WORD, height=10, state=tk.DISABLED, font=("Courier", 10))
+        
+        # --- 水平排列：左邊 parse result，右邊 struct member debug ---
+        result_debug_frame = tk.Frame(result_frame)
+        result_debug_frame.pack(fill=tk.BOTH, expand=True)
+        result_debug_frame.columnconfigure(0, weight=1)
+        result_debug_frame.columnconfigure(1, weight=1)
+
+        # 左邊：Parse Results
+        left_result_frame = tk.Frame(result_debug_frame)
+        left_result_frame.grid(row=0, column=0, sticky="nsew")
+
+        self.result_text = scrolledtext.ScrolledText(left_result_frame, wrap=tk.WORD, height=10, state=tk.DISABLED, font=("Courier", 10))
         self.result_text.pack(fill=tk.BOTH, expand=True)
+
+        # 右邊：Struct Member Debug
+        right_result_frame = tk.Frame(result_debug_frame)
+        right_result_frame.grid(row=0, column=1, sticky="nsew")
+
+        debug_result_label = tk.Label(right_result_frame, text="Debug: Struct Member Bytes", font=("Arial", 10, "bold"))
+        debug_result_label.pack(anchor="w")
+
+        self.debug_result_text = scrolledtext.ScrolledText(right_result_frame, wrap=tk.WORD, width=80, height=10, state=tk.DISABLED, font=("Courier", 10))
+        self.debug_result_text.pack(fill=tk.BOTH, expand=True)
 
     def _dispatch_on_unit_size_change(self, *args):
         if self.presenter:
@@ -142,21 +165,30 @@ class StructView(tk.Tk):
 
     def show_parsed_values(self, parsed_values, byte_order_str):
         result_str = f"Parsed Values (using {byte_order_str})\n"
-        result_str += "{:<18} {:<25} {}\n".format("Member", "Value (Decimal/Bool)", "Hex (Raw Slice)")
+        result_str += "{:<18} {:<25} {}\n".format("Member", "Value (Decimal/Bool)", "Hex (Value)")
         result_str += "-" * 70 + "\n"
 
         for item in parsed_values:
-            # 補齊 hex 長度（每 byte 2 位），不足左補 0
-            hex_raw = item['hex_raw']
-            # 取得 struct member 對應的 size
+            name = item['name']
+            value = item['value']
+            # 找到對應的 size
             size = None
             for p in parsed_values:
-                if p['name'] == item['name']:
-                    size = len(hex_raw) // 2 if hex_raw else 0
+                if p['name'] == name:
+                    # padding 也會有 hex_raw，但 value 是 "-"
+                    size = len(item['hex_raw']) // 2 if item['hex_raw'] else 0
                     break
-            if size is not None and len(hex_raw) < size * 2:
-                hex_raw = hex_raw.zfill(size * 2)
-            result_str += "{:<18} {:<25} {}\n".format(item['name'], item['value'], f"0x{hex_raw}")
+            # padding 顯示 -
+            if value == "-":
+                hex_value = "-"
+            else:
+                try:
+                    int_value = int(value) if not isinstance(value, bool) else int(value)
+                    hex_value = hex(int_value)[2:].zfill(size * 2) if size else hex(int_value)[2:]
+                    hex_value = "0x" + hex_value
+                except Exception:
+                    hex_value = str(value)
+            result_str += "{:<18} {:<25} {}\n".format(name, value, hex_value)
 
         self.result_text.config(state=tk.NORMAL); self.result_text.delete('1.0', tk.END); self.result_text.insert(tk.END, result_str); self.result_text.config(state=tk.DISABLED)
 
@@ -220,3 +252,47 @@ class StructView(tk.Tk):
         for line in debug_lines:
             self.debug_text.insert(tk.END, line + '\n')
         self.debug_text.config(state=tk.DISABLED)
+
+    def show_struct_member_debug(self, parsed_values, layout):
+        """
+        Show debug information for each struct member including byte values and offset.
+        parsed_values: list of dict with parsed member data
+        layout: list of dict with struct layout information
+        """
+        debug_str = "Struct Member Debug Info\n"
+        debug_str += "{:<18} {:<8} {:<8} {:<20} {}\n".format("Member", "Offset", "Size", "Bytes (Raw)", "Bytes (Formatted)")
+        debug_str += "-" * 80 + "\n"
+        
+        for item in parsed_values:
+            member_name = item['name']
+            hex_raw = item['hex_raw']
+            
+            # Find corresponding layout info
+            layout_info = None
+            for layout_item in layout:
+                if layout_item['name'] == member_name:
+                    layout_info = layout_item
+                    break
+            
+            if layout_info:
+                offset = layout_info['offset']
+                size = layout_info['size']
+                
+                # Format bytes for display
+                if hex_raw:
+                    # Show raw hex
+                    raw_bytes = hex_raw
+                    # Show formatted bytes (space separated)
+                    formatted_bytes = ' '.join([hex_raw[i:i+2] for i in range(0, len(hex_raw), 2)])
+                else:
+                    raw_bytes = "00" * size
+                    formatted_bytes = "00 " * size
+                
+                debug_str += "{:<18} {:<8} {:<8} {:<20} {}\n".format(
+                    member_name, offset, size, raw_bytes, formatted_bytes
+                )
+        
+        self.debug_result_text.config(state=tk.NORMAL)
+        self.debug_result_text.delete('1.0', tk.END)
+        self.debug_result_text.insert(tk.END, debug_str)
+        self.debug_result_text.config(state=tk.DISABLED)
