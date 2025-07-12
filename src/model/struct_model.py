@@ -27,6 +27,8 @@ def parse_struct_definition(file_content):
         return None, None
     struct_name = struct_match.group(1)
     struct_content = struct_match.group(2)
+    # 移除 // 註解
+    struct_content = re.sub(r'//.*', '', struct_content)
     member_matches = re.findall(r"\s*([\w\s\*]+?)\s+([\w\[\]]+);", struct_content)
     members = []
     for type_str, name in member_matches:
