@@ -199,5 +199,17 @@ class TestStructView(unittest.TestCase):
         # 應無錯誤訊息
         self.assertIn("設定正確", self.view.validation_label.cget("text"))
 
+    def test_hex_grid_last_entry_dynamic_length(self):
+        # struct 9 byte, unit_size 4
+        total_size = 9
+        unit_size = 4
+        self.view.rebuild_hex_grid(total_size, unit_size)
+        # 應有 3 格
+        self.assertEqual(len(self.view.hex_entries), 3)
+        # 前兩格應該是 8 hex 字元，最後一格應該是 2 hex 字元
+        self.assertEqual(self.view.hex_entries[0][1], 8)
+        self.assertEqual(self.view.hex_entries[1][1], 8)
+        self.assertEqual(self.view.hex_entries[2][1], 2)
+
 if __name__ == "__main__":
     unittest.main()

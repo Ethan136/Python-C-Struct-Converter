@@ -74,7 +74,9 @@ class StructView(tk.Tk):
         # struct layout 顯示區
         layout_frame = tk.LabelFrame(parent, text="Struct Layout")
         layout_frame.pack(fill="both", expand=True, padx=2, pady=2)
-        self.layout_tree = ttk.Treeview(layout_frame, columns=("name", "type", "offset", "size", "bit_offset", "bit_size", "is_bitfield"), show="headings", height=10)
+        # 新增 scroll bar
+        layout_scrollbar = ttk.Scrollbar(layout_frame, orient="vertical")
+        self.layout_tree = ttk.Treeview(layout_frame, columns=("name", "type", "offset", "size", "bit_offset", "bit_size", "is_bitfield"), show="headings", height=10, yscrollcommand=layout_scrollbar.set)
         self.layout_tree.heading("name", text="欄位名稱")
         self.layout_tree.heading("type", text="型別")
         self.layout_tree.heading("offset", text="Offset")
@@ -82,7 +84,9 @@ class StructView(tk.Tk):
         self.layout_tree.heading("bit_offset", text="bit_offset")
         self.layout_tree.heading("bit_size", text="bit_size")
         self.layout_tree.heading("is_bitfield", text="is_bitfield")
-        self.layout_tree.pack(fill="both", expand=True)
+        self.layout_tree.pack(side="left", fill="both", expand=True)
+        layout_scrollbar.config(command=self.layout_tree.yview)
+        layout_scrollbar.pack(side="right", fill="y")
 
     def _create_manual_struct_frame(self, parent):
         # 結構體名稱
@@ -342,13 +346,20 @@ class StructView(tk.Tk):
             return
         chars_per_box = unit_size * 2
         num_boxes = (total_size + unit_size - 1) // unit_size
-        cols = 4
+        cols = max(1, 16 // unit_size)
         for i in range(num_boxes):
-            entry = tk.Entry(self.hex_grid_frame, width=chars_per_box + 2, font=("Courier", 10))
+            # 動態調整最後一格的輸入長度
+            if i == num_boxes - 1:
+                # 剩餘 byte
+                remain_bytes = total_size - (unit_size * (num_boxes - 1))
+                box_chars = remain_bytes * 2 if remain_bytes > 0 else chars_per_box
+            else:
+                box_chars = chars_per_box
+            entry = tk.Entry(self.hex_grid_frame, width=box_chars + 2, font=("Courier", 10))
             entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
-            self.hex_entries.append((entry, chars_per_box))
-            entry.bind("<KeyPress>", lambda e, length=chars_per_box: self._validate_input(e, length))
-            entry.bind("<Key>", lambda e, length=chars_per_box: self._limit_input_length(e, length))
+            self.hex_entries.append((entry, box_chars))
+            entry.bind("<KeyPress>", lambda e, length=box_chars: self._validate_input(e, length))
+            entry.bind("<Key>", lambda e, length=box_chars: self._limit_input_length(e, length))
 
     def get_hex_input_parts(self):
         return [(entry.get().strip(), expected_len) for entry, expected_len in self.hex_entries]
