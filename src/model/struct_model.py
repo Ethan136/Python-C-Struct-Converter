@@ -244,10 +244,19 @@ class StructModel:
         """
         設定手動 struct 內容。
         Args:
-            members (list): bitfield dicts, e.g. [{"name": str, "length": int}, ...]
-            total_size (int): 結構體總大小（bits 或 bytes）
+            members (list): dicts, e.g. [{"name": str, "byte_size": int, "bit_size": int}, ...]
+            total_size (int): 結構體總大小（bytes）
         """
-        self.manual_struct = {"members": members, "total_size": total_size}
+        # 兼容舊格式: 若 member 只有 length，轉為 bit_size
+        new_members = []
+        for m in members:
+            if "byte_size" in m or "bit_size" in m:
+                new_members.append(m)
+            elif "length" in m:
+                new_members.append({"name": m["name"], "byte_size": 0, "bit_size": m["length"]})
+            else:
+                raise ValueError("manual struct member must have byte_size/bit_size or length")
+        self.manual_struct = {"members": new_members, "total_size": total_size}
 
     def load_struct_from_file(self, file_path):
         with open(file_path, 'r') as f:
@@ -309,71 +318,96 @@ class StructModel:
 
     def validate_manual_struct(self, members, total_size):
         """
-        驗證 bitfield 設定：
-        - bitfield 總長度需等於結構體大小
+        驗證 struct 設定：
+        - byte_size/bit_size 需為正整數
         - 名稱不可重複
-        - bitfield 長度需為正整數
         - 結構體大小需為正整數
-        Args:
-            members (list): bitfield dicts, e.g. [{"name": str, "length": int}, ...]
-            total_size (int): 結構體總大小（bits 或 bytes）
-        Returns:
-            list: 錯誤訊息字串 list，若驗證通過則為空 list
+        - member 總長度（byte_size*8+bit_size 累加）需等於 struct size*8
+        Returns: list of error string
         """
-        errors = []
-        # 檢查 bitfield 長度
+        # 兼容舊格式
+        new_members = []
         for m in members:
-            if not isinstance(m["length"], int) or m["length"] <= 0:
-                errors.append(f"bitfield '{m['name']}' 長度需為正整數")
-        # 檢查名稱重複
-        names = [m["name"] for m in members]
+            if "byte_size" in m or "bit_size" in m:
+                new_members.append(m)
+            elif "length" in m:
+                new_members.append({"name": m["name"], "byte_size": 0, "bit_size": m["length"]})
+            else:
+                continue
+        errors = []
+        for m in new_members:
+            if not isinstance(m["byte_size"], int) or m["byte_size"] < 0:
+                errors.append(f"member '{m['name']}' byte_size 需為 0 或正整數")
+            if not isinstance(m["bit_size"], int) or m["bit_size"] < 0:
+                errors.append(f"member '{m['name']}' bit_size 需為 0 或正整數")
+        names = [m["name"] for m in new_members]
         if len(set(names)) != len(names):
             for n in set([x for x in names if names.count(x) > 1]):
                 errors.append(f"成員名稱 '{n}' 重複")
-        # 檢查結構體大小
         if not isinstance(total_size, int) or total_size <= 0:
             errors.append("結構體大小需為正整數")
-        # 檢查 bitfield 總長度
-        total_bits = sum(m["length"] for m in members if isinstance(m["length"], int) and m["length"] > 0)
-        if total_bits != total_size and total_size > 0:
-            errors.append(f"Bitfield 總長度 ({total_bits}) 不等於結構體大小 ({total_size})")
+        total_bits = sum(m["byte_size"] * 8 + m["bit_size"] for m in new_members)
+        if total_size > 0 and total_bits != total_size * 8:
+            errors.append(f"Member 總長度 ({total_bits} bits) 不等於結構體大小 ({total_size*8} bits)")
         return errors
 
     def calculate_manual_layout(self, members, total_size):
         """
-        計算無 padding 的 bitfield 記憶體排列。
-        Args:
-            members (list): bitfield dicts, e.g. [{"name": str, "length": int}, ...]
-            total_size (int): 結構體總大小（bits）
-        Returns:
-            list: layout，每個 dict 含 name, size, offset, is_bitfield, bit_offset, bit_size
+        計算無 padding 的 struct 記憶體排列，支援 byte/bit size。
+        Returns: layout list，每個 dict 含 name, size, offset, bit_offset, bit_size
         """
-        layout = []
-        bit_offset = 0
-        byte_size = (total_size + 7) // 8  # 向上取整
+        # 兼容舊格式
+        new_members = []
         for m in members:
-            layout.append({
-                "name": m["name"],
-                "type": "bitfield",
-                "size": byte_size,
-                "offset": 0,
-                "is_bitfield": True,
-                "bit_offset": bit_offset,
-                "bit_size": m["length"]
-            })
-            bit_offset += m["length"]
+            if "byte_size" in m or "bit_size" in m:
+                new_members.append(m)
+            elif "length" in m:
+                new_members.append({"name": m["name"], "byte_size": 0, "bit_size": m["length"]})
+            else:
+                continue
+        layout = []
+        byte_offset = 0
+        bit_offset = 0
+        for m in new_members:
+            if m["byte_size"] > 0:
+                layout.append({
+                    "name": m["name"],
+                    "type": "byte",
+                    "size": m["byte_size"],
+                    "offset": byte_offset,
+                    "is_bitfield": False,
+                    "bit_offset": 0,
+                    "bit_size": m["byte_size"] * 8
+                })
+                byte_offset += m["byte_size"]
+            if m["bit_size"] > 0:
+                layout.append({
+                    "name": m["name"],
+                    "type": "bitfield",
+                    "size": 1 if bit_offset + m["bit_size"] > 8 else 0,
+                    "offset": byte_offset,
+                    "is_bitfield": True,
+                    "bit_offset": bit_offset,
+                    "bit_size": m["bit_size"]
+                })
+                bit_offset += m["bit_size"]
+                byte_offset += bit_offset // 8
+                bit_offset = bit_offset % 8
         return layout
 
     def export_manual_struct_to_h(self, struct_name=None):
         """
-        產生對應的 C struct bitfield 語法（無 padding），回傳 .h 檔內容字串。
+        產生對應的 C struct 語法（byte_size 以 unsigned char array，bit_size 以 bitfield 輸出）。
         """
         members = self.manual_struct["members"] if self.manual_struct else []
         total_size = self.manual_struct["total_size"] if self.manual_struct else 0
         struct_name = struct_name or "MyStruct"
         lines = [f"struct {struct_name} {{"]
         for m in members:
-            lines.append(f"    unsigned int {m['name']} : {m['length']};")
+            if m["byte_size"] > 0:
+                lines.append(f"    unsigned char {m['name']}[{'%d' % m['byte_size']}] ;")
+            if m["bit_size"] > 0:
+                lines.append(f"    unsigned int {m['name']}_bits : {m['bit_size']};")
         lines.append("};")
-        lines.append(f"// total size: {total_size} bits")
+        lines.append(f"// total size: {total_size} bytes")
         return "\n".join(lines)

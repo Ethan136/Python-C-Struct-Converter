@@ -17,18 +17,24 @@
 - 使用者可在GUI上直接設定資料結構，流程如下：
 
   1. **設定資料結構總大小（size）**
-     - 輸入框或下拉選單，讓使用者指定結構體的總bit數或byte數。
+     - 輸入框讓使用者指定結構體的總「byte」數（原本為 bit，現改為 byte）。
 
-  2. **設定Bitfield與對應成員名稱**
-     - 動態表格或列表，讓使用者逐一新增bitfield。
-     - 每一列包含：
-       - bitfield長度（bit數）
-       - 對應的struct member名稱
+  2. **設定 struct member 的 byte/bit size**
+     - 動態表格，每一列可設定：
+       - 成員名稱
+       - byte size（以 byte 為單位）
+       - bit size（以 bit 為單位）
+     - 每個 member 的實際 size = byte size + bit size（bit size 以 bit 為單位，byte size 以 byte 為單位）。
      - 可新增、刪除、調整順序。
 
-  3. **記憶體緊密排列**
-     - 由於此模式下不允許padding，所有bitfield會緊密排列，總長度必須等於結構體總大小。
-     - 若bitfield總和不等於結構體大小，需提示使用者修正。
+  3. **自動顯示 offset**
+     - 依照所有 member 的 byte/bit size，自動計算並顯示每個 member 的 byte offset / bit offset。
+     - offset 計算規則：
+       - 先累加 byte offset，若 bit size 累積超過 8，則進位到下一個 byte offset。
+
+  4. **記憶體緊密排列**
+     - 不允許 padding，所有 member 會緊密排列，總長度必須等於結構體總大小（byte+bit 換算成 bit 後比對）。
+     - 若總和不等於結構體大小，需提示使用者修正。
 
 #### 2.3 載入.H檔（現有功能保留）
 - 保持現有從外部載入C語言.H檔案的機制不變。

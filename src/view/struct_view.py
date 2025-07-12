@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, messagebox, scrolledtext
 # from config import get_string
+from model.struct_model import StructModel
 
 class StructView(tk.Tk):
     def __init__(self, presenter=None):
@@ -96,21 +97,21 @@ class StructView(tk.Tk):
         self.struct_name_var = tk.StringVar(value="MyStruct")
         tk.Entry(name_frame, textvariable=self.struct_name_var, width=20).pack(side=tk.LEFT)
 
-        # 結構體大小
+        # 結構體大小（byte）
         size_frame = tk.Frame(parent)
         size_frame.pack(anchor="w", pady=5)
-        tk.Label(size_frame, text="結構體總大小 (bits):").pack(side=tk.LEFT)
+        tk.Label(size_frame, text="結構體總大小 (bytes):").pack(side=tk.LEFT)
         self.size_var = tk.IntVar(value=0)
         tk.Entry(size_frame, textvariable=self.size_var, width=10).pack(side=tk.LEFT)
 
-        # Bitfield表格
-        self.bitfields = []
-        self.bitfield_frame = tk.Frame(parent)
-        self.bitfield_frame.pack(fill="x", pady=5)
-        self._render_bitfield_table()
+        # Member表格
+        self.members = []
+        self.member_frame = tk.Frame(parent)
+        self.member_frame.pack(fill="x", pady=5)
+        self._render_member_table()
 
-        # 新增Bitfield按鈕
-        tk.Button(parent, text="新增Bitfield", command=self._add_bitfield).pack(anchor="w", pady=2)
+        # 新增Member按鈕
+        tk.Button(parent, text="新增Member", command=self._add_member).pack(anchor="w", pady=2)
 
         # 驗證提示
         self.validation_label = tk.Label(parent, text="", fg="red")
@@ -122,86 +123,123 @@ class StructView(tk.Tk):
         tk.Button(btn_frame, text="匯出為.H檔", command=self.on_export_manual_struct).pack(side=tk.LEFT, padx=2)
         tk.Button(btn_frame, text="重設", command=self._reset_manual_struct).pack(side=tk.LEFT, padx=2)
 
-    def _render_bitfield_table(self):
+    def _render_member_table(self):
         # 清空現有表格
-        for widget in self.bitfield_frame.winfo_children():
+        for widget in self.member_frame.winfo_children():
             widget.destroy()
         # 標題
-        tk.Label(self.bitfield_frame, text="#").grid(row=0, column=0)
-        tk.Label(self.bitfield_frame, text="成員名稱").grid(row=0, column=1)
-        tk.Label(self.bitfield_frame, text="長度(bit)").grid(row=0, column=2)
-        tk.Label(self.bitfield_frame, text="操作").grid(row=0, column=3)
-        # 每一列
-        for idx, bf in enumerate(self.bitfields):
-            tk.Label(self.bitfield_frame, text=str(idx+1)).grid(row=idx+1, column=0)
-            name_var = tk.StringVar(value=bf.get("name", ""))
-            length_var = tk.IntVar(value=bf.get("length", 1))
-            tk.Entry(self.bitfield_frame, textvariable=name_var, width=10).grid(row=idx+1, column=1)
-            tk.Entry(self.bitfield_frame, textvariable=length_var, width=6).grid(row=idx+1, column=2)
-            op_frame = tk.Frame(self.bitfield_frame)
-            op_frame.grid(row=idx+1, column=3)
-            tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_bitfield(i)).pack(side=tk.LEFT)
-            tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_bitfield_up(i)).pack(side=tk.LEFT)
-            tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_bitfield_down(i)).pack(side=tk.LEFT)
-            tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_bitfield(i)).pack(side=tk.LEFT)
-            # 綁定變更
-            name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_bitfield_name(i, v))
-            length_var.trace_add("write", lambda *_, i=idx, v=length_var: self._update_bitfield_length(i, v))
-            bf["name_var"] = name_var
-            bf["length_var"] = length_var
-
-    def _add_bitfield(self):
-        self.bitfields.append({"name": "", "length": 1})
-        self._render_bitfield_table()
-        self._on_manual_struct_change()
-
-    def _delete_bitfield(self, idx):
-        del self.bitfields[idx]
-        self._render_bitfield_table()
-        self._on_manual_struct_change()
-
-    def _update_bitfield_name(self, idx, var):
-        self.bitfields[idx]["name"] = var.get()
-        self._on_manual_struct_change()
-
-    def _update_bitfield_length(self, idx, var):
+        tk.Label(self.member_frame, text="#").grid(row=0, column=0)
+        tk.Label(self.member_frame, text="成員名稱").grid(row=0, column=1)
+        tk.Label(self.member_frame, text="byte size").grid(row=0, column=2)
+        tk.Label(self.member_frame, text="bit size").grid(row=0, column=3)
+        tk.Label(self.member_frame, text="byte offset").grid(row=0, column=4)
+        tk.Label(self.member_frame, text="bit offset").grid(row=0, column=5)
+        tk.Label(self.member_frame, text="操作").grid(row=0, column=6)
+        # 用 model 計算 layout
+        model = StructModel()
         try:
-            self.bitfields[idx]["length"] = int(var.get())
-        except ValueError:
-            self.bitfields[idx]["length"] = 0
+            layout = model.calculate_manual_layout(
+                [
+                    {"name": m.get("name", ""), "byte_size": m.get("byte_size", 0), "bit_size": m.get("bit_size", 0)}
+                    for m in self.members
+                ],
+                self.size_var.get()
+            )
+        except Exception:
+            layout = []
+        # 依 member 對應 layout 多 row 合併 offset 顯示
+        for idx, m in enumerate(self.members):
+            tk.Label(self.member_frame, text=str(idx+1)).grid(row=idx+1, column=0)
+            name_var = tk.StringVar(value=m.get("name", ""))
+            byte_var = tk.IntVar(value=m.get("byte_size", 0))
+            bit_var = tk.IntVar(value=m.get("bit_size", 0))
+            tk.Entry(self.member_frame, textvariable=name_var, width=10).grid(row=idx+1, column=1)
+            tk.Entry(self.member_frame, textvariable=byte_var, width=6).grid(row=idx+1, column=2)
+            tk.Entry(self.member_frame, textvariable=bit_var, width=6).grid(row=idx+1, column=3)
+            # offset 顯示（合併同名 layout row）
+            layout_rows = [item for item in layout if item["name"] == m.get("name", "")]
+            if layout_rows:
+                offsets = ",".join(str(item["offset"]) for item in layout_rows)
+                bit_offsets = ",".join(str(item["bit_offset"]) for item in layout_rows)
+                tk.Label(self.member_frame, text=offsets).grid(row=idx+1, column=4)
+                tk.Label(self.member_frame, text=bit_offsets).grid(row=idx+1, column=5)
+            else:
+                tk.Label(self.member_frame, text="-").grid(row=idx+1, column=4)
+                tk.Label(self.member_frame, text="-").grid(row=idx+1, column=5)
+            op_frame = tk.Frame(self.member_frame)
+            op_frame.grid(row=idx+1, column=6)
+            tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i)).pack(side=tk.LEFT)
+            tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i)).pack(side=tk.LEFT)
+            tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i)).pack(side=tk.LEFT)
+            tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i)).pack(side=tk.LEFT)
+            # 綁定變更
+            name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
+            byte_var.trace_add("write", lambda *_, i=idx, v=byte_var: self._update_member_byte(i, v))
+            bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
+            m["name_var"] = name_var
+            m["byte_var"] = byte_var
+            m["bit_var"] = bit_var
+
+    def _add_member(self):
+        self.members.append({"name": "", "byte_size": 0, "bit_size": 0})
+        self._render_member_table()
         self._on_manual_struct_change()
 
-    def _move_bitfield_up(self, idx):
+    def _delete_member(self, idx):
+        del self.members[idx]
+        self._render_member_table()
+        self._on_manual_struct_change()
+
+    def _update_member_name(self, idx, var):
+        self.members[idx]["name"] = var.get()
+        self._on_manual_struct_change()
+
+    def _update_member_byte(self, idx, var):
+        try:
+            value = var.get()
+            self.members[idx]["byte_size"] = int(value) if str(value).strip() else 0
+        except Exception:
+            self.members[idx]["byte_size"] = 0
+        self._on_manual_struct_change()
+
+    def _update_member_bit(self, idx, var):
+        try:
+            value = var.get()
+            self.members[idx]["bit_size"] = int(value) if str(value).strip() else 0
+        except Exception:
+            self.members[idx]["bit_size"] = 0
+        self._on_manual_struct_change()
+
+    def _move_member_up(self, idx):
         if idx > 0:
-            self.bitfields[idx-1], self.bitfields[idx] = self.bitfields[idx], self.bitfields[idx-1]
-            self._render_bitfield_table()
+            self.members[idx-1], self.members[idx] = self.members[idx], self.members[idx-1]
+            self._render_member_table()
             self._on_manual_struct_change()
 
-    def _move_bitfield_down(self, idx):
-        if idx < len(self.bitfields) - 1:
-            self.bitfields[idx+1], self.bitfields[idx] = self.bitfields[idx], self.bitfields[idx+1]
-            self._render_bitfield_table()
+    def _move_member_down(self, idx):
+        if idx < len(self.members) - 1:
+            self.members[idx+1], self.members[idx] = self.members[idx], self.members[idx+1]
+            self._render_member_table()
             self._on_manual_struct_change()
 
-    def _copy_bitfield(self, idx):
-        orig = self.bitfields[idx]
+    def _copy_member(self, idx):
+        orig = self.members[idx]
         base_name = orig["name"]
-        # 自動命名：a_copy, a_copy2, a_copy3...
         new_name = base_name + "_copy"
-        existing_names = {bf["name"] for bf in self.bitfields}
+        existing_names = {m["name"] for m in self.members}
         count = 2
         while new_name in existing_names:
             new_name = f"{base_name}_copy{count}"
             count += 1
-        new_bf = {"name": new_name, "length": orig["length"]}
-        self.bitfields.insert(idx+1, new_bf)
-        self._render_bitfield_table()
+        new_m = {"name": new_name, "byte_size": orig["byte_size"], "bit_size": orig["bit_size"]}
+        self.members.insert(idx+1, new_m)
+        self._render_member_table()
         self._on_manual_struct_change()
 
     def _reset_manual_struct(self):
         self.size_var.set(0)
-        self.bitfields.clear()
-        self._render_bitfield_table()
+        self.members.clear()
+        self._render_member_table()
         self.validation_label.config(text="")
 
     def _on_manual_struct_change(self):
@@ -213,7 +251,10 @@ class StructView(tk.Tk):
         return {
             "struct_name": self.struct_name_var.get(),
             "total_size": self.size_var.get(),
-            "members": [{"name": bf["name"], "length": bf["length"]} for bf in self.bitfields]
+            "members": [
+                {"name": m["name"], "byte_size": m["byte_size"], "bit_size": m["bit_size"]}
+                for m in self.members
+            ]
         }
 
     def show_manual_struct_validation(self, errors):
@@ -224,6 +265,10 @@ class StructView(tk.Tk):
 
     def on_export_manual_struct(self):
         if self.presenter:
+            # 匯出前先同步 model 的 manual_struct
+            struct_data = self.get_manual_struct_definition()
+            if hasattr(self.presenter, "model") and self.presenter.model:
+                self.presenter.model.set_manual_struct(struct_data["members"], struct_data["total_size"])
             self.presenter.on_export_manual_struct()
 
     def show_exported_struct(self, h_content):
