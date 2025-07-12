@@ -157,3 +157,24 @@
 - `tests/test_struct_model.py`：新增/擴充 bit field 解析、layout、hex 解析單元測試。
 
 --- 
+
+## 2024/07/07 View/GUI 層 bit field 支援現況與待辦
+
+### 現況分析
+- 目前 `src/view/struct_view.py` 的 `show_parsed_values`、`show_struct_member_debug` 僅以通用欄位格式顯示 struct 解析結果，未針對 bit field 欄位做特殊顯示。
+- GUI 解析結果區（Parsed Values）與 Debug 區，僅顯示欄位名稱、值、hex，無法辨識哪些欄位為 bit field，也未顯示 bit offset/bit size 等資訊。
+- struct layout 顯示（show_struct_layout）同樣未顯示 bit 欄位的 bit offset/bit size/is_bitfield 屬性。
+- 目前 GUI 輸入區（hex grid）僅支援以 byte 為單位的欄位，無法針對 bit 欄位提供更細緻的輸入框或提示。
+
+### 待辦與建議修改
+- [ ] **struct layout 顯示**：於 struct layout 區塊，若欄位為 bit field，應額外顯示 `bit_offset`、`bit_size`、`is_bitfield`。
+- [ ] **解析結果顯示**：於解析結果區，bit 欄位應有明顯標示（如加註 [bitfield]、顯示 bit offset/size），以利辨識。
+- [ ] **Debug 區**：struct member debug info 應顯示 bit 欄位的 storage unit、bit offset、bit size。
+- [ ] **GUI 輸入區**：未來可考慮針對 bit 欄位提供更細緻的輸入驗證或提示（目前僅支援 byte 為單位）。
+- [ ] **View 文件**：`src/view/README.md` 應補充 bit field 顯示支援現況與設計。
+
+### 目前尚未支援/需修改的檔案
+- `src/view/struct_view.py`（顯示/標示 bit 欄位資訊）
+- `src/view/README.md`（文件補充）
+
+--- 
