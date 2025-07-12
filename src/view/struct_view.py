@@ -278,6 +278,8 @@ class StructView(tk.Tk):
         if self.presenter:
             # 匯出前先同步 model 的 manual_struct
             struct_data = self.get_manual_struct_definition()
+            # 先調用 on_manual_struct_change 來設定 last_struct_data
+            self.presenter.on_manual_struct_change(struct_data)
             if hasattr(self.presenter, "model") and self.presenter.model:
                 self.presenter.model.set_manual_struct(struct_data["members"], struct_data["total_size"])
             self.presenter.on_export_manual_struct()

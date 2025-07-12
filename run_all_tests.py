@@ -2,15 +2,23 @@ import subprocess
 import sys
 import os
 import unittest
+import shutil
 
 # 強制使用 .venv/bin/python
 VENV_PYTHON = os.path.join(os.path.dirname(__file__), '.venv', 'bin', 'python')
 
 
-def run_pytest(args, desc):
+def run_pytest(args, desc, use_xvfb=False):
     print(f"\n==== {desc} ====")
+    cmd = [VENV_PYTHON, "-m", "pytest"] + args
+    if use_xvfb:
+        if shutil.which("xvfb-run") is None:
+            print("[警告] headless 環境下未偵測到 xvfb-run，請安裝 Xvfb (Linux: sudo apt install xvfb, macOS: brew install xquartz)")
+            print("將直接執行 pytest，可能會 skip GUI 測試...")
+        else:
+            cmd = ["xvfb-run", "-a"] + cmd
     result = subprocess.run(
-        [VENV_PYTHON, "-m", "pytest"] + args,
+        cmd,
         check=False,
         capture_output=True,
         text=True
@@ -61,7 +69,9 @@ def main():
 
     # Step 2: 執行 GUI 測試
     gui_args = ["tests/test_struct_view.py"]
-    gui_result = run_pytest(gui_args, "Step 2: 執行 GUI 測試")
+    # 若無 DISPLAY，則用 xvfb-run 包裝
+    use_xvfb = not os.environ.get("DISPLAY")
+    gui_result = run_pytest(gui_args, "Step 2: 執行 GUI 測試", use_xvfb=use_xvfb)
 
     print("\n==== 測試結果彙總 ====")
     if non_gui_result == 0 and gui_result == 0:
