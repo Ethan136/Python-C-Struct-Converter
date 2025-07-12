@@ -1,5 +1,6 @@
 import re
 from tkinter import filedialog
+from utils import string_parser
 
 class StructPresenter:
     def __init__(self, model, view=None):
@@ -8,7 +9,7 @@ class StructPresenter:
 
     def browse_file(self):
         file_path = filedialog.askopenfilename(
-            title="Select a C++ header file",
+            title=string_parser.get_string("dialog_select_file"),
             filetypes=(("Header files", "*.h"), ("All files", "*.*" ))
         )
         if not file_path:
@@ -26,7 +27,7 @@ class StructPresenter:
             self.view.rebuild_hex_grid(total_size, unit_size)
 
         except Exception as e:
-            self.view.show_error("File Error", f"An error occurred: {e}")
+            self.view.show_error(string_parser.get_string("dialog_file_error"), f"An error occurred: {e}")
             self.view.disable_parse_button()
             self.view.clear_results()
             self.view.rebuild_hex_grid(0, 1) # Clear hex grid
@@ -44,7 +45,8 @@ class StructPresenter:
 
     def parse_hex_data(self):
         if not self.model.layout:
-            self.view.show_warning("No Struct", "Please load a struct definition file first.")
+            self.view.show_warning(string_parser.get_string("dialog_no_struct"),
+                                   "Please load a struct definition file first.")
             return
 
         hex_parts_with_expected_len = self.view.get_hex_input_parts()
@@ -57,7 +59,8 @@ class StructPresenter:
         for raw_part, expected_chars_in_box in hex_parts_with_expected_len:
             # Validate input is hex
             if not re.match(r"^[0-9a-fA-F]*$", raw_part):
-                self.view.show_error("Invalid Input", f"Input \'{raw_part}\' contains non-hexadecimal characters.")
+                self.view.show_error(string_parser.get_string("dialog_invalid_input"),
+                                   f"Input \'{raw_part}\' contains non-hexadecimal characters.")
                 return
             
             # Convert raw_part to integer value
@@ -65,7 +68,8 @@ class StructPresenter:
                 # Handle empty string as 0
                 int_value = int(raw_part, 16) if raw_part else 0
             except ValueError:
-                self.view.show_error("Invalid Input", f"Could not convert \'{raw_part}\' to a number.")
+                self.view.show_error(string_parser.get_string("dialog_invalid_input"),
+                                   f"Could not convert \'{raw_part}\' to a number.")
                 return
 
             # Determine the byte size of the current input chunk (e.g., 1, 4, or 8 bytes)
@@ -77,16 +81,19 @@ class StructPresenter:
                 # Max value for N bytes is (2**(N*8)) - 1
                 max_val = (2**(chunk_byte_size * 8)) - 1
                 if int_value > max_val:
-                    self.view.show_error("Value Too Large", f"Value 0x{raw_part} is too large for a {chunk_byte_size}-byte field.")
+                    self.view.show_error(string_parser.get_string("dialog_value_too_large"),
+                                       f"Value 0x{raw_part} is too large for a {chunk_byte_size}-byte field.")
                     return
 
                 bytes_for_chunk = int_value.to_bytes(chunk_byte_size, byteorder=byte_order_for_conversion)
                 final_memory_hex_parts.append(bytes_for_chunk.hex())
             except OverflowError:
-                self.view.show_error("Overflow Error", f"Value 0x{raw_part} is too large for a {chunk_byte_size}-byte field.")
+                self.view.show_error(string_parser.get_string("dialog_overflow_error"),
+                                   f"Value 0x{raw_part} is too large for a {chunk_byte_size}-byte field.")
                 return
             except Exception as e:
-                self.view.show_error("Conversion Error", f"Error converting value 0x{raw_part} to bytes: {e}")
+                self.view.show_error(string_parser.get_string("dialog_conversion_error"),
+                                   f"Error converting value 0x{raw_part} to bytes: {e}")
                 return
 
         # Join all converted hex parts to form the complete hex_data string representing raw memory
@@ -99,7 +106,8 @@ class StructPresenter:
         # The model will handle padding if hex_data is shorter than total_size * 2
         # We only check if it's too long here
         if len(hex_data) > self.model.total_size * 2:
-            self.view.show_error("Invalid Length", f"Input data ({len(hex_data)} chars) is longer than the expected total size ({self.model.total_size * 2} chars).")
+            self.view.show_error(string_parser.get_string("dialog_invalid_length"),
+                               f"Input data ({len(hex_data)} chars) is longer than the expected total size ({self.model.total_size * 2} chars).")
             return
 
         try:
@@ -107,4 +115,5 @@ class StructPresenter:
             parsed_values = self.model.parse_hex_data(hex_data, byte_order_for_conversion)
             self.view.show_parsed_values(parsed_values, byte_order_str)
         except Exception as e:
-            self.view.show_error("Parsing Error", f"An error occurred during parsing: {e}")
+            self.view.show_error(string_parser.get_string("dialog_parsing_error"),
+                               f"An error occurred during parsing: {e}")
