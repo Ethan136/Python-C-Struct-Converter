@@ -15,5 +15,11 @@
   - 由 Presenter 控制，僅負責顯示與事件委派。
   - 透過 get_string 取得國際化字串。
 
+## GUI 顯示行為（2024/07 更新）
+
+- 手動 struct 設定頁面（tab）**只顯示下方標準 struct layout（ttk.Treeview）**，即時顯示所有成員、padding、offset，完全對齊 C++ 標準。
+- 原本的自訂 memory layout 表格已移除。
+- 此行為已通過自動化測試驗證（見 tests/test_struct_view_padding.py）。
+
 ## 相關設計文檔
 - [MVP 架構說明](../../docs/architecture/MVP_ARCHITECTURE_COMPLETE.md) 

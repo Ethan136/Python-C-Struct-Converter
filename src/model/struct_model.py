@@ -354,7 +354,7 @@ class StructModel:
         if not errors:
             layout = self.calculate_manual_layout(members, total_size)
             # 取得 layout 計算出來的 struct 大小
-            from model.struct_model import calculate_layout
+            from src.model.struct_model import calculate_layout
             expanded_members = self._convert_to_cpp_members(members)
             _, layout_size, _ = calculate_layout(expanded_members)
             if layout_size > total_size:

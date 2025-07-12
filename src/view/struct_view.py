@@ -108,7 +108,6 @@ class StructView(tk.Tk):
         self.members = []
         self.member_frame = tk.Frame(parent)
         self.member_frame.pack(fill="x", pady=5)
-        self._render_member_table()
 
         # 新增Member按鈕
         tk.Button(parent, text="新增Member", command=self._add_member).pack(anchor="w", pady=2)
@@ -123,19 +122,64 @@ class StructView(tk.Tk):
         tk.Button(btn_frame, text="匯出為.H檔", command=self.on_export_manual_struct).pack(side=tk.LEFT, padx=2)
         tk.Button(btn_frame, text="重設", command=self._reset_manual_struct).pack(side=tk.LEFT, padx=2)
 
+        # 標準 struct layout Treeview（與 H 檔 tab 一致）
+        layout_frame = tk.LabelFrame(parent, text="Struct Layout (標準顯示)")
+        layout_frame.pack(fill="both", expand=True, padx=2, pady=2)
+        layout_scrollbar = ttk.Scrollbar(layout_frame, orient="vertical")
+        self.manual_layout_tree = ttk.Treeview(layout_frame, columns=("name", "type", "offset", "size", "bit_offset", "bit_size", "is_bitfield"), show="headings", height=10, yscrollcommand=layout_scrollbar.set)
+        self.manual_layout_tree.heading("name", text="欄位名稱")
+        self.manual_layout_tree.heading("type", text="型別")
+        self.manual_layout_tree.heading("offset", text="Offset")
+        self.manual_layout_tree.heading("size", text="Size")
+        self.manual_layout_tree.heading("bit_offset", text="bit_offset")
+        self.manual_layout_tree.heading("bit_size", text="bit_size")
+        self.manual_layout_tree.heading("is_bitfield", text="is_bitfield")
+        self.manual_layout_tree.pack(side="left", fill="both", expand=True)
+        layout_scrollbar.config(command=self.manual_layout_tree.yview)
+        layout_scrollbar.pack(side="right", fill="y")
+
+        # 最後再呼叫 render member table
+        self._render_member_table()
+
     def _render_member_table(self):
         # 清空現有表格
         for widget in self.member_frame.winfo_children():
             widget.destroy()
-        # 標題
-        tk.Label(self.member_frame, text="#").grid(row=0, column=0)
-        tk.Label(self.member_frame, text="成員名稱").grid(row=0, column=1)
-        tk.Label(self.member_frame, text="byte size").grid(row=0, column=2)
-        tk.Label(self.member_frame, text="bit size").grid(row=0, column=3)
-        tk.Label(self.member_frame, text="byte offset").grid(row=0, column=4)
-        tk.Label(self.member_frame, text="bit offset").grid(row=0, column=5)
-        tk.Label(self.member_frame, text="操作").grid(row=0, column=6)
-        # 用 model 計算 layout
+        # Member 編輯表格
+        if self.members:
+            tk.Label(self.member_frame, text="#", font=("Arial", 9, "bold")).grid(row=0, column=0, padx=2, pady=2)
+            tk.Label(self.member_frame, text="成員名稱", font=("Arial", 9, "bold")).grid(row=0, column=1, padx=2, pady=2)
+            tk.Label(self.member_frame, text="byte size", font=("Arial", 9, "bold")).grid(row=0, column=2, padx=2, pady=2)
+            tk.Label(self.member_frame, text="bit size", font=("Arial", 9, "bold")).grid(row=0, column=3, padx=2, pady=2)
+            tk.Label(self.member_frame, text="操作", font=("Arial", 9, "bold")).grid(row=0, column=4, padx=2, pady=2)
+            for idx, m in enumerate(self.members):
+                row = idx + 1
+                tk.Label(self.member_frame, text=str(idx+1)).grid(row=row, column=0, padx=2, pady=1)
+                name_var = tk.StringVar(value=m.get("name", ""))
+                byte_var = tk.IntVar(value=m.get("byte_size", 0))
+                bit_var = tk.IntVar(value=m.get("bit_size", 0))
+                tk.Entry(self.member_frame, textvariable=name_var, width=10).grid(row=row, column=1, padx=2, pady=1)
+                tk.Entry(self.member_frame, textvariable=byte_var, width=6).grid(row=row, column=2, padx=2, pady=1)
+                tk.Entry(self.member_frame, textvariable=bit_var, width=6).grid(row=row, column=3, padx=2, pady=1)
+                op_frame = tk.Frame(self.member_frame)
+                op_frame.grid(row=row, column=4, padx=2, pady=1)
+                tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i), width=4).pack(side=tk.LEFT, padx=1)
+                tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i), width=4).pack(side=tk.LEFT, padx=1)
+                tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i), width=4).pack(side=tk.LEFT, padx=1)
+                tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4).pack(side=tk.LEFT, padx=1)
+                name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
+                byte_var.trace_add("write", lambda *_, i=idx, v=byte_var: self._update_member_byte(i, v))
+                bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
+                m["name_var"] = name_var
+                m["byte_var"] = byte_var
+                m["bit_var"] = bit_var
+        else:
+            tk.Label(self.member_frame, text="無成員資料", fg="gray").grid(row=0, column=0, columnspan=5, pady=10)
+        # 更新下方標準 struct layout treeview
+        self._update_manual_layout_tree()
+
+    def _update_manual_layout_tree(self):
+        # 計算 layout
         model = StructModel()
         try:
             layout = model.calculate_manual_layout(
@@ -147,41 +191,31 @@ class StructView(tk.Tk):
             )
         except Exception:
             layout = []
-        # 依 member 對應 layout 多 row 合併 offset 顯示
-        for idx, m in enumerate(self.members):
-            tk.Label(self.member_frame, text=str(idx+1)).grid(row=idx+1, column=0)
-            name_var = tk.StringVar(value=m.get("name", ""))
-            byte_var = tk.IntVar(value=m.get("byte_size", 0))
-            bit_var = tk.IntVar(value=m.get("bit_size", 0))
-            tk.Entry(self.member_frame, textvariable=name_var, width=10).grid(row=idx+1, column=1)
-            tk.Entry(self.member_frame, textvariable=byte_var, width=6).grid(row=idx+1, column=2)
-            tk.Entry(self.member_frame, textvariable=bit_var, width=6).grid(row=idx+1, column=3)
-            # offset 顯示（合併同名 layout row）
-            layout_rows = [item for item in layout if item["name"] == m.get("name", "")]
-            if layout_rows:
-                offsets = ",".join(
-                    f"{item['offset']}+{item['bit_offset']}" if item['bit_offset'] else f"{item['offset']}"
-                    for item in layout_rows
-                )
-                bit_offsets = ",".join(str(item["bit_offset"]) for item in layout_rows)
-                tk.Label(self.member_frame, text=offsets).grid(row=idx+1, column=4)
-                tk.Label(self.member_frame, text=bit_offsets).grid(row=idx+1, column=5)
-            else:
-                tk.Label(self.member_frame, text="-").grid(row=idx+1, column=4)
-                tk.Label(self.member_frame, text="-").grid(row=idx+1, column=5)
-            op_frame = tk.Frame(self.member_frame)
-            op_frame.grid(row=idx+1, column=6)
-            tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i)).pack(side=tk.LEFT)
-            tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i)).pack(side=tk.LEFT)
-            tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i)).pack(side=tk.LEFT)
-            tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i)).pack(side=tk.LEFT)
-            # 綁定變更
-            name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
-            byte_var.trace_add("write", lambda *_, i=idx, v=byte_var: self._update_member_byte(i, v))
-            bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
-            m["name_var"] = name_var
-            m["byte_var"] = byte_var
-            m["bit_var"] = bit_var
+        # 清空 treeview
+        for i in self.manual_layout_tree.get_children():
+            self.manual_layout_tree.delete(i)
+        # 插入新資料
+        for item in layout:
+            bit_offset = item.get("bit_offset")
+            bit_size = item.get("bit_size")
+            bit_offset_str = str(bit_offset) if bit_offset is not None else "-"
+            bit_size_str = str(bit_size) if bit_size is not None else "-"
+            self.manual_layout_tree.insert("", "end", values=(
+                item.get("name", ""),
+                item.get("type", ""),
+                item.get("offset", ""),
+                item.get("size", ""),
+                bit_offset_str,
+                bit_size_str,
+                str(item.get("is_bitfield", False))
+            ))
+    
+    def _on_manual_struct_change(self):
+        struct_data = self.get_manual_struct_definition()
+        if self.presenter:
+            self.presenter.on_manual_struct_change(struct_data)
+        # 變更時即時更新下方標準 struct layout treeview
+        self._update_manual_layout_tree()
 
     def _add_member(self):
         self.members.append({"name": "", "byte_size": 0, "bit_size": 0})
@@ -244,11 +278,6 @@ class StructView(tk.Tk):
         self.members.clear()
         self._render_member_table()
         self.validation_label.config(text="")
-
-    def _on_manual_struct_change(self):
-        struct_data = self.get_manual_struct_definition()
-        if self.presenter:
-            self.presenter.on_manual_struct_change(struct_data)
 
     def get_manual_struct_definition(self):
         return {

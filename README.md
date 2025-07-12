@@ -193,6 +193,7 @@ python3 run.py
    - The interface will show real-time remaining space and validation.
    - **All members will be automatically aligned and padded according to C++ standard struct alignment rules.**
    - The layout and final struct size will match what a C++ compiler would produce for the same member types and order.
+   - **The manual struct page now only displays the standard struct layout (ttk.Treeview) at the bottom, showing each member and all inserted paddings/offsets in real time. The previous custom memory layout table has been removed. This behavior is fully verified by automated tests.**
 
 4. **Export to Header**:
    - Export the manually defined struct to a C header file with proper bitfield syntax.

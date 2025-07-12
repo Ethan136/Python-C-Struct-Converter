@@ -194,6 +194,12 @@ def calculate_manual_layout(self, members, total_size):
 - **Bitfield Syntax**: Proper bitfield syntax for bit-sized members
 - **Type Compatibility**: Ensures exported code compiles correctly
 
+## GUI Display Behavior (2024/07 Update)
+
+- The manual struct definition page **only displays the standard struct layout (ttk.Treeview) at the bottom**, showing all members, paddings, and offsets in real time, fully matching C++ standards.
+- The previous custom memory layout table has been removed.
+- This behavior is fully verified by automated tests (see tests/test_struct_view_padding.py).
+
 ## Testing
 
 ### Alignment Tests
