@@ -256,3 +256,15 @@ To add new tests:
 ## Continuous Integration
 
 These tests are designed to be run in CI/CD pipelines. The test runner (`run_tests.py`) provides a simple interface for automated testing environments. 
+
+# 測試說明
+
+本測試套件涵蓋：
+- struct 解析、記憶體佈局、bitfield、padding、pointer、混合欄位
+- hex 資料解析（含 endianness、padding、bitfield、pointer、bool、short input 等）
+- input field processor 的所有功能（pad_hex_input, process_input_field, convert_to_raw_bytes, is_supported_field_size），含正常與異常情境
+- config/ui_strings.py 的 get_string，驗證 key 存在與不存在時的行為
+- GUI 與 Presenter wiring、錯誤處理、UI 狀態
+- 測試資料與範例 struct 覆蓋多種結構
+
+所有 public API 均有單元測試，並涵蓋異常/邊界情境。 

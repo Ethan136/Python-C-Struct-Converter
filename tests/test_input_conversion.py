@@ -2,6 +2,8 @@ import unittest
 import tempfile
 import os
 import sys
+import pytest
+from model.input_field_processor import InputFieldProcessor
 
 # Add src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -417,6 +419,42 @@ struct TestStruct {
                         int_value_le, bytes_result_le, hex_result_le = self.convert_input_to_bytes(input_val, config.unit_size, 'little')
                         self.assertEqual(hex_result_le, expected_result['little_endian'],
                                         f"Little endian failed for {config_name}[{i}]: expected {expected_result['little_endian']}, got {hex_result_le}")
+
+def test_convert_to_raw_bytes_valid():
+    processor = InputFieldProcessor()
+    # big endian
+    assert processor.convert_to_raw_bytes("00000012", 4, 'big') == b'\x00\x00\x00\x12'
+    # little endian
+    assert processor.convert_to_raw_bytes("00000012", 4, 'little') == b'\x12\x00\x00\x00'
+
+def test_convert_to_raw_bytes_invalid_endianness():
+    processor = InputFieldProcessor()
+    with pytest.raises(ValueError):
+        processor.convert_to_raw_bytes("00000012", 4, 'middle')
+
+def test_convert_to_raw_bytes_invalid_hex():
+    processor = InputFieldProcessor()
+    with pytest.raises(ValueError):
+        processor.convert_to_raw_bytes("zzzzzzzz", 4, 'big')
+
+def test_convert_to_raw_bytes_length_mismatch():
+    processor = InputFieldProcessor()
+    # 7 bytes = 14 hex digits, 15 hex digits為長度錯誤
+    with pytest.raises(ValueError):
+        processor.convert_to_raw_bytes("100000000000000", 7, 'big')
+
+def test_convert_to_raw_bytes_max_value():
+    processor = InputFieldProcessor()
+    # 7 bytes = 14 hex digits, 最大值 0xfffffffffffffff，不會 overflow
+    processor.convert_to_raw_bytes("ffffffffffffff", 7, 'big')  # 不應該丟出異常
+
+def test_is_supported_field_size():
+    processor = InputFieldProcessor()
+    assert processor.is_supported_field_size(1)
+    assert processor.is_supported_field_size(4)
+    assert processor.is_supported_field_size(8)
+    assert not processor.is_supported_field_size(2)
+    assert not processor.is_supported_field_size(16)
 
 if __name__ == '__main__':
     unittest.main() 
