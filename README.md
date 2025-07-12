@@ -149,32 +149,9 @@ An `example.h` file is included in the project root to demonstrate the functiona
 
 ## Development
 
-### Running Tests
-```bash
-# Run all tests
-python3 -m unittest discover tests -v
+For all test-related documentation, including how to run, extend, and automate tests (including XML array input), please see:
 
-# Run specific test module
-python3 -m unittest tests.test_input_conversion -v
-python3 -m unittest tests.test_string_parser -v
-
-# Use the test runner
-python3 run_tests.py
-python3 run_tests.py --test test_input_conversion
-
-# Run from tests directory
-cd tests
-python3 -m unittest test_input_conversion -v
-```
-
-### Test Coverage
-The test suite covers:
-- ✅ Input conversion mechanism (field expansion, endianness, validation)
-- ✅ String parser functionality
-- ✅ Model integration
-- ✅ Error handling and edge cases
-
-For detailed test information, see [tests/README.md](tests/README.md).
+👉 [tests/README.md](tests/README.md)
 
 ### Code Quality
 ```bash

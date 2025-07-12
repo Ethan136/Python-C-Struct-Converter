@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test_configs>
+    <!-- Test configuration for 4-byte fields -->
+    <test_config name="4byte_test" unit_size="4" description="Test 4-byte field expansion">
+        <input_values>
+            <array>123,234,456,567,11</array>
+        </input_values>
+        <expected_results>
+            <result index="0" big_endian="00000123" little_endian="23010000">123</result>
+            <result index="1" big_endian="00000234" little_endian="34020000">234</result>
+            <result index="2" big_endian="00000456" little_endian="56040000">456</result>
+            <result index="3" big_endian="00000567" little_endian="67050000">567</result>
+            <result index="4" big_endian="00000011" little_endian="11000000">11</result>
+        </expected_results>
+    </test_config>
+
+    <!-- Test configuration for 8-byte fields -->
+    <test_config name="8byte_test" unit_size="8" description="Test 8-byte field expansion">
+        <input_values>
+            <value index="0">123</value>
+            <value index="1">123456789</value>
+            <value index="2">ABCDEF01</value>
+        </input_values>
+        <expected_results>
+            <result index="0" big_endian="0000000000000123" little_endian="2301000000000000">123</result>
+            <result index="1" big_endian="0000000123456789" little_endian="8967452301000000">123456789</result>
+            <result index="2" big_endian="00000000abcdef01" little_endian="01efcdab00000000">ABCDEF01</result>
+        </expected_results>
+    </test_config>
+
+    <!-- Test configuration for 1-byte fields -->
+    <test_config name="1byte_test" unit_size="1" description="Test 1-byte field expansion">
+        <input_values>
+            <value index="0">1</value>
+            <value index="1">FF</value>
+            <value index="2">A</value>
+            <value index="3">0</value>
+        </input_values>
+        <expected_results>
+            <result index="0" big_endian="01" little_endian="01">1</result>
+            <result index="1" big_endian="ff" little_endian="ff">FF</result>
+            <result index="2" big_endian="0a" little_endian="0a">A</result>
+            <result index="3" big_endian="00" little_endian="00">0</result>
+        </expected_results>
+    </test_config>
+
+    <!-- Test configuration for mixed scenarios -->
+    <test_config name="mixed_test" unit_size="4" description="Test mixed input scenarios">
+        <input_values>
+            <value index="0">12</value>
+            <value index="1"></value>
+            <value index="2">ABCDEF01</value>
+            <value index="3">123</value>
+        </input_values>
+        <expected_results>
+            <result index="0" big_endian="00000012" little_endian="12000000">12</result>
+            <result index="1" big_endian="00000000" little_endian="00000000">empty</result>
+            <result index="2" big_endian="abcdef01" little_endian="01efcdab">ABCDEF01</result>
+            <result index="3" big_endian="00000123" little_endian="23010000">123</result>
+        </expected_results>
+    </test_config>
+
+    <!-- Test configuration for edge cases -->
+    <test_config name="edge_cases_test" unit_size="4" description="Test edge cases">
+        <input_values>
+            <value index="0">0</value>
+            <value index="1">FFFFFFFF</value>
+            <value index="2">1</value>
+        </input_values>
+        <expected_results>
+            <result index="0" big_endian="00000000" little_endian="00000000">0</result>
+            <result index="1" big_endian="ffffffff" little_endian="ffffffff">FFFFFFFF</result>
+            <result index="2" big_endian="00000001" little_endian="01000000">1</result>
+        </expected_results>
+    </test_config>
+</test_configs> 

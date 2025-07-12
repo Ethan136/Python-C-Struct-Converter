@@ -7,6 +7,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from model.struct_model import StructModel
+from test_config_parser import TestConfigParser
 
 class TestInputConversion(unittest.TestCase):
     """Test cases for input conversion mechanism"""
@@ -35,6 +36,14 @@ struct TestStruct {
         # Load the struct
         self.struct_name, self.layout, self.total_size, self.struct_align = \
             self.model.load_struct_from_file(self.tmp_file.name)
+        
+        # Load test configurations
+        config_file_path = os.path.join(os.path.dirname(__file__), 'test_config.xml')
+        if os.path.exists(config_file_path):
+            self.config_parser = TestConfigParser(config_file_path)
+            self.test_configs = self.config_parser.parse()
+        else:
+            self.test_configs = {}
 
     def tearDown(self):
         """Clean up test fixtures"""
@@ -234,6 +243,180 @@ struct TestStruct {
                 int_value, bytes_result, hex_result = self.convert_input_to_bytes(input_val, byte_size, 'big')
                 self.assertEqual(hex_result, expected,
                                 f"Requirement failed: {desc}\nExpected: {expected}\nGot: {hex_result}")
+
+    # ============================================================================
+    # XML Configuration Based Tests
+    # ============================================================================
+
+    def test_xml_config_loading(self):
+        """Test that XML configuration files can be loaded correctly"""
+        if not self.test_configs:
+            self.skipTest("No XML configuration file found")
+        
+        # Check that we have test configurations
+        self.assertGreater(len(self.test_configs), 0, "Should have at least one test configuration")
+        
+        # Check that all configurations are valid
+        errors = self.config_parser.validate_config()
+        self.assertEqual(len(errors), 0, f"Configuration validation failed: {errors}")
+
+    def test_xml_4byte_config(self):
+        """Test 4-byte configuration from XML"""
+        if '4byte_test' not in self.test_configs:
+            self.skipTest("4byte_test configuration not found in XML")
+        
+        config = self.test_configs['4byte_test']
+        
+        # Verify configuration
+        self.assertEqual(config.unit_size, 4, "Unit size should be 4")
+        self.assertEqual(len(config.input_values), 5, "Should have 5 input values")
+        
+        # Test each input value
+        input_values = config.get_input_values_list()
+        expected_results = config.get_expected_results_list()
+        
+        for i, (input_val, expected_result) in enumerate(zip(input_values, expected_results)):
+            with self.subTest(index=i, input=input_val):
+                # Test big endian
+                int_value, bytes_result, hex_result = self.convert_input_to_bytes(input_val, config.unit_size, 'big')
+                self.assertEqual(hex_result, expected_result['big_endian'],
+                                f"Big endian failed for index {i}: expected {expected_result['big_endian']}, got {hex_result}")
+                
+                # Test little endian
+                int_value_le, bytes_result_le, hex_result_le = self.convert_input_to_bytes(input_val, config.unit_size, 'little')
+                self.assertEqual(hex_result_le, expected_result['little_endian'],
+                                f"Little endian failed for index {i}: expected {expected_result['little_endian']}, got {hex_result_le}")
+
+    def test_xml_8byte_config(self):
+        """Test 8-byte configuration from XML"""
+        if '8byte_test' not in self.test_configs:
+            self.skipTest("8byte_test configuration not found in XML")
+        
+        config = self.test_configs['8byte_test']
+        
+        # Verify configuration
+        self.assertEqual(config.unit_size, 8, "Unit size should be 8")
+        self.assertEqual(len(config.input_values), 3, "Should have 3 input values")
+        
+        # Test each input value
+        input_values = config.get_input_values_list()
+        expected_results = config.get_expected_results_list()
+        
+        for i, (input_val, expected_result) in enumerate(zip(input_values, expected_results)):
+            with self.subTest(index=i, input=input_val):
+                # Test big endian
+                int_value, bytes_result, hex_result = self.convert_input_to_bytes(input_val, config.unit_size, 'big')
+                self.assertEqual(hex_result, expected_result['big_endian'],
+                                f"Big endian failed for index {i}: expected {expected_result['big_endian']}, got {hex_result}")
+                
+                # Test little endian
+                int_value_le, bytes_result_le, hex_result_le = self.convert_input_to_bytes(input_val, config.unit_size, 'little')
+                self.assertEqual(hex_result_le, expected_result['little_endian'],
+                                f"Little endian failed for index {i}: expected {expected_result['little_endian']}, got {hex_result_le}")
+
+    def test_xml_1byte_config(self):
+        """Test 1-byte configuration from XML"""
+        if '1byte_test' not in self.test_configs:
+            self.skipTest("1byte_test configuration not found in XML")
+        
+        config = self.test_configs['1byte_test']
+        
+        # Verify configuration
+        self.assertEqual(config.unit_size, 1, "Unit size should be 1")
+        self.assertEqual(len(config.input_values), 4, "Should have 4 input values")
+        
+        # Test each input value
+        input_values = config.get_input_values_list()
+        expected_results = config.get_expected_results_list()
+        
+        for i, (input_val, expected_result) in enumerate(zip(input_values, expected_results)):
+            with self.subTest(index=i, input=input_val):
+                # Test big endian
+                int_value, bytes_result, hex_result = self.convert_input_to_bytes(input_val, config.unit_size, 'big')
+                self.assertEqual(hex_result, expected_result['big_endian'],
+                                f"Big endian failed for index {i}: expected {expected_result['big_endian']}, got {hex_result}")
+                
+                # Test little endian
+                int_value_le, bytes_result_le, hex_result_le = self.convert_input_to_bytes(input_val, config.unit_size, 'little')
+                self.assertEqual(hex_result_le, expected_result['little_endian'],
+                                f"Little endian failed for index {i}: expected {expected_result['little_endian']}, got {hex_result_le}")
+
+    def test_xml_mixed_config(self):
+        """Test mixed configuration from XML (including empty values)"""
+        if 'mixed_test' not in self.test_configs:
+            self.skipTest("mixed_test configuration not found in XML")
+        
+        config = self.test_configs['mixed_test']
+        
+        # Verify configuration
+        self.assertEqual(config.unit_size, 4, "Unit size should be 4")
+        self.assertEqual(len(config.input_values), 4, "Should have 4 input values")
+        
+        # Test each input value
+        input_values = config.get_input_values_list()
+        expected_results = config.get_expected_results_list()
+        
+        for i, (input_val, expected_result) in enumerate(zip(input_values, expected_results)):
+            with self.subTest(index=i, input=input_val):
+                # Test big endian
+                int_value, bytes_result, hex_result = self.convert_input_to_bytes(input_val, config.unit_size, 'big')
+                self.assertEqual(hex_result, expected_result['big_endian'],
+                                f"Big endian failed for index {i}: expected {expected_result['big_endian']}, got {hex_result}")
+                
+                # Test little endian
+                int_value_le, bytes_result_le, hex_result_le = self.convert_input_to_bytes(input_val, config.unit_size, 'little')
+                self.assertEqual(hex_result_le, expected_result['little_endian'],
+                                f"Little endian failed for index {i}: expected {expected_result['little_endian']}, got {hex_result_le}")
+
+    def test_xml_edge_cases_config(self):
+        """Test edge cases configuration from XML"""
+        if 'edge_cases_test' not in self.test_configs:
+            self.skipTest("edge_cases_test configuration not found in XML")
+        
+        config = self.test_configs['edge_cases_test']
+        
+        # Verify configuration
+        self.assertEqual(config.unit_size, 4, "Unit size should be 4")
+        self.assertEqual(len(config.input_values), 3, "Should have 3 input values")
+        
+        # Test each input value
+        input_values = config.get_input_values_list()
+        expected_results = config.get_expected_results_list()
+        
+        for i, (input_val, expected_result) in enumerate(zip(input_values, expected_results)):
+            with self.subTest(index=i, input=input_val):
+                # Test big endian
+                int_value, bytes_result, hex_result = self.convert_input_to_bytes(input_val, config.unit_size, 'big')
+                self.assertEqual(hex_result, expected_result['big_endian'],
+                                f"Big endian failed for index {i}: expected {expected_result['big_endian']}, got {hex_result}")
+                
+                # Test little endian
+                int_value_le, bytes_result_le, hex_result_le = self.convert_input_to_bytes(input_val, config.unit_size, 'little')
+                self.assertEqual(hex_result_le, expected_result['little_endian'],
+                                f"Little endian failed for index {i}: expected {expected_result['little_endian']}, got {hex_result_le}")
+
+    def test_xml_all_configs(self):
+        """Test all configurations from XML file"""
+        if not self.test_configs:
+            self.skipTest("No XML configuration file found")
+        
+        # Test all configurations
+        for config_name, config in self.test_configs.items():
+            with self.subTest(config_name=config_name):
+                input_values = config.get_input_values_list()
+                expected_results = config.get_expected_results_list()
+                
+                for i, (input_val, expected_result) in enumerate(zip(input_values, expected_results)):
+                    with self.subTest(index=i, input=input_val):
+                        # Test big endian
+                        int_value, bytes_result, hex_result = self.convert_input_to_bytes(input_val, config.unit_size, 'big')
+                        self.assertEqual(hex_result, expected_result['big_endian'],
+                                        f"Big endian failed for {config_name}[{i}]: expected {expected_result['big_endian']}, got {hex_result}")
+                        
+                        # Test little endian
+                        int_value_le, bytes_result_le, hex_result_le = self.convert_input_to_bytes(input_val, config.unit_size, 'little')
+                        self.assertEqual(hex_result_le, expected_result['little_endian'],
+                                        f"Little endian failed for {config_name}[{i}]: expected {expected_result['little_endian']}, got {hex_result_le}")
 
 if __name__ == '__main__':
     unittest.main() 

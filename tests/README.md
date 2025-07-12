@@ -1,6 +1,9 @@
 # Tests Directory
 
-This directory contains all test files for the C++ Struct Memory Parser project.
+本文件為所有測試相關說明的唯一入口，包含：
+- 測試架構與檔案說明
+- 如何執行/擴充/自動化測試
+- XML array 格式自動化測試說明
 
 ## Test Files
 
@@ -19,6 +22,47 @@ Tests for the input conversion mechanism.
 - Tests value range validation
 - Tests invalid input handling
 - Tests integration with model parsing
+- **支援 XML array 格式自動化測試**
+
+## XML 測試自動化與簡化
+
+本專案支援以 XML 檔案自動化測試輸入轉換機制，且支援簡化的 array 格式：
+
+### 範例 (簡化 array 格式)
+```xml
+<test_config name="4byte_test" unit_size="4" description="Test 4-byte field expansion">
+    <input_values>
+        <array>123,234,456,567,11</array>
+    </input_values>
+    <expected_results>
+        <result index="0" big_endian="00000123" little_endian="23010000">123</result>
+        <result index="1" big_endian="00000234" little_endian="34020000">234</result>
+        <result index="2" big_endian="00000456" little_endian="56040000">456</result>
+        <result index="3" big_endian="00000567" little_endian="67050000">567</result>
+        <result index="4" big_endian="00000011" little_endian="11000000">11</result>
+    </expected_results>
+</test_config>
+```
+- `<array>` 內容可用逗號、空白、換行分隔，程式會自動解析。
+- 舊的 `<value index=...>` 格式也可混用。
+
+### 如何擴充
+1. 在 `tests/test_config.xml` 新增 `<test_config>` 區塊，設定 `unit_size`、`input_values`（可用 array）、`expected_results`。
+2. 不需改動 Python 測試程式，會自動讀取所有 config 並驗證。
+
+### 執行測試
+```bash
+cd tests
+python3 -m unittest test_input_conversion -v
+```
+或在專案根目錄：
+```bash
+python3 run_tests.py --test test_input_conversion
+```
+
+### 測試結果
+- 支援 array 格式的 XML 測試已通過。
+- 你可以自由設計任何 1/4/8 byte、任意格數、任意數值的自動化測試。
 
 ## Running Tests
 
