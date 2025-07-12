@@ -577,6 +577,27 @@ class TestStructModel(unittest.TestCase):
         expected_hex_big = "0000000000000121"  # big endian: 直接顯示原始 bytes 的 hex
         self.assertEqual(result[2]["hex_raw"], expected_hex_little)
 
+    def test_hex_raw_formatting_and_padding(self):
+        """Test that hex_raw is zero-padded and can be safely prefixed with 0x for display."""
+        struct_content = """
+        struct TestStruct {
+            char a;
+            int b;
+            long long c;
+        };
+        """
+        with patch("builtins.open", mock_open(read_data=struct_content)):
+            self.model.load_struct_from_file("test_file.h")
+        # a: 1 byte, padding: 3 bytes, b: 4 bytes, c: 8 bytes
+        # Input: a=0x1, padding=000000, b=0x123, c=0x4567890
+        hex_data = "01" + "000000" + "00000123" + "0000000004567890"
+        result = self.model.parse_hex_data(hex_data, "big")
+        # 檢查 hex_raw 長度與補 0x
+        self.assertEqual(result[0]["hex_raw"], "01")  # 1 byte
+        self.assertEqual(result[1]["hex_raw"], "000000")  # 3 bytes padding
+        self.assertEqual(result[2]["hex_raw"], "00000123")  # 4 bytes
+        self.assertEqual(result[3]["hex_raw"], "0000000004567890")  # 8 bytes
+
 
 class TestTypeInfo(unittest.TestCase):
     """Test cases for TYPE_INFO constant."""

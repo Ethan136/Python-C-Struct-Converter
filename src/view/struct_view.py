@@ -133,7 +133,17 @@ class StructView(tk.Tk):
         result_str += "-" * 70 + "\n"
 
         for item in parsed_values:
-            result_str += "{:<18} {:<25} 0x{}\n".format(item['name'], item['value'], item['hex_raw'])
+            # 補齊 hex 長度（每 byte 2 位），不足左補 0
+            hex_raw = item['hex_raw']
+            # 取得 struct member 對應的 size
+            size = None
+            for p in parsed_values:
+                if p['name'] == item['name']:
+                    size = len(hex_raw) // 2 if hex_raw else 0
+                    break
+            if size is not None and len(hex_raw) < size * 2:
+                hex_raw = hex_raw.zfill(size * 2)
+            result_str += "{:<18} {:<25} {}\n".format(item['name'], item['value'], f"0x{hex_raw}")
 
         self.result_text.config(state=tk.NORMAL); self.result_text.delete('1.0', tk.END); self.result_text.insert(tk.END, result_str); self.result_text.config(state=tk.DISABLED)
 
