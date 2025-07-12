@@ -229,6 +229,16 @@ class StructModel:
         self.struct_align = 1
         # Initialize the input field processor
         self.input_processor = InputFieldProcessor()
+        self.manual_struct = None  # 新增屬性
+
+    def set_manual_struct(self, members, total_size):
+        """
+        設定手動 struct 內容。
+        Args:
+            members (list): bitfield dicts, e.g. [{"name": str, "length": int}, ...]
+            total_size (int): 結構體總大小（bits 或 bytes）
+        """
+        self.manual_struct = {"members": members, "total_size": total_size}
 
     def load_struct_from_file(self, file_path):
         with open(file_path, 'r') as f:
@@ -287,3 +297,73 @@ class StructModel:
                 "hex_raw": hex_value
             })
         return parsed_values
+
+    def validate_manual_struct(self, members, total_size):
+        """
+        驗證 bitfield 設定：
+        - bitfield 總長度需等於結構體大小
+        - 名稱不可重複
+        - bitfield 長度需為正整數
+        - 結構體大小需為正整數
+        Args:
+            members (list): bitfield dicts, e.g. [{"name": str, "length": int}, ...]
+            total_size (int): 結構體總大小（bits 或 bytes）
+        Returns:
+            list: 錯誤訊息字串 list，若驗證通過則為空 list
+        """
+        errors = []
+        # 檢查 bitfield 長度
+        for m in members:
+            if not isinstance(m["length"], int) or m["length"] <= 0:
+                errors.append(f"bitfield '{m['name']}' 長度需為正整數")
+        # 檢查名稱重複
+        names = [m["name"] for m in members]
+        if len(set(names)) != len(names):
+            for n in set([x for x in names if names.count(x) > 1]):
+                errors.append(f"成員名稱 '{n}' 重複")
+        # 檢查結構體大小
+        if not isinstance(total_size, int) or total_size <= 0:
+            errors.append("結構體大小需為正整數")
+        # 檢查 bitfield 總長度
+        total_bits = sum(m["length"] for m in members if isinstance(m["length"], int) and m["length"] > 0)
+        if total_bits != total_size and total_size > 0:
+            errors.append(f"Bitfield 總長度 ({total_bits}) 不等於結構體大小 ({total_size})")
+        return errors
+
+    def calculate_manual_layout(self, members, total_size):
+        """
+        計算無 padding 的 bitfield 記憶體排列。
+        Args:
+            members (list): bitfield dicts, e.g. [{"name": str, "length": int}, ...]
+            total_size (int): 結構體總大小（bits）
+        Returns:
+            list: layout，每個 dict 含 name, size, offset, is_bitfield, bit_offset, bit_size
+        """
+        layout = []
+        bit_offset = 0
+        byte_size = (total_size + 7) // 8  # 向上取整
+        for m in members:
+            layout.append({
+                "name": m["name"],
+                "type": "bitfield",
+                "size": byte_size,
+                "offset": 0,
+                "is_bitfield": True,
+                "bit_offset": bit_offset,
+                "bit_size": m["length"]
+            })
+            bit_offset += m["length"]
+        return layout
+
+    def export_manual_struct_to_h(self):
+        """
+        產生對應的 C struct bitfield 語法（無 padding），回傳 .h 檔內容字串。
+        """
+        members = self.manual_struct["members"] if self.manual_struct else []
+        total_size = self.manual_struct["total_size"] if self.manual_struct else 0
+        lines = ["struct ManualStruct {"]
+        for m in members:
+            lines.append(f"    unsigned int {m['name']} : {m['length']};")
+        lines.append("};")
+        lines.append(f"// total size: {total_size} bits")
+        return "\n".join(lines)

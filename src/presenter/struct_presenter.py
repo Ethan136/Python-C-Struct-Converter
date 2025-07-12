@@ -138,3 +138,14 @@ class StructPresenter:
         except Exception as e:
             self.view.show_error(get_string("dialog_parsing_error"),
                                f"An error occurred during parsing: {e}")
+
+    def validate_manual_struct(self, struct_data):
+        return self.model.validate_manual_struct(struct_data["members"], struct_data["total_size"])
+
+    def on_manual_struct_change(self, struct_data):
+        errors = self.model.validate_manual_struct(struct_data["members"], struct_data["total_size"])
+        self.view.show_manual_struct_validation(errors)
+
+    def on_export_manual_struct(self):
+        h_content = self.model.export_manual_struct_to_h()
+        self.view.show_exported_struct(h_content)

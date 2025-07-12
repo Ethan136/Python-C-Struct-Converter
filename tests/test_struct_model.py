@@ -684,6 +684,115 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(result[2]["name"], "c")
         self.assertEqual(result[2]["value"], "17")
 
+    def test_set_manual_struct_sets_members_and_size(self):
+        """Test that set_manual_struct correctly sets members and total_size."""
+        members = [
+            {"name": "a", "length": 8},
+            {"name": "b", "length": 16}
+        ]
+        total_size = 24
+        self.model.set_manual_struct(members, total_size)
+        self.assertEqual(self.model.manual_struct["members"], members)
+        self.assertEqual(self.model.manual_struct["total_size"], total_size)
+
+    def test_validate_manual_struct_errors_and_success(self):
+        # 測試 bitfield 總長度不符
+        members = [
+            {"name": "a", "length": 8},
+            {"name": "b", "length": 8}
+        ]
+        total_size = 24
+        errors = self.model.validate_manual_struct(members, total_size)
+        self.assertIn("Bitfield 總長度 (16) 不等於結構體大小 (24)", errors[0])
+
+        # 測試名稱重複
+        members = [
+            {"name": "a", "length": 8},
+            {"name": "a", "length": 16}
+        ]
+        total_size = 24
+        errors = self.model.validate_manual_struct(members, total_size)
+        self.assertIn("成員名稱 'a' 重複", errors[0])
+
+        # 測試 bitfield 長度非正整數
+        members = [
+            {"name": "a", "length": 0},
+            {"name": "b", "length": -1}
+        ]
+        total_size = -1
+        errors = self.model.validate_manual_struct(members, total_size)
+        self.assertIn("bitfield 'a' 長度需為正整數", errors[0])
+        self.assertIn("bitfield 'b' 長度需為正整數", errors[1])
+        self.assertIn("結構體大小需為正整數", errors[2])
+
+        # 驗證通過情境
+        members = [
+            {"name": "a", "length": 8},
+            {"name": "b", "length": 16}
+        ]
+        total_size = 24
+        errors = self.model.validate_manual_struct(members, total_size)
+        self.assertEqual(errors, [])
+
+    def test_calculate_manual_layout_no_padding(self):
+        # 測試 bitfield 緊密排列、無 padding
+        members = [
+            {"name": "a", "length": 3},
+            {"name": "b", "length": 5},
+            {"name": "c", "length": 8}
+        ]
+        total_size = 16
+        layout = self.model.calculate_manual_layout(members, total_size)
+        # 應該有三個 bitfield，offset 依序排列，無 padding
+        self.assertEqual(len(layout), 3)
+        self.assertEqual(layout[0]["name"], "a")
+        self.assertEqual(layout[0]["bit_offset"], 0)
+        self.assertEqual(layout[0]["bit_size"], 3)
+        self.assertEqual(layout[1]["name"], "b")
+        self.assertEqual(layout[1]["bit_offset"], 3)
+        self.assertEqual(layout[1]["bit_size"], 5)
+        self.assertEqual(layout[2]["name"], "c")
+        self.assertEqual(layout[2]["bit_offset"], 8)
+        self.assertEqual(layout[2]["bit_size"], 8)
+        # offset 全部為 0（同一 storage unit）
+        for item in layout:
+            self.assertEqual(item["offset"], 0)
+            self.assertEqual(item["size"], 2)  # 16 bits = 2 bytes
+        # total_size = 16 bits
+        total_bits = sum(item["bit_size"] for item in layout)
+        self.assertEqual(total_bits, total_size)
+
+    def test_export_manual_struct_to_h(self):
+        # 多欄位 bitfield
+        members = [
+            {"name": "a", "length": 3},
+            {"name": "b", "length": 5},
+            {"name": "c", "length": 8}
+        ]
+        total_size = 16
+        self.model.set_manual_struct(members, total_size)
+        h_content = self.model.export_manual_struct_to_h()
+        self.assertIn("struct ManualStruct", h_content)
+        self.assertIn("unsigned int a : 3;", h_content)
+        self.assertIn("unsigned int b : 5;", h_content)
+        self.assertIn("unsigned int c : 8;", h_content)
+        self.assertIn("// total size: 16 bits", h_content)
+
+        # 單一欄位
+        members = [{"name": "x", "length": 16}]
+        total_size = 16
+        self.model.set_manual_struct(members, total_size)
+        h_content = self.model.export_manual_struct_to_h()
+        self.assertIn("unsigned int x : 16;", h_content)
+
+        # 空 struct
+        members = []
+        total_size = 0
+        self.model.set_manual_struct(members, total_size)
+        h_content = self.model.export_manual_struct_to_h()
+        self.assertIn("struct ManualStruct", h_content)
+        self.assertIn("// total size: 0 bits", h_content)
+
 
 class TestCombinedExampleStruct(unittest.TestCase):
     """
