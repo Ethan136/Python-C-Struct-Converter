@@ -1,0 +1,20 @@
+<strings>
+    <string name="app_title">C++ Struct Parser</string>
+    <string name="no_file_selected">No file selected.</string>
+    <string name="browse_button">Browse...</string>
+    <string name="layout_frame_title">Struct Layout</string>
+    <string name="hex_input_title">Hex Data Input</string>
+    <string name="input_unit_size">Input Unit Size:</string>
+    <string name="byte_order">Byte Order:</string>
+    <string name="parse_button">Parse Data</string>
+    <string name="parsed_values_title">Parsed Values</string>
+    <string name="dialog_select_file">Select a C++ header file</string>
+    <string name="dialog_file_error">File Error</string>
+    <string name="dialog_invalid_input">Invalid Input</string>
+    <string name="dialog_value_too_large">Value Too Large</string>
+    <string name="dialog_overflow_error">Overflow Error</string>
+    <string name="dialog_conversion_error">Conversion Error</string>
+    <string name="dialog_invalid_length">Invalid Length</string>
+    <string name="dialog_parsing_error">Parsing Error</string>
+    <string name="dialog_no_struct">No Struct</string>
+</strings>
