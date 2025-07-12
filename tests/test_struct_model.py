@@ -866,6 +866,42 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(non_pad[3]["bit_offset"], 0)
         self.assertEqual(non_pad[3]["bit_size"], 4)
 
+    def test_parse_manual_hex_data_uses_file_parsing_logic(self):
+        """測試 MyStruct 解析機制直接使用載入.h檔的解析邏輯"""
+        manual_layout = [
+            {"name": "a", "type": "int", "offset": 0, "size": 4, "is_bitfield": False},
+            {"name": "b", "type": "char", "offset": 4, "size": 1, "is_bitfield": False}
+        ]
+        hex_data = "04030201" + "41"  # little endian
+        result = self.model.parse_manual_hex_data(hex_data, "little", manual_layout)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["name"], "a")
+        self.assertEqual(result[0]["value"], "16909060")
+        self.assertEqual(result[0]["hex_raw"], "04030201")  # 修正這裡
+        self.assertEqual(result[1]["name"], "b")
+        self.assertEqual(result[1]["value"], "65")
+        self.assertEqual(result[1]["hex_raw"], "41")
+
+    def test_parse_manual_hex_data_preserves_original_layout(self):
+        """測試橋接函數不會影響原始的 layout 和 total_size"""
+        struct_content = """
+        struct FileStruct {
+            int x;
+            char y;
+        };
+        """
+        with patch("builtins.open", mock_open(read_data=struct_content)):
+            self.model.load_struct_from_file("test_file.h")
+        original_layout = self.model.layout.copy()
+        original_total_size = self.model.total_size
+        manual_layout = [
+            {"name": "a", "type": "int", "offset": 0, "size": 4, "is_bitfield": False}
+        ]
+        hex_data = "01000000"
+        self.model.parse_manual_hex_data(hex_data, "little", manual_layout)
+        self.assertEqual(self.model.layout, original_layout)
+        self.assertEqual(self.model.total_size, original_total_size)
+
 
 class TestCombinedExampleStruct(unittest.TestCase):
     """

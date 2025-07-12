@@ -156,8 +156,8 @@ class StructPresenter:
     def parse_manual_hex_data(self, hex_parts, struct_def, endian):
         """解析 MyStruct tab 的 hex 資料並顯示結果"""
         try:
-            # 將 hex_parts 組成完整的 hex 字串
-            hex_str = ''.join([h[0].zfill(h[1]) for h in hex_parts])
+            # 修正：直接連接輸入的 hex 字串，與 .H 檔 tab 保持一致
+            hex_str = ''.join([h[0] for h in hex_parts])
             
             # 設定 model 的 manual struct
             self.model.set_manual_struct(struct_def['members'], struct_def['total_size'])

@@ -334,52 +334,33 @@ class StructModel:
         return parsed_values
 
     def parse_manual_hex_data(self, hex_data, byte_order, layout):
-        """解析 MyStruct tab 的 hex 資料"""
+        """解析 MyStruct tab 的 hex 資料 - 橋接版本，直接使用載入.h檔的解析機制"""
         if not layout:
             raise ValueError("No manual struct layout provided.")
 
-        # 使用 input field processor 處理 hex 資料
-        total_size = sum(item['size'] for item in layout)
-        padded_hex = self.input_processor.pad_hex_input(hex_data, total_size)
-        data_bytes = bytes.fromhex(padded_hex)
+        # 橋接：暫時設定 model 的 layout 和 total_size，讓 parse_hex_data 可以工作
+        original_layout = self.layout
+        original_total_size = self.total_size
         
-        parsed_values = []
-        for item in layout:
-            # 只解析實際成員，跳過 padding
-            if item['type'] == "padding":
-                padding_bytes = data_bytes[item['offset'] : item['offset'] + item['size']]
-                hex_value = padding_bytes.hex()
-                parsed_values.append({
-                    "name": item['name'],
-                    "value": "-", # padding 沒有值
-                    "hex_raw": hex_value
-                })
-                continue
-
-            offset, size, name = item['offset'], item['size'], item['name']
-            member_bytes = data_bytes[offset : offset + size]
+        try:
+            # 設定 MyStruct 的 layout
+            self.layout = layout
             
-            if item.get("is_bitfield", False):
-                # 處理 bitfield
-                storage_int = int.from_bytes(member_bytes, byte_order)
-                bit_offset = item["bit_offset"]
-                bit_size = item["bit_size"]
-                mask = (1 << bit_size) - 1
-                value = (storage_int >> bit_offset) & mask
-                display_value = str(value)
+            # 修正：計算實際的 total_size，考慮 bitfield 共用 storage unit
+            if layout:
+                # 找出最大的 offset + size，這代表實際需要的記憶體大小
+                max_offset_plus_size = max(item['offset'] + item['size'] for item in layout)
+                self.total_size = max_offset_plus_size
             else:
-                # 處理普通欄位
-                value = int.from_bytes(member_bytes, byte_order)
-                display_value = str(bool(value)) if item['type'] == 'bool' else str(value)
+                self.total_size = 0
             
-            # hex_raw 一律用 big endian 顯示
-            hex_value = int.from_bytes(member_bytes, 'big').to_bytes(size, 'big').hex()
-            parsed_values.append({
-                "name": name,
-                "value": display_value,
-                "hex_raw": hex_value
-            })
-        return parsed_values
+            # 直接使用載入.h檔的解析機制
+            return self.parse_hex_data(hex_data, byte_order)
+            
+        finally:
+            # 恢復原始的 layout 和 total_size
+            self.layout = original_layout
+            self.total_size = original_total_size
 
     def _convert_legacy_member(self, member):
         """支援舊格式的 member（包含 byte_size）"""
