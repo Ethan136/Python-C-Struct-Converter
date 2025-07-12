@@ -1,4 +1,5 @@
 import re
+from .input_field_processor import InputFieldProcessor
 
 # Based on a common 64-bit system (like GCC on x86-64)
 TYPE_INFO = {
@@ -95,6 +96,8 @@ class StructModel:
         self.layout = []
         self.total_size = 0
         self.struct_align = 1
+        # Initialize the input field processor
+        self.input_processor = InputFieldProcessor()
 
     def load_struct_from_file(self, file_path):
         with open(file_path, 'r') as f:
@@ -113,9 +116,10 @@ class StructModel:
         if not self.layout:
             raise ValueError("No struct layout loaded. Please load a struct definition first.")
 
-        # Pad if the input is shorter (e.g. user didn't fill all boxes)
-        hex_data = hex_data.zfill(self.total_size * 2)
-        data_bytes = bytes.fromhex(hex_data)
+        # Use the input field processor to handle the complete hex data
+        # For the entire struct, we need to pad to the total size
+        padded_hex = self.input_processor.pad_hex_input(hex_data, self.total_size)
+        data_bytes = bytes.fromhex(padded_hex)
         
         parsed_values = []
         for item in self.layout:
