@@ -156,8 +156,59 @@ class StructPresenter:
     def parse_manual_hex_data(self, hex_parts, struct_def, endian):
         """解析 MyStruct tab 的 hex 資料並顯示結果"""
         try:
-            # 修正：直接連接輸入的 hex 字串，與 .H 檔 tab 保持一致
-            hex_str = ''.join([h[0] for h in hex_parts])
+            # 取得 unit size 來計算每個 box 的 byte 數
+            unit_size = self.view.get_selected_manual_unit_size()
+            byte_order = 'little' if endian == "Little Endian" else 'big'
+            
+            # 使用與 .H 檔 tab 相同的 debug bytes 機制
+            final_memory_hex_parts = []
+            debug_bytes_per_box = []
+            
+            for raw_part, expected_chars_in_box in hex_parts:
+                # Validate input is hex
+                if not re.match(r"^[0-9a-fA-F]*$", raw_part):
+                    self.view.show_error("無效輸入", f"輸入 '{raw_part}' 包含非十六進位字元。")
+                    return
+                
+                # Determine the byte size of the current input chunk
+                chunk_byte_size = expected_chars_in_box // 2
+
+                # 使用 InputFieldProcessor 進行左補0
+                try:
+                    padded_hex = self.input_processor.pad_hex_input(raw_part, chunk_byte_size)
+                    int_value = int(padded_hex, 16) if padded_hex else 0
+                except ValueError:
+                    self.view.show_error("無效輸入", f"無法將 '{raw_part}' 轉換為數字。")
+                    return
+
+                # Convert integer value to bytes using the selected endianness
+                try:
+                    max_val = (2**(chunk_byte_size * 8)) - 1
+                    if int_value > max_val:
+                        self.view.show_error("數值過大", f"數值 0x{raw_part} 對於 {chunk_byte_size}-byte 欄位來說太大。")
+                        return
+
+                    bytes_for_chunk = int_value.to_bytes(chunk_byte_size, byteorder=byte_order)
+                    final_memory_hex_parts.append(bytes_for_chunk.hex())
+                    debug_bytes_per_box.append(bytes_for_chunk)
+                except OverflowError:
+                    self.view.show_error("溢位錯誤", f"數值 0x{raw_part} 對於 {chunk_byte_size}-byte 欄位來說太大。")
+                    return
+                except Exception as e:
+                    self.view.show_error("轉換錯誤", f"轉換數值 0x{raw_part} 到 bytes 時發生錯誤: {e}")
+                    return
+
+            # 格式化 debug bytes 並顯示（與 .H 檔 tab 相同的格式）
+            debug_lines = []
+            for i, chunk_bytes in enumerate(debug_bytes_per_box):
+                # 將這個 chunk 的所有 bytes 轉成 hex 字串
+                hex_chars = []
+                for b in chunk_bytes:
+                    hex_chars.append(f"{b:02x}")
+                debug_lines.append(f"Box {i+1} ({len(chunk_bytes)} bytes): {' '.join(hex_chars)}")
+            
+            # 使用與 .H 檔 tab 相同的 show_debug_bytes 方法
+            self.view.show_manual_debug_bytes(debug_lines)
             
             # 設定 model 的 manual struct
             self.model.set_manual_struct(struct_def['members'], struct_def['total_size'])
@@ -165,18 +216,14 @@ class StructPresenter:
             # 計算 layout
             layout = self.model.calculate_manual_layout(struct_def['members'], struct_def['total_size'])
             
+            # 連接所有 hex parts 形成完整的 hex_data
+            hex_data = "".join(final_memory_hex_parts)
+            
             # 解析 hex 資料
-            byte_order = 'little' if endian == "Little Endian" else 'big'
-            parsed_values = self.model.parse_manual_hex_data(hex_str, byte_order, layout)
+            parsed_values = self.model.parse_manual_hex_data(hex_data, byte_order, layout)
             
             # 呼叫 view 的顯示方法
             self.view.show_manual_parsed_values(parsed_values, endian)
-            
-            # 顯示 debug 資訊
-            self.view.manual_debug_text.config(state="normal")
-            self.view.manual_debug_text.delete("1.0", tk.END)
-            self.view.manual_debug_text.insert("1.0", f"Parsed {len(parsed_values)} fields\nHex data: {hex_str}\nEndian: {endian}")
-            self.view.manual_debug_text.config(state="disabled")
             
         except Exception as e:
             self.view.show_error("解析錯誤", f"解析 hex 資料時發生錯誤: {e}")

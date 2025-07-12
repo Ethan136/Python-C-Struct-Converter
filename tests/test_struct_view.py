@@ -885,9 +885,9 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(values_g[1], str(int("100f0e0d0c0b0a09", 16)), "pointer g 的值應該是 0x100f0e0d0c0b0a09")
         
         # 驗證 debug 資訊
-        self.assertIn("Parsed 12 fields", debug_text, "debug 應該顯示解析了 12 個欄位")
-        self.assertIn("Hex data:", debug_text, "debug 應該顯示 hex 資料")
-        self.assertIn("Little Endian", debug_text, "debug 應該顯示 endianness")
+        self.assertIn("Box 1 (1 bytes): 41", debug_text, "debug 應該顯示第一個 box 的 bytes")
+        self.assertIn("Box 40 (1 bytes): 10", debug_text, "debug 應該顯示最後一個 box 的 bytes")
+        self.assertEqual(debug_text.count("Box "), 40, "debug 應該顯示 40 個 box 的資訊")
         
         # 測試 Big Endian
         self.view.manual_endian_var.set("Big Endian")

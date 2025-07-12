@@ -577,6 +577,16 @@ class StructView(tk.Tk):
             self.debug_text.insert("1.0", "無 debug 資訊")
         self.debug_text.config(state="disabled")
 
+    def show_manual_debug_bytes(self, debug_lines):
+        """顯示 MyStruct tab 的 debug bytes，與 file tab 的 show_debug_bytes 一致"""
+        self.manual_debug_text.config(state="normal")
+        self.manual_debug_text.delete("1.0", tk.END)
+        if debug_lines:
+            self.manual_debug_text.insert("1.0", "\n".join(debug_lines))
+        else:
+            self.manual_debug_text.insert("1.0", "無 debug 資訊")
+        self.manual_debug_text.config(state="disabled")
+
     def show_struct_member_debug(self, parsed_values, layout):
         # 顯示 struct layout 與欄位對應
         # 全檔案移除 self.struct_info_text 相關操作，確保不再存取不存在的 Text 物件。
@@ -630,6 +640,10 @@ class StructView(tk.Tk):
 
     def get_selected_endianness(self):
         return self.endian_var.get()
+
+    def get_selected_manual_unit_size(self):
+        """取得 MyStruct tab 選擇的單位大小"""
+        return int(self.manual_unit_size_var.get().split()[0])
 
     def rebuild_hex_grid(self, total_size, unit_size):
         for widget in self.hex_grid_frame.winfo_children():
