@@ -6,6 +6,8 @@ This document explains how `struct_model.py` parses a C++ `struct` and computes 
 - The parser is implemented in `src/model/struct_model.py`.
 - Only `struct` definitions are supported; `union` parsing is not implemented.
 - **Supports bitfield members (e.g., `int a : 1;`), including bitfield packing and storage unit alignment.**
+- **Supports manual struct definition with byte/bit size validation and export functionality.**
+- **Implements comprehensive validation logic with TDD testing approach.**
 
 ## Steps
 1. **Regex Extraction (Intermediate Representation)**
@@ -65,6 +67,64 @@ Each struct member (including padding and bitfields) is stored as a dictionary. 
    - It iterates through the list, using each member's `offset` and `size` to slice the byte string correctly.
    - The bytes for each member are then converted to a value using the user-specified endianness.
 
+## Manual Struct Definition System
+
+### Overview
+The system supports manual struct definition through GUI interface, allowing users to create structs without external header files.
+
+### Manual Layout Calculation
+- **Function**: `calculate_manual_layout(members, total_size)`
+- **Purpose**: Calculate layout for manually defined structs without padding
+- **Features**:
+  - Bit-level size tracking
+  - Automatic end padding insertion
+  - Validation against total struct size
+  - Future-ready for pragma pack/align mechanisms
+
+### Manual Struct Validation
+- **Function**: `validate_manual_struct(members, total_size)`
+- **Purpose**: Comprehensive validation of manual struct definitions
+- **Validation Rules**:
+  - Member name uniqueness
+  - Positive integer size validation
+  - Total size consistency verification
+  - Real-time validation feedback
+
+### Struct Export Functionality
+- **Function**: `export_manual_struct_to_h()`
+- **Purpose**: Export manually defined structs to C header files
+- **Features**:
+  - Generates valid C struct declarations
+  - Proper bitfield syntax formatting
+  - Type compatibility handling
+
+## Validation Logic
+
+### Struct Definition Validation
+- **Function**: `validate_struct_definition()`
+- **Purpose**: Enhanced validation logic for struct definitions
+- **Validation Areas**:
+  - Member field type validation
+  - Positive integer size validation
+  - Total size consistency checking
+  - Bitfield-specific validation rules
+
+### Layout Validation
+- **Function**: `validate_layout()`
+- **Purpose**: Layout consistency validation
+- **Validation Rules**:
+  - Sum of bit sizes equals struct total size
+  - Proper offset calculation verification
+  - Padding entry validation
+
+### Byte/Bit Size Merging
+- **Function**: `_merge_byte_and_bit_size()`
+- **Purpose**: Compatibility layer for legacy data formats
+- **Features**:
+  - Converts length to bit_size when needed
+  - Maintains backward compatibility
+  - Supports both old and new data formats
+
 ## Extending for `union`
 The current implementation does not recognize `union` definitions. To add support, a new parsing branch would need to detect `union` keywords and adjust layout logic so that all members share offset `0` and the total size equals the largest member.
 
@@ -111,7 +171,43 @@ Offset:  0   1   2   3   4   5   6   7   8   9  10  11
 - Padding ensures correct alignment but does not store member values.
 - The value of each member is stored as raw bytes at its offset, and can be read/written by slicing the memory block accordingly.
 
+## Testing and TDD Approach
+
+### Test-Driven Development
+The struct parsing system follows TDD principles with comprehensive test coverage:
+
+- **Unit Tests**: All core functionality is unit tested
+- **Integration Tests**: End-to-end testing of struct parsing and data conversion
+- **GUI Tests**: Tkinter interface testing with proper skip handling
+- **Validation Tests**: Comprehensive validation logic testing
+
+### Test Coverage Areas
+- **Bitfield Functionality**: Parsing, layout, data extraction
+- **Manual Struct Definition**: Creation, validation, export
+- **Validation Logic**: Error handling and edge cases
+- **Memory Layout**: Padding, alignment, bitfield packing
+- **Data Processing**: Hex conversion, endianness, bitfield extraction
+
+### Testing Infrastructure
+- **Cross-Platform Test Runner**: `run_all_tests.py` separates GUI and non-GUI tests
+- **XML Configuration Tests**: Automated testing using XML configuration files
+- **TDD Workflow**: Test-first development approach for all new features
+
 ## 支援限制
 - 不支援 union、enum、typedef、nested struct、#pragma pack、__attribute__ 等 C/C++ 語法。
 - 只支援單一 struct 解析，不支援多 struct 同時解析。
 - bitfield 只支援 int/unsigned int/char/unsigned char 等基本型別，不支援 pointer bitfield。
+- 手動 struct 定義目前不支援 padding，所有成員緊密排列。
+
+## Future Enhancements
+
+### Planned Features
+- **Pragma Pack Support**: Bit-level padding foundation ready for alignment mechanisms
+- **Advanced Alignment**: Framework in place for custom alignment rules
+- **Extended Type Support**: Architecture supports additional C types
+- **Union Support**: Framework ready for union parsing implementation
+
+### Maintenance Notes
+- **Backward Compatibility**: Maintained for existing functionality
+- **Documentation**: All changes documented and tested
+- **Code Quality**: TDD approach ensures robust implementation

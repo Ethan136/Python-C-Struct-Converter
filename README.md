@@ -6,9 +6,12 @@ This project provides a graphical user interface (GUI) tool built with Python an
 
 - **Model (`src/model/`)**: Contains the core business logic, data structures, and data manipulation. It's independent of the UI.
   - `struct_model.py`: Handles parsing C++ struct definitions, calculating memory layouts (including padding), and interpreting raw hexadecimal data based on endianness.
+  - **Supports bitfield members** (e.g., `int a : 1;`) with proper packing and storage unit alignment.
+  - **Manual struct definition** with byte/bit size validation and export functionality.
 
 - **View (`src/view/`)**: Responsible for displaying the user interface and handling user interactions. It's passive and doesn't contain any business logic.
   - `struct_view.py`: Implements the Tkinter GUI elements and methods to update the display and retrieve user input.
+  - **Real-time remaining space display** showing available bits/bytes in manual struct mode.
 
 - **Presenter (`src/presenter/`)**: Acts as an intermediary between the Model and the View. It handles user events from the View, retrieves data from the Model, and updates the View accordingly. It contains the application's presentation logic.
   - `struct_presenter.py`: Manages the flow of data and events between `StructModel` and `StructView`.
@@ -54,6 +57,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
 │   └── test_input_conversion.py
 ├── run.py                    # Application launcher
 ├── run_tests.py              # Test runner
+├── run_all_tests.py          # Cross-platform test runner (separates GUI/non-GUI tests)
 ├── setup.py                  # Package configuration
 ├── requirements.txt          # Dependencies
 └── README.md                 # This file
@@ -67,10 +71,37 @@ This project provides a graphical user interface (GUI) tool built with Python an
   - The size and alignment of each member.
   - The required memory padding between members.
   - The final total size of the struct.
+- **Bitfield Support**: Full support for C/C++ bitfield members (e.g., `int a : 1;`) with proper packing and storage unit alignment.
+- **Manual Struct Definition**: Define structs directly in the GUI with byte/bit size validation and real-time remaining space display.
 - **Chunked Hexadecimal Data Input**: Allows inputting hex data in user-defined chunks (1, 4, or 8 bytes) for better readability and ease of entry.
 - **Auto-Padding Hex Input**: Automatically pads shorter hexadecimal inputs with leading zeros to match the expected chunk size (e.g., `12` in a 4-byte field becomes `00000012`).
 - **Configurable Byte Order**: Choose between Little Endian and Big Endian for data interpretation.
 - **Clear Results Display**: Shows the parsed values for each member in both decimal and hexadecimal formats.
+- **Struct Export**: Export manually defined structs to C header files with proper bitfield syntax.
+
+## Bitfield Support
+
+The application fully supports C/C++ bitfield members with the following features:
+
+### Bitfield Parsing
+- Parses bitfield declarations like `int a : 1;` from C++ header files
+- Supports multiple bitfields in the same storage unit with proper bit offset calculation
+- Handles bitfield packing across storage unit boundaries
+
+### Manual Bitfield Definition
+- Define bitfields directly in the GUI with byte/bit size specification
+- Real-time validation ensuring total bit size matches struct size
+- Automatic bit offset calculation and storage unit management
+
+### Memory Layout
+- Bitfields are packed according to C/C++ standards
+- Storage units are aligned according to type alignment rules
+- Mixed bitfield and regular member support
+
+### Data Parsing
+- Correctly extracts bitfield values from hex data considering endianness
+- Handles bitfield values that span multiple bytes
+- Supports all basic types: int, unsigned int, char, unsigned char
 
 ## Input Conversion Mechanism
 
@@ -138,6 +169,7 @@ python3 run.py
 
 3. **Review the Layout**:
    - Once loaded, the "Struct Layout" area will display the parsed information: the struct's total size, alignment, and the offset, size, and type of each member.
+   - Bitfield members will show additional information including bit offset and bit size.
 
 4. **Input Hex Data**:
    - Choose your preferred "Input Unit Size" (1, 4, or 8 Bytes) and "Byte Order" (Little Endian or Big Endian).
@@ -148,9 +180,24 @@ python3 run.py
    - Click the **"Parse Data"** button.
    - The "Parsed Values" area will populate with a table showing each member's name, its parsed value, and its original raw hex representation.
 
+### Manual Struct Definition
+
+1. **Switch to Manual Mode**:
+   - Use the tab interface to switch to "Manual Struct Definition" mode.
+
+2. **Set Struct Size**:
+   - Enter the total size of the struct in bytes.
+
+3. **Add Members**:
+   - Add struct members with name, byte size, and bit size.
+   - The interface will show real-time remaining space and validation.
+
+4. **Export to Header**:
+   - Export the manually defined struct to a C header file with proper bitfield syntax.
+
 ## Example File
 
-An `examples/example.h` file is included in the project to demonstrate the functionality with a struct that requires memory padding.
+An `examples/example.h` file is included in the project to demonstrate the functionality with a struct that requires memory padding and includes bitfield members.
 
 ## Development
 
@@ -167,6 +214,15 @@ python run_all_tests.py
 ```
 - 此腳本會自動分開執行 GUI 測試與非 GUI 測試，並彙總結果，適用於 Windows、macOS、Linux。
 - 詳細說明請見：[docs/development/run_all_tests_usage.md](docs/development/run_all_tests_usage.md)
+
+### Test-Driven Development (TDD)
+
+The project follows TDD principles with comprehensive test coverage:
+
+- **Unit Tests**: All core functionality is unit tested with pytest
+- **Integration Tests**: End-to-end testing of struct parsing and data conversion
+- **GUI Tests**: Tkinter interface testing (automatically skipped in headless environments)
+- **XML Configuration Tests**: Automated testing using XML configuration files
 
 ### Code Quality
 ```bash
@@ -189,3 +245,22 @@ mypy src/
 5. **Team Development**: Different developers can work on different layers
 
 For detailed architecture information, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Recent Updates
+
+### Bitfield and Padding Support
+- Complete bitfield parsing and layout calculation
+- Manual struct definition with byte/bit size validation
+- Real-time remaining space display
+- Struct export functionality with proper C syntax
+
+### Validation and Testing
+- Comprehensive validation logic for struct definitions
+- TDD approach with extensive test coverage
+- Cross-platform test automation
+- GUI and non-GUI test separation
+
+### Memory Layout Improvements
+- Bit-level padding calculation for future alignment support
+- Improved struct size validation
+- Enhanced bitfield packing across storage units

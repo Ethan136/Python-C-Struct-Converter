@@ -5,6 +5,8 @@
 - 如何執行/擴充/自動化測試
 - XML array 格式自動化測試說明
 - 核心功能測試說明
+- Bitfield 與手動 struct 定義測試
+- TDD 測試流程說明
 
 ## Test Files
 
@@ -64,6 +66,36 @@ Tests for core struct parsing functionality without GUI.
 - Tests empty input handling
 - **支援 XML 配置檔案自動化測試**
 
+### `test_struct_model.py` *(大幅擴充)*
+Tests for core struct model functionality with comprehensive coverage.
+- **Bitfield Support Tests**:
+  - Tests bitfield parsing from C++ struct definitions
+  - Tests bitfield layout calculation with storage units
+  - Tests bitfield data extraction from hex data
+  - Tests bitfield packing across storage unit boundaries
+  - Tests mixed bitfield and regular member handling
+- **Manual Struct Definition Tests**:
+  - Tests manual struct creation and validation
+  - Tests byte/bit size merging and compatibility
+  - Tests manual layout calculation without padding
+  - Tests struct export to C header files
+- **Validation Logic Tests**:
+  - Tests struct definition validation
+  - Tests member field validation
+  - Tests layout consistency validation
+  - Tests error handling and edge cases
+- **Legacy Compatibility Tests**:
+  - Tests length field to bit_size conversion
+  - Tests backward compatibility with old data formats
+
+### `test_struct_manual_integration.py` *(新增)*
+Tests for manual struct definition integration functionality.
+- Tests complete manual struct creation workflow
+- Tests validation feedback and error handling
+- Tests real-time remaining space calculation
+- Tests struct export functionality
+- Tests integration between manual and file-based struct loading
+
 ### `test_gui_input_validation.py`
 Tests for GUI input validation and length limiting.
 - Tests hex character validation
@@ -72,13 +104,24 @@ Tests for GUI input validation and length limiting.
 - Tests auto-focus removal verification
 - Tests input validation binding
 
-### `test_struct_view.py`
-Tests for GUI view functionality.
+### `test_struct_view.py` *(大幅擴充)*
+Tests for GUI view functionality with TDD approach.
 - Tests UI component initialization
 - Tests presenter wiring
 - Tests error message display
 - Tests bitfield display in parsed values
 - Tests struct layout display with bitfield info
+- **Manual Struct Definition GUI Tests**:
+  - Tests tab switching between file loading and manual definition
+  - Tests dynamic member table functionality
+  - Tests real-time remaining space display
+  - Tests validation feedback in GUI
+  - Tests export functionality triggers
+- **TDD Tests for Remaining Space Display**:
+  - Tests correct display of remaining bits/bytes
+  - Tests dynamic updates when members are added/removed
+  - Tests validation state display
+  - Tests edge cases (empty struct, full struct, partial fill)
 
 ### `test_config_parser.py`
 Tests for XML configuration parsing.
@@ -157,6 +200,93 @@ python3 -m unittest tests.test_struct_parsing_core.TestStructParsingCore.test_al
 - ✅ **混合欄位大小**: char, short, int, long long
 - ✅ **空輸入處理**: 空輸入轉換為零值
 - ✅ **數值驗證**: 驗證解析結果的正確性
+- ✅ **Bitfield 支援**: 完整的 bitfield 解析與處理
+- ✅ **手動 struct 定義**: 手動建立與驗證 struct
+
+## Bitfield 測試 (Bitfield Testing)
+
+### 概述
+專案新增完整的 bitfield 支援測試，涵蓋 C/C++ bitfield 語法的所有方面。
+
+### 測試範圍
+- **Bitfield 解析**: 測試 `int a : 1;` 語法解析
+- **Storage Unit 管理**: 測試 bitfield 在 storage unit 內的分配
+- **Bit Offset 計算**: 測試 bitfield 在 storage unit 內的 bit offset
+- **跨 Storage Unit**: 測試 bitfield 跨越 storage unit 邊界
+- **混合成員**: 測試 bitfield 與普通成員混用的情況
+- **資料提取**: 測試從 hex 資料中正確提取 bitfield 值
+
+### 執行 Bitfield 測試
+```bash
+# 執行所有 bitfield 相關測試
+python3 -m unittest tests.test_struct_model.TestStructModel.test_bitfield_* -v
+
+# 執行特定 bitfield 測試
+python3 -m unittest tests.test_struct_model.TestStructModel.test_bitfield_parsing -v
+python3 -m unittest tests.test_struct_model.TestStructModel.test_bitfield_layout -v
+python3 -m unittest tests.test_struct_model.TestStructModel.test_parse_hex_data_bitfields -v
+```
+
+### Bitfield 測試案例
+- 單一 bitfield: `struct A { int a:1; int b:2; int c:5; };`
+- 跨 byte bitfield: `struct B { char a:4; char b:4; char c:8; };`
+- 不同型別斷開: `struct C { int a:3; char b:2; int c:5; };`
+- 混合 bitfield 與一般欄位: `struct D { int a:1; int b; int c:2; };`
+
+## 手動 Struct 定義測試 (Manual Struct Definition Testing)
+
+### 概述
+測試手動 struct 定義功能，包括 GUI 介面、驗證邏輯、匯出功能等。
+
+### 測試範圍
+- **GUI 介面**: Tab 切換、成員表格、即時驗證
+- **驗證邏輯**: 成員名稱唯一性、大小驗證、總大小一致性
+- **Layout 計算**: 無 padding 的記憶體排列
+- **匯出功能**: C header 檔案匯出
+- **整合測試**: 完整的手動 struct 建立流程
+
+### 執行手動 Struct 測試
+```bash
+# 執行所有手動 struct 相關測試
+python3 -m unittest tests.test_struct_model.TestStructModel.test_manual_* -v
+python3 -m unittest tests.test_struct_manual_integration -v
+
+# 執行特定測試
+python3 -m unittest tests.test_struct_model.TestStructModel.test_validate_manual_struct -v
+python3 -m unittest tests.test_struct_model.TestStructModel.test_calculate_manual_layout -v
+python3 -m unittest tests.test_struct_model.TestStructModel.test_export_manual_struct_to_h -v
+```
+
+### 手動 Struct 測試案例
+- 基本手動 struct 建立與驗證
+- 成員名稱重複錯誤處理
+- 大小驗證錯誤處理
+- 總大小不一致錯誤處理
+- C header 檔案匯出格式驗證
+
+## TDD 測試 (Test-Driven Development)
+
+### 概述
+專案採用 TDD 開發方法，所有新功能都先寫測試再實作。
+
+### TDD 流程
+1. **寫測試**: 先撰寫失敗的測試案例
+2. **實作功能**: 實作最小可行功能讓測試通過
+3. **重構**: 改善程式碼品質
+4. **重複**: 持續迭代直到功能完成
+
+### TDD 測試案例
+- **剩餘空間顯示**: 測試 GUI 即時顯示剩餘可用空間
+- **驗證回饋**: 測試驗證錯誤的即時顯示
+- **動態更新**: 測試成員增刪時的動態更新
+- **邊界情況**: 測試空 struct、滿 struct、部分填滿等情況
+
+### 執行 TDD 測試
+```bash
+# 執行 TDD 相關測試
+python3 -m unittest tests.test_struct_view.TestStructView.test_remaining_space_display -v
+python3 -m unittest tests.test_struct_view.TestStructView.test_validation_feedback -v
+```
 
 ## XML 測試自動化與簡化
 
@@ -191,7 +321,7 @@ python3 -m unittest test_input_conversion -v
 ```
 或在專案根目錄：
 ```bash
-python3 run_tests.py --test test_input_conversion
+python run_tests.py --test test_input_conversion
 ```
 
 ### 測試結果
@@ -207,6 +337,9 @@ python3 -m unittest discover tests -v
 
 # Or use the test runner
 python3 run_tests.py
+
+# Or use the cross-platform test runner (recommended)
+python run_all_tests.py
 ```
 
 ### Run Specific Test Module
@@ -219,6 +352,8 @@ python3 -m unittest tests.test_struct_model_integration -v
 python3 -m unittest tests.test_struct_parsing_core -v
 python3 -m unittest tests.test_gui_input_validation -v
 python3 -m unittest tests.test_struct_view -v
+python3 -m unittest tests.test_struct_model -v
+python3 -m unittest tests.test_struct_manual_integration -v
 
 # Or use the test runner
 python3 run_tests.py --test test_input_conversion
@@ -228,6 +363,8 @@ python3 run_tests.py --test test_struct_model_integration
 python3 run_tests.py --test test_struct_parsing_core
 python3 run_tests.py --test test_gui_input_validation
 python3 run_tests.py --test test_struct_view
+python3 run_tests.py --test test_struct_model
+python3 run_tests.py --test test_struct_manual_integration
 ```
 
 ### Run Specific Test Method
@@ -246,135 +383,67 @@ python3 -m unittest test_struct_model_integration -v
 python3 -m unittest test_struct_parsing_core -v
 python3 -m unittest test_gui_input_validation -v
 python3 -m unittest test_struct_view -v
+python3 -m unittest test_struct_model -v
+python3 -m unittest test_struct_manual_integration -v
 ```
 
-## Test Coverage
+## 測試結果統計
 
-The tests cover the following areas:
+### 當前測試狀態
+- **總測試數**: 131
+- **通過**: 114
+- **跳過**: 17 (GUI 測試在 headless 環境)
+- **警告**: 3 (非關鍵配置問題)
 
-### Input Conversion Mechanism (`test_input_conversion.py`)
-- ✅ **4-byte field expansion**: Input `12` → Expand to `00000012`
-- ✅ **8-byte field expansion**: Input `123` → Expand to `0000000000000123`
-- ✅ **1-byte field expansion**: Input `1` → Expand to `01`
-- ✅ **Empty field handling**: Empty fields → All zeros
-- ✅ **Big endian conversion**: Correct byte ordering
-- ✅ **Little endian conversion**: Correct byte ordering
-- ✅ **Value range validation**: Prevents overflow
-- ✅ **Invalid input handling**: Rejects non-hex characters
-- ✅ **Model integration**: Works with struct parsing
+### 測試分類
+- **核心邏輯**: 所有測試通過
+- **Bitfield 功能**: 完整覆蓋
+- **手動 Struct 定義**: 完整驗證
+- **GUI 介面**: 在 headless 環境中正確跳過
 
-### Input Field Processor (`test_input_field_processor.py`)
-- ✅ **Hex input padding**: Automatic zero padding
-- ✅ **Raw byte conversion**: Endianness handling
-- ✅ **Complete pipeline**: End-to-end processing
-- ✅ **Error handling**: Invalid inputs and edge cases
-- ✅ **Field size validation**: Supported size checking
+### 測試覆蓋範圍
+- ✅ **Struct 解析**: 基本型別、bitfield、pointer
+- ✅ **記憶體排列**: padding、alignment、bitfield packing
+- ✅ **資料處理**: hex 轉換、endianness、bitfield 提取
+- ✅ **手動定義**: GUI 介面、驗證、匯出
+- ✅ **整合測試**: 端到端功能驗證
+- ✅ **GUI 測試**: 介面行為 (適當的跳過處理)
 
-### Struct Parsing (`test_struct_parsing.py`)
-- ✅ **Struct definition parsing**: Valid and invalid structs
-- ✅ **Bitfield parsing**: Bit field member extraction
-- ✅ **Pointer type handling**: Pointer member recognition
-- ✅ **Layout calculation**: Memory layout with padding
-- ✅ **Bitfield layout**: Bit field storage unit management
+## 測試最佳實踐
 
-### Struct Model Integration (`test_struct_model_integration.py`)
-- ✅ **Model initialization**: State management
-- ✅ **File loading**: Struct loading from files
-- ✅ **Hex data parsing**: Various parsing scenarios
-- ✅ **Endianness handling**: Big/little endian support
-- ✅ **Bitfield extraction**: Bit field value extraction
-- ✅ **Type-specific parsing**: Bool, pointer, padding handling
+### 1. TDD 開發流程
+- 先寫測試，再實作功能
+- 確保測試失敗後再實作
+- 持續重構改善程式碼品質
 
-### String Parser (`test_string_parser.py`)
-- ✅ **XML loading**: Loads UI strings from XML files
-- ✅ **String retrieval**: Gets strings with fallback handling
+### 2. 測試分類
+- **單元測試**: 測試個別函數/方法
+- **整合測試**: 測試模組間互動
+- **GUI 測試**: 測試使用者介面 (適當跳過)
 
-### GUI Input Validation (`test_gui_input_validation.py`)
-- ✅ **Hex validation**: Only hex characters allowed
-- ✅ **Length limiting**: Input length restrictions
-- ✅ **Control key handling**: Navigation and shortcuts
-- ✅ **Auto-focus removal**: No automatic field jumping
+### 3. 測試資料管理
+- 使用 XML 配置檔案管理測試資料
+- 支援自動化測試案例擴充
+- 保持測試資料與程式碼同步
 
-### Core Struct Parsing (`test_struct_parsing_core.py`)
-- ✅ **Struct definition loading**: Loads struct definitions from .h files
-- ✅ **Input processing**: Processes input data with InputFieldProcessor
-- ✅ **Endianness handling**: Supports both little and big endian
-- ✅ **Padding handling**: Correctly handles struct padding
-- ✅ **Mixed field sizes**: Supports char, short, int, long long
-- ✅ **Empty input handling**: Converts empty inputs to zero values
-- ✅ **Value validation**: Validates parsed results against expected values
+### 4. 跨平台測試
+- 使用 `run_all_tests.py` 進行跨平台測試
+- 分離 GUI 與非 GUI 測試
+- 適當處理 headless 環境
 
-### GUI View (`test_struct_view.py`)
-- ✅ **UI initialization**: All components properly created
-- ✅ **Presenter wiring**: Button and command connections
-- ✅ **Error display**: Error message handling
-- ✅ **Bitfield display**: Bit field information in results
-- ✅ **Layout display**: Struct layout with bit field info
+## 未來測試規劃
 
-## Test Structure
+### 1. 測試覆蓋率提升
+- 增加更多邊界條件測試
+- 擴充錯誤處理測試
+- 新增效能測試
 
-All tests follow the standard Python `unittest` framework:
+### 2. 自動化測試增強
+- 整合 CI/CD pipeline
+- 自動化 GUI 測試 (使用虛擬顯示)
+- 測試報告自動化
 
-```python
-import unittest
-
-class TestClassName(unittest.TestCase):
-    def setUp(self):
-        """Set up test fixtures"""
-        pass
-    
-    def tearDown(self):
-        """Clean up test fixtures"""
-        pass
-    
-    def test_specific_functionality(self):
-        """Test description"""
-        # Test implementation
-        self.assertEqual(expected, actual)
-```
-
-## Adding New Tests
-
-To add new tests:
-
-1. Create a new file `test_<module_name>.py` in the `tests/` directory
-2. Follow the existing naming convention and structure
-3. Use descriptive test method names starting with `test_`
-4. Include proper setup and teardown methods if needed
-5. Add comprehensive docstrings explaining what each test does
-
-## Test Requirements
-
-- All tests must pass before merging code changes
-- Tests should be comprehensive and cover edge cases
-- Tests should be independent and not rely on external state
-- Tests should clean up after themselves (use `tearDown` methods)
-- Tests should provide clear error messages when they fail
-
-## Continuous Integration
-
-These tests are designed to be run in CI/CD pipelines. The test runner (`run_tests.py`) provides a simple interface for automated testing environments. 
-
-# 測試說明
-
-本測試套件涵蓋：
-- struct 解析、記憶體佈局、bitfield、padding、pointer、混合欄位
-- hex 資料解析（含 endianness、padding、bitfield、pointer、bool、short input 等）
-- input field processor 的所有功能（pad_hex_input, process_input_field, convert_to_raw_bytes, is_supported_field_size），含正常與異常情境
-- config/ui_strings.py 的 get_string，驗證 key 存在與不存在時的行為
-- GUI 與 Presenter wiring、錯誤處理、UI 狀態
-- 測試資料與範例 struct 覆蓋多種結構
-
-所有 public API 均有單元測試，並涵蓋異常/邊界情境。
-
-## 重構說明
-
-### 程式碼重構
-- **StructView**: 將 `__init__` 方法拆分為多個私有方法，提高可讀性
-- **StructModel**: 將 `calculate_layout` 拆分為 `LayoutCalculator` 類別，改善複雜度
-- **測試檔案**: 將肥大的 `test_struct_model.py` 拆分為多個專責測試檔案
-
-### 測試檔案重構
-- `test_struct_parsing.py`: 專門測試 struct 解析和 layout 計算
-- `test_struct_model_integration.py`: 專門測試 StructModel 整合功能
-- 保留原有測試檔案，確保向後相容性 
+### 3. 測試工具改進
+- 測試資料生成工具
+- 測試結果分析工具
+- 測試覆蓋率報告工具 
