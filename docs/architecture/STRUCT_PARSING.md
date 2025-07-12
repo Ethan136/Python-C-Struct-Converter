@@ -72,16 +72,18 @@ Each struct member (including padding and bitfields) is stored as a dictionary. 
 ### Overview
 The system supports manual struct definition through GUI interface, allowing users to create structs without external header files.
 
-> **Note:** Manual struct mode does not support padding or advanced C features (e.g., union, nested struct, #pragma pack). All members are tightly packed.
+> **Note:** Manual struct mode now fully supports C++-style alignment and padding. All members are automatically aligned and padded as in C++.
 
 ### Manual Layout Calculation
 - **Function**: `calculate_manual_layout(members, total_size)`
-- **Purpose**: Calculate layout for manually defined structs without padding
+- **Purpose**: Calculate layout for manually defined structs using C++ standard alignment and padding rules
 - **Features**:
   - Bit-level size tracking
   - Automatic end padding insertion
+  - **Automatic alignment and padding for all members, matching C++ compiler behavior**
   - Validation against total struct size
   - Future-ready for pragma pack/align mechanisms
+- **Implementation Note**: `calculate_manual_layout` now directly calls `calculate_layout` after converting members to C++ types, so the resulting layout is identical to what a C++ compiler would produce.
 
 ### Manual Struct Validation
 - **Function**: `validate_manual_struct(members, total_size)`

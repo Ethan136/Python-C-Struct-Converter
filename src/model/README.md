@@ -1,5 +1,7 @@
 # Model Layer 說明文件
 
+> **2024/07 補充：手動 struct（MyStruct）現在會自動依 C++ 標準 struct align/padding 機制產生記憶體佈局。所有成員型別會自動推斷（byte/bit 欄位自動對應 char/short/int/long long/bitfield），並自動補齊必要的 padding，結構體結尾也會補齊 align。這讓手動 struct 的記憶體佈局與 C++ 編譯器產生的結果完全一致。**
+
 本目錄包含 C++ Struct 解析工具的 Model 層，負責核心業務邏輯與資料處理。
 
 ## 檔案說明

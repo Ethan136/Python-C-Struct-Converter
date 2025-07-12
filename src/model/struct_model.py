@@ -350,67 +350,68 @@ class StructModel:
                 errors.append(f"成員名稱 '{n}' 重複")
         if not isinstance(total_size, int) or total_size <= 0:
             errors.append("結構體大小需為正整數")
-            return errors  # 如果 total_size 無效，直接返回，不進行 layout 驗證
-        # 新驗證：layout 所有 entry（含 padding）的 bit_size 總和 == struct 總大小（bytes）× 8
-        layout = self.calculate_manual_layout(members, total_size)
-        total_bits = sum(item["bit_size"] for item in layout)
-        if total_size > 0 and total_bits != total_size * 8:
-            errors.append(f"Layout 總長度 ({total_bits} bits) 不等於結構體大小 ({total_size*8} bits)")
+        # layout 驗證
+        if not errors:
+            layout = self.calculate_manual_layout(members, total_size)
+            # 取得 layout 計算出來的 struct 大小
+            from model.struct_model import calculate_layout
+            expanded_members = self._convert_to_cpp_members(members)
+            _, layout_size, _ = calculate_layout(expanded_members)
+            if layout_size > total_size:
+                errors.append(f"Layout 總長度 ({layout_size} bytes) 超過指定 struct 大小 ({total_size} bytes)")
         return errors
 
-    def calculate_manual_layout(self, members, total_size):
-        new_members = self._merge_byte_and_bit_size(members)
-        layout = []
-        byte_offset = 0
-        bit_offset = 0
+    def _convert_to_cpp_members(self, members):
+        """將 byte/bit 欄位轉換為 C++ 標準型別"""
+        def infer_type(byte_size, bit_size):
+            if bit_size > 0:
+                # bitfield，預設用 unsigned int
+                return {"type": "unsigned int", "name": "", "is_bitfield": True, "bit_size": bit_size}
+            if byte_size == 1:
+                return {"type": "char", "name": ""}
+            elif byte_size == 2:
+                return {"type": "short", "name": ""}
+            elif byte_size == 4:
+                return {"type": "int", "name": ""}
+            elif byte_size == 8:
+                return {"type": "long long", "name": ""}
+            elif byte_size > 0:
+                # 其他大小用 unsigned char 陣列
+                return {"type": "unsigned char", "name": "", "array_size": byte_size}
+            else:
+                return None
+
+        new_members = []
+        for m in members:
+            name = m.get("name", "")
+            byte_size = m.get("byte_size", 0)
+            bit_size = m.get("bit_size", 0)
+            t = infer_type(byte_size, bit_size)
+            if t is None:
+                continue
+            t["name"] = name
+            if t.get("is_bitfield"):
+                t["bit_size"] = bit_size
+            if "array_size" in t:
+                t["array_size"] = t["array_size"]
+            new_members.append(t)
+
+        # 將 array_size 轉成多個 char 欄位
+        expanded_members = []
         for m in new_members:
-            if m["bit_size"] > 0:
-                # 計算 bitfield 的 storage unit size
-                # 如果 bit_offset + bit_size 超過 8 bits，需要新的 storage unit
-                if bit_offset + m["bit_size"] > 8:
-                    # 需要新的 storage unit，通常是 1 byte (8 bits)
-                    storage_size = 1
-                else:
-                    # 使用現有的 storage unit
-                    storage_size = 0 if bit_offset == 0 else 1
-                
-                layout.append({
-                    "name": m["name"],
-                    "type": "bitfield",
-                    "size": storage_size,
-                    "offset": byte_offset,
-                    "is_bitfield": True,
-                    "bit_offset": bit_offset,
-                    "bit_size": m["bit_size"]
-                })
-                bit_offset += m["bit_size"]
-                byte_offset += bit_offset // 8
-                bit_offset = bit_offset % 8
-            elif m["byte_size"] > 0:
-                layout.append({
-                    "name": m["name"],
-                    "type": "byte",
-                    "size": m["byte_size"],
-                    "offset": byte_offset,
-                    "is_bitfield": False,
-                    "bit_offset": 0,
-                    "bit_size": m["byte_size"] * 8
-                })
-                byte_offset += m["byte_size"]
-        # 補齊 struct 總大小（以 bit 為單位，不再強制 byte 對齊）
-        total_bits = total_size * 8
-        used_bits = byte_offset * 8 + bit_offset
-        if used_bits < total_bits:
-            # 補一個 bit padding
-            layout.append({
-                "name": "(manual final padding)",
-                "type": "padding",
-                "size": 0,  # 不再以 byte 計算
-                "offset": byte_offset,
-                "is_bitfield": False,
-                "bit_offset": bit_offset,
-                "bit_size": total_bits - used_bits
-            })
+            if m.get("type") == "unsigned char" and m.get("array_size", 0) > 0:
+                for i in range(m["array_size"]):
+                    expanded_members.append({"type": "unsigned char", "name": f"{m['name']}_{i}"})
+            else:
+                expanded_members.append(m)
+
+        return expanded_members
+
+    def calculate_manual_layout(self, members, total_size):
+        # 使用 _convert_to_cpp_members 轉換為 C++ 標準型別
+        expanded_members = self._convert_to_cpp_members(members)
+        # 呼叫 calculate_layout 產生 C++ 標準 struct align/padding
+        layout, total, align = calculate_layout(expanded_members)
         return layout
 
     def export_manual_struct_to_h(self, struct_name=None):

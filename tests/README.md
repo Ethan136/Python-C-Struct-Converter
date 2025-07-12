@@ -240,14 +240,15 @@ python3 -m unittest tests.test_struct_model.TestStructModel.test_parse_hex_data_
 ### 概述
 測試手動 struct 定義功能，包括 GUI 介面、驗證邏輯、匯出功能等。
 
-> **Note:** Manual struct mode does not support padding; all members are tightly packed. GUI tests are automatically skipped in headless environments.
+> **Note:** Manual struct mode now fully supports C++-style alignment and padding. All members are automatically aligned and padded as in C++.
 
 ### 測試範圍
 - **GUI 介面**: Tab 切換、成員表格、即時驗證
 - **驗證邏輯**: 成員名稱唯一性、大小驗證、總大小一致性
-- **Layout 計算**: 無 padding 的記憶體排列
+- **Layout 計算**: 依 C++ 標準 struct align/padding 規則自動排列
 - **匯出功能**: C header 檔案匯出
 - **整合測試**: 完整的手動 struct 建立流程
+- **C++ align/padding 驗證**: 測試手動 struct 產生的 layout 與 C++ 編譯器一致
 
 ### 執行手動 Struct 測試
 ```bash

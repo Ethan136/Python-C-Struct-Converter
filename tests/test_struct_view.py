@@ -216,11 +216,37 @@ class TestStructView(unittest.TestCase):
         # 設定一組 byte/bit size 混合的 members
         self.view.size_var.set(8)
         self.view.members = [
-            {"name": "a", "byte_size": 4, "bit_size": 0},
-            {"name": "b", "byte_size": 0, "bit_size": 8},
-            {"name": "c", "byte_size": 4, "bit_size": 0},
+            {"name": "a", "byte_size": 4, "bit_size": 0},  # int
+            {"name": "b", "byte_size": 1, "bit_size": 0},  # char
+            {"name": "c", "byte_size": 2, "bit_size": 0},  # short
         ]
         self.view._render_member_table()
+        # 取得 layout
+        model = self.view.presenter.model if hasattr(self.view.presenter, 'model') else None
+        if model:
+            layout = model.calculate_manual_layout(self.view.members, 8)
+        else:
+            from src.model.struct_model import StructModel
+            layout = StructModel().calculate_manual_layout(self.view.members, 8)
+        # 驗證 C++ align/padding 行為
+        self.assertEqual(layout[0]['name'], 'a')
+        self.assertEqual(layout[0]['type'], 'int')
+        self.assertEqual(layout[0]['offset'], 0)
+        self.assertEqual(layout[1]['name'], 'b')
+        self.assertEqual(layout[1]['type'], 'char')
+        self.assertEqual(layout[1]['offset'], 4)
+        self.assertEqual(layout[2]['name'], '(padding)')
+        self.assertEqual(layout[2]['type'], 'padding')
+        self.assertEqual(layout[2]['size'], 1)
+        self.assertEqual(layout[2]['offset'], 5)
+        self.assertEqual(layout[3]['name'], 'c')
+        self.assertEqual(layout[3]['type'], 'short')
+        self.assertEqual(layout[3]['offset'], 6)
+        # 允許有無 (final padding)
+        if len(layout) > 4:
+            self.assertEqual(layout[4]['name'], '(final padding)')
+            self.assertEqual(layout[4]['type'], 'padding')
+            self.assertEqual(layout[4]['offset'] % 2, 0)  # align 2 or 4
         # 驗證表格有正確顯示
         self.assertEqual(len(self.view.members), 3)
 

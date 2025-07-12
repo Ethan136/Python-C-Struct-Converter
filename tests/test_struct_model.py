@@ -751,37 +751,32 @@ class TestStructModel(unittest.TestCase):
             {"name": "a", "byte_size": 1, "bit_size": 0},
             {"name": "b", "byte_size": 2, "bit_size": 0}
         ]
-        total_size = 3
+        total_size = 4  # C++ align: char + short = 4 bytes
         errors = self.model.validate_manual_struct(members, total_size)
         self.assertEqual(errors, [])
 
     def test_calculate_manual_layout_no_padding(self):
-        # 測試 bitfield 緊密排列、無 padding
+        # 測試 bitfield 緊密排列、無 padding（C++ 標準行為：同一 storage unit）
         members = [
             {"name": "a", "byte_size": 0, "bit_size": 3},
             {"name": "b", "byte_size": 0, "bit_size": 5},
             {"name": "c", "byte_size": 0, "bit_size": 8}
         ]
-        total_size = 2  # bytes
+        total_size = 4  # C++ align 4
         layout = self.model.calculate_manual_layout(members, total_size)
-        # 應該有三個 bitfield，offset 依序排列，無 padding
-        self.assertEqual(len([item for item in layout if item["type"] != "padding"]), 3)
-        self.assertEqual(layout[0]["name"], "a")
-        self.assertEqual(layout[0]["bit_offset"], 0)
-        self.assertEqual(layout[0]["bit_size"], 3)
-        self.assertEqual(layout[1]["name"], "b")
-        self.assertEqual(layout[1]["bit_offset"], 3)
-        self.assertEqual(layout[1]["bit_size"], 5)
-        self.assertEqual(layout[2]["name"], "c")
-        self.assertEqual(layout[2]["bit_offset"], 0)  # offset 進位後 bit_offset 歸零
-        self.assertEqual(layout[2]["bit_size"], 8)
-        # offset 全部為 0 或 1（根據進位）
-        self.assertEqual(layout[0]["offset"], 0)
-        self.assertEqual(layout[1]["offset"], 0)
-        self.assertEqual(layout[2]["offset"], 1)
-        # total_size = 16 bits
-        total_bits = sum(item["bit_size"] for item in layout if item["type"] != "padding")
-        self.assertEqual(total_bits, total_size * 8)
+        # 應該有三個 bitfield，全部在 offset=0, type=unsigned int, size=4
+        for i, (name, bit_offset, bit_size) in enumerate([
+            ("a", 0, 3), ("b", 3, 5), ("c", 8, 8)
+        ]):
+            self.assertEqual(layout[i]["name"], name)
+            self.assertEqual(layout[i]["type"], "unsigned int")
+            self.assertEqual(layout[i]["offset"], 0)
+            self.assertEqual(layout[i]["size"], 4)
+            self.assertEqual(layout[i]["bit_offset"], bit_offset)
+            self.assertEqual(layout[i]["bit_size"], bit_size)
+        # 檢查 struct 總大小為 4 bytes
+        storage_unit_size = layout[0]["size"]
+        self.assertEqual(storage_unit_size, 4)
 
     def test_export_manual_struct_to_h(self):
         # 多欄位 bitfield
@@ -836,38 +831,40 @@ class TestStructModel(unittest.TestCase):
             {"name": "c", "byte_size": 2, "bit_size": 0},
             {"name": "d", "byte_size": 0, "bit_size": 4}
         ]
-        total_size = 5  # bytes (40 bits)
+        total_size = 16  # C++ align 4, 8, 2, etc.，實際會比 5 大
         # 驗證 set_manual_struct
         model.set_manual_struct(members, total_size)
-        self.assertEqual(model.manual_struct["total_size"], 5)
+        self.assertEqual(model.manual_struct["total_size"], total_size)
         self.assertEqual(len(model.manual_struct["members"]), 4)
         # 驗證 validate_manual_struct
         errors = model.validate_manual_struct(members, total_size)
         self.assertEqual(errors, [])
         # 驗證 layout 計算
         layout = model.calculate_manual_layout(members, total_size)
-        # a: 1 byte, offset 0
-        self.assertEqual(layout[0]["name"], "a")
-        self.assertEqual(layout[0]["type"], "byte")
-        self.assertEqual(layout[0]["size"], 1)
-        self.assertEqual(layout[0]["offset"], 0)
-        # b: 12 bits, offset 1, bit_offset 0
-        self.assertEqual(layout[1]["name"], "b")
-        self.assertEqual(layout[1]["type"], "bitfield")
-        self.assertEqual(layout[1]["offset"], 1)
-        self.assertEqual(layout[1]["bit_offset"], 0)
-        self.assertEqual(layout[1]["bit_size"], 12)
-        # c: 2 bytes, offset 2
-        self.assertEqual(layout[2]["name"], "c")
-        self.assertEqual(layout[2]["type"], "byte")
-        self.assertEqual(layout[2]["offset"], 2)
-        self.assertEqual(layout[2]["size"], 2)
-        # d: 4 bits, offset 4, bit_offset 4
-        self.assertEqual(layout[3]["name"], "d")
-        self.assertEqual(layout[3]["type"], "bitfield")
-        self.assertEqual(layout[3]["offset"], 4)
-        self.assertEqual(layout[3]["bit_offset"], 4)
-        self.assertEqual(layout[3]["bit_size"], 4)
+        # 只驗證非 padding 成員
+        non_pad = [item for item in layout if item["type"] != "padding"]
+        # a: char, offset 0
+        self.assertEqual(non_pad[0]["name"], "a")
+        self.assertEqual(non_pad[0]["type"], "char")
+        self.assertEqual(non_pad[0]["size"], 1)
+        self.assertEqual(non_pad[0]["offset"], 0)
+        # b: unsigned int bitfield, offset 4, bit_offset 0, bit_size 12
+        self.assertEqual(non_pad[1]["name"], "b")
+        self.assertEqual(non_pad[1]["type"], "unsigned int")
+        self.assertEqual(non_pad[1]["offset"], 4)
+        self.assertEqual(non_pad[1]["bit_offset"], 0)
+        self.assertEqual(non_pad[1]["bit_size"], 12)
+        # c: short, offset 8
+        self.assertEqual(non_pad[2]["name"], "c")
+        self.assertEqual(non_pad[2]["type"], "short")
+        self.assertEqual(non_pad[2]["offset"], 8)
+        self.assertEqual(non_pad[2]["size"], 2)
+        # d: unsigned int bitfield, offset 12, bit_offset 0, bit_size 4
+        self.assertEqual(non_pad[3]["name"], "d")
+        self.assertEqual(non_pad[3]["type"], "unsigned int")
+        self.assertEqual(non_pad[3]["offset"], 12)
+        self.assertEqual(non_pad[3]["bit_offset"], 0)
+        self.assertEqual(non_pad[3]["bit_size"], 4)
 
 
 class TestCombinedExampleStruct(unittest.TestCase):

@@ -13,6 +13,7 @@ This directory contains all documentation for the C++ Struct Memory Parser proje
 ### 🏗️ Architecture Documents
 - **[MVP_ARCHITECTURE_COMPLETE.md](architecture/MVP_ARCHITECTURE_COMPLETE.md)** - Complete MVP architecture guide with component comparisons
 - **[STRUCT_PARSING.md](architecture/STRUCT_PARSING.md)** - Detailed struct parsing mechanism documentation
+- **[MANUAL_STRUCT_ALIGNMENT.md](architecture/MANUAL_STRUCT_ALIGNMENT.md)** - Manual struct alignment and padding behavior documentation
 
 ### 📊 Analysis Documents
 - **[INPUT_CONVERSION_COMPLETE.md](analysis/INPUT_CONVERSION_COMPLETE.md)** - Comprehensive input conversion mechanism guide
@@ -32,8 +33,9 @@ This directory contains all documentation for the C++ Struct Memory Parser proje
 ### For Developers
 1. Read **[MVP_ARCHITECTURE_COMPLETE.md](architecture/MVP_ARCHITECTURE_COMPLETE.md)** to understand the complete MVP architecture
 2. Review **[STRUCT_PARSING.md](architecture/STRUCT_PARSING.md)** for struct parsing details
-3. Check **[INPUT_CONVERSION_COMPLETE.md](analysis/INPUT_CONVERSION_COMPLETE.md)** for input processing details
-4. Follow **[tests/README.md](../tests/README.md)** for testing guidelines
+3. Check **[MANUAL_STRUCT_ALIGNMENT.md](architecture/MANUAL_STRUCT_ALIGNMENT.md)** for manual struct alignment and padding behavior
+4. Check **[INPUT_CONVERSION_COMPLETE.md](analysis/INPUT_CONVERSION_COMPLETE.md)** for input processing details
+5. Follow **[tests/README.md](../tests/README.md)** for testing guidelines
 
 ### For Contributors
 1. Review **[string_refactor_plan.md](development/string_refactor_plan.md)** for UI improvements
@@ -64,6 +66,7 @@ This directory contains all documentation for the C++ Struct Memory Parser proje
 ### 🏗️ Architecture Documents (`architecture/`)
 - **MVP_ARCHITECTURE_COMPLETE.md**: Complete guide to MVP architecture, component responsibilities, and design patterns
 - **STRUCT_PARSING.md**: Detailed explanation of C++ struct parsing mechanism
+- **MANUAL_STRUCT_ALIGNMENT.md**: Comprehensive guide to manual struct alignment and padding behavior
 
 ### 📊 Analysis Documents (`analysis/`)
 - **INPUT_CONVERSION_COMPLETE.md**: Comprehensive guide to hex input conversion process and requirements

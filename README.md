@@ -191,78 +191,14 @@ python3 run.py
 3. **Add Members**:
    - Add struct members with name, byte size, and bit size.
    - The interface will show real-time remaining space and validation.
+   - **All members will be automatically aligned and padded according to C++ standard struct alignment rules.**
+   - The layout and final struct size will match what a C++ compiler would produce for the same member types and order.
 
 4. **Export to Header**:
    - Export the manually defined struct to a C header file with proper bitfield syntax.
 
-> **Note:** Manual struct mode does not support padding; all members are tightly packed. Only basic types (int, unsigned int, char, unsigned char) are supported for bitfields.
+> **Note:** Manual struct mode now fully supports C++-style alignment and padding. All members are automatically aligned and padded as in C++.
 
 ## Example File
 
-An `examples/example.h` file is included in the project to demonstrate the functionality with a struct that requires memory padding and includes bitfield members.
-
-## Development
-
-For all test-related documentation, including how to run, extend, and automate tests (including XML array input), please see:
-
-👉 [tests/README.md](tests/README.md)
-
-### 測試自動化入口
-
-推薦使用專案根目錄的 `run_all_tests.py` 腳本進行所有測試：
-
-```bash
-python run_all_tests.py
-```
-- 此腳本會自動分開執行 GUI 測試與非 GUI 測試，並彙總結果，適用於 Windows、macOS、Linux。
-- 詳細說明請見：[docs/development/run_all_tests_usage.md](docs/development/run_all_tests_usage.md)
-
-### Test-Driven Development (TDD)
-
-The project follows TDD principles with comprehensive test coverage:
-
-- **Unit Tests**: All core functionality is unit tested with pytest
-- **Integration Tests**: End-to-end testing of struct parsing and data conversion
-- **GUI Tests**: Tkinter interface testing (automatically skipped in headless environments)
-- **XML Configuration Tests**: Automated testing using XML configuration files
-
-### Code Quality
-```bash
-# Format code
-black src/ tests/
-
-# Lint code
-flake8 src/ tests/
-
-# Type checking
-mypy src/
-```
-
-## Architecture Benefits
-
-1. **Maintainability**: Clear separation of concerns makes code easier to understand and modify
-2. **Testability**: Each layer can be unit tested independently
-3. **Reusability**: Model can be reused with different UI frameworks
-4. **Scalability**: Easy to add new features without affecting existing code
-5. **Team Development**: Different developers can work on different layers
-
-For detailed architecture information, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Recent Updates
-
-### Bitfield and Padding Support
-- Complete bitfield parsing and layout calculation
-- Manual struct definition with byte/bit size validation
-- Real-time remaining space display
-- Struct export functionality with proper C syntax
-
-### Validation and Testing
-- Comprehensive validation logic for struct definitions
-- TDD approach with extensive test coverage
-- Cross-platform test automation
-- GUI and non-GUI test separation
-
-### Memory Layout Improvements
-- Bit-level padding calculation for future alignment support
-- Improved struct size validation
-- Enhanced bitfield packing across storage units
+An `examples/example.h`
