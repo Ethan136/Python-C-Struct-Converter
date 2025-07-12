@@ -238,5 +238,31 @@ class TestStructView(unittest.TestCase):
         label = self.view.validation_label.cget("text")
         self.assertIn("剩餘可用空間：16 bits（2 bytes）", label)
 
+    def test_manual_struct_offset_display_byte_plus_bit(self):
+        # 設定一組 byte/bit size 混合的 members
+        self.view.members = [
+            {"name": "a", "byte_size": 1, "bit_size": 3},
+            {"name": "b", "byte_size": 0, "bit_size": 2},
+            {"name": "c", "byte_size": 1, "bit_size": 0},
+            {"name": "d", "byte_size": 0, "bit_size": 5},
+        ]
+        self.view.size_var.set(3)  # 3 bytes
+        self.view._render_member_table()
+        # 取得 offset 欄位的顯示內容
+        # offset 欄位在 column=4，row=1~N
+        offsets = []
+        for idx in range(len(self.view.members)):
+            label = self.view.member_frame.grid_slaves(row=idx+1, column=4)[0]
+            offsets.append(label.cget("text"))
+        # 應該都是 "byte+bit" 格式（bit_offset=0 可只顯示 byte）
+        for offset_str in offsets:
+            # 允許 "N" 或 "N+M" 格式
+            self.assertRegex(offset_str, r"^\d+(\+\d+)?$")
+        # 具體驗證第一個欄位（a）應為 "0" 或 "0+0"，第二個欄位（b）應為 "1+3" 之類
+        self.assertIn(offsets[0], ["0", "0+0"])  # a
+        self.assertRegex(offsets[1], r"^\d+\+\d+$")  # b
+        self.assertIn(offsets[2], ["1", "1+0"])  # c
+        self.assertRegex(offsets[3], r"^\d+\+\d+$")  # d
+
 if __name__ == "__main__":
     unittest.main()

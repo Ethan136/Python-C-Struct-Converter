@@ -159,7 +159,10 @@ class StructView(tk.Tk):
             # offset 顯示（合併同名 layout row）
             layout_rows = [item for item in layout if item["name"] == m.get("name", "")]
             if layout_rows:
-                offsets = ",".join(str(item["offset"]) for item in layout_rows)
+                offsets = ",".join(
+                    f"{item['offset']}+{item['bit_offset']}" if item['bit_offset'] else f"{item['offset']}"
+                    for item in layout_rows
+                )
                 bit_offsets = ",".join(str(item["bit_offset"]) for item in layout_rows)
                 tk.Label(self.member_frame, text=offsets).grid(row=idx+1, column=4)
                 tk.Label(self.member_frame, text=bit_offsets).grid(row=idx+1, column=5)
