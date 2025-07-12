@@ -182,3 +182,141 @@
 ---
 
 如需更進一步的UI設計圖或程式碼範例，請再告知！ 
+
+---
+
+## 8. 實作細節規劃
+
+### 8.1 需要改動的檔案與內容
+
+- **src/view/struct_view.py**
+  - 新增/調整 GUI：Tab 切換、手動設定資料結構的 UI、bitfield 設定表格、互動邏輯
+- **src/presenter/struct_presenter.py**
+  - 新增/調整 Presenter：Tab 切換事件、手動設定資料結構的資料流、驗證、匯出
+- **src/model/struct_model.py**
+  - 新增/調整 Model：支援手動 bitfield 結構的資料結構、驗證、無 padding 計算、匯出 .h 檔
+- **src/model/input_field_processor.py**
+  - 如需自訂 bitfield 輸入處理，則需擴充
+- 可能需新增/調整 config（如國際化字串）
+- **tests/** 相關測試檔案（如 test_struct_view.py、test_struct_model.py 等）
+- **docs/development/v3_define_struct_input2_design_plan.md**（設計規格文件，持續同步更新）
+
+### 8.2 需要改動/新增的物件與 function
+
+#### View（struct_view.py）
+- 物件/屬性：
+  - `self.tab_control`（Tab 控制元件）
+  - `self.manual_struct_frame`（手動設定資料結構的 Frame）
+  - `self.bitfield_table`（bitfield 設定表格元件）
+- function：
+  - `_create_tab_control()`：建立 Tab UI
+  - `_create_manual_struct_frame()`：建立手動設定資料結構的 UI
+  - `get_manual_struct_definition()`：取得手動輸入的 struct 定義
+  - `show_manual_struct_validation()`：顯示驗證結果
+  - `on_export_manual_struct()`：匯出 .h 檔
+
+#### Presenter（struct_presenter.py）
+- 物件/屬性：
+  - `self.manual_struct_data`（暫存手動設定的資料結構）
+- function：
+  - `on_tab_switch()`：Tab 切換事件
+  - `on_manual_struct_change()`：手動設定資料結構時的資料流與驗證
+  - `on_export_manual_struct()`：呼叫 Model 匯出 .h 檔
+  - `validate_manual_struct()`：驗證 bitfield 設定
+
+#### Model（struct_model.py）
+- 物件/屬性：
+  - `self.manual_struct`（手動設定的 struct 物件）
+- function：
+  - `set_manual_struct(members, total_size)`：設定手動 struct
+  - `validate_manual_struct(members, total_size)`：驗證 bitfield 設定
+  - `export_manual_struct_to_h()`：產生 .h 檔內容
+  - `calculate_manual_layout(members, total_size)`：無 padding 的 bitfield 記憶體排列
+
+#### 測試
+- 新增/擴充單元測試與整合測試，覆蓋：
+  - bitfield 設定驗證
+  - 無 padding 記憶體排列
+  - 匯出 .h 檔格式
+  - GUI 互動流程
+
+### 8.3 其他注意事項
+- 若現有 GUI 為 Tkinter，Tab 建議用 `ttk.Notebook`
+- 若現有 Model 計算有 padding，需為手動模式新增「無 padding」排列邏輯
+- 匯出 .h 檔需自動產生正確的 C struct bitfield 語法
+- 驗證需即時反饋於 UI，並影響「儲存/匯出」按鈕狀態 
+
+### 8.4 主要 function 介面細節與測試/功能骨架建議
+
+#### View（struct_view.py）
+
+- `def _create_tab_control(self) -> None:`
+  - 建立 Tab UI，切換「載入.H檔」與「手動設定資料結構」兩個頁籤。
+  - 無參數，無回傳值。
+  - 測試：Tab 切換時內容正確顯示。
+
+- `def _create_manual_struct_frame(self) -> None:`
+  - 建立手動設定資料結構的 UI（結構體大小、bitfield 表格、操作按鈕）。
+  - 無參數，無回傳值。
+  - 測試：UI 元件正確渲染，欄位可互動。
+
+- `def get_manual_struct_definition(self) -> dict:`
+  - 取得使用者於 UI 輸入的 struct 定義資料。
+  - 回傳：dict，格式如 `{ 'total_size': int, 'bitfields': List[{'name': str, 'length': int}] }`
+  - 測試：輸入不同資料，回傳內容正確。
+
+- `def show_manual_struct_validation(self, errors: list) -> None:`
+  - 顯示驗證錯誤訊息於 UI。
+  - 參數：errors（list of str）
+  - 測試：錯誤時紅字顯示，正確時顯示通過。
+
+- `def on_export_manual_struct(self) -> None:`
+  - 匯出手動設定的 struct 為 .h 檔。
+  - 無參數，無回傳值。
+  - 測試：匯出內容正確，檔案可下載。
+
+#### Presenter（struct_presenter.py）
+
+- `def on_tab_switch(self, tab_name: str) -> None:`
+  - 處理 Tab 切換事件，tab_name 為目前選中的頁籤。
+  - 測試：切換時 UI 狀態正確、資料流正確。
+
+- `def on_manual_struct_change(self, struct_data: dict) -> None:`
+  - 處理手動 struct 設定變更，進行驗證並更新狀態。
+  - 參數：struct_data（dict，格式同 get_manual_struct_definition 回傳）
+  - 測試：資料異動時驗證正確、UI 及按鈕狀態正確。
+
+- `def on_export_manual_struct(self) -> None:`
+  - 呼叫 Model 匯出 .h 檔，並觸發 View 顯示/下載。
+  - 測試：匯出內容正確。
+
+- `def validate_manual_struct(self, struct_data: dict) -> list:`
+  - 驗證 bitfield 設定，回傳錯誤訊息 list。
+  - 測試：各種錯誤情境皆能正確回報。
+
+#### Model（struct_model.py）
+
+- `def set_manual_struct(self, members: list, total_size: int) -> None:`
+  - 設定手動 struct 內容。
+  - 測試：設定後屬性正確。
+
+- `def validate_manual_struct(self, members: list, total_size: int) -> list:`
+  - 驗證 bitfield 設定（長度總和、名稱唯一、長度正整數等），回傳錯誤訊息 list。
+  - 測試：各種錯誤情境皆能正確回報。
+
+- `def export_manual_struct_to_h(self) -> str:`
+  - 產生對應的 C struct bitfield 語法（無 padding），回傳 .h 檔內容字串。
+  - 測試：產生內容正確。
+
+- `def calculate_manual_layout(self, members: list, total_size: int) -> list:`
+  - 計算無 padding 的 bitfield 記憶體排列，回傳 layout list。
+  - 測試：排列正確、無 padding。
+
+#### 測試/功能骨架建議
+- 每個 function 先寫單元測試（如 pytest/unittest），再實作功能。
+- 測試覆蓋：
+  - UI 互動（可用 mock 或 integration 測試）
+  - bitfield 驗證（如總長度不符、名稱重複、長度非正整數等）
+  - 匯出內容格式
+  - 記憶體排列正確性
+- 建議先產生測試檔案與 function stub，再逐步實作。 
