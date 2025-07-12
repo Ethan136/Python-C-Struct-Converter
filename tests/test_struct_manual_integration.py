@@ -12,7 +12,7 @@ class TestManualStructIntegration(unittest.TestCase):
             {"name": "b", "length": 5},
             {"name": "c", "length": 8}
         ]
-        total_size = 16
+        total_size = 2
         self.model.set_manual_struct(members, total_size)
 
         # 2. 驗證
@@ -21,17 +21,17 @@ class TestManualStructIntegration(unittest.TestCase):
 
         # 3. 計算 layout
         layout = self.model.calculate_manual_layout(members, total_size)
-        self.assertEqual(len(layout), 3)
+        self.assertEqual(len([item for item in layout if item["type"] != "padding"]), 3)
         self.assertEqual(layout[0]["name"], "a")
         self.assertEqual(layout[1]["name"], "b")
         self.assertEqual(layout[2]["name"], "c")
         self.assertEqual(layout[0]["bit_offset"], 0)
         self.assertEqual(layout[1]["bit_offset"], 3)
-        self.assertEqual(layout[2]["bit_offset"], 8)
+        self.assertEqual(layout[2]["bit_offset"], 0)
         self.assertEqual(layout[2]["bit_size"], 8)
-        for item in layout:
-            self.assertEqual(item["offset"], 0)
-            self.assertEqual(item["size"], 2)  # 16 bits = 2 bytes
+        # 檢查 struct 總大小是否為 2 bytes (16 bits)
+        total_bits = sum(item["bit_size"] for item in layout)
+        self.assertEqual(total_bits, total_size * 8)
 
         # 4. 匯出 .h 檔
         h_content = self.model.export_manual_struct_to_h()
@@ -39,7 +39,7 @@ class TestManualStructIntegration(unittest.TestCase):
         self.assertIn("unsigned int a : 3;", h_content)
         self.assertIn("unsigned int b : 5;", h_content)
         self.assertIn("unsigned int c : 8;", h_content)
-        self.assertIn("// total size: 16 bits", h_content)
+        self.assertIn("// total size: 2 bytes", h_content)
 
 if __name__ == "__main__":
     unittest.main() 

@@ -246,6 +246,14 @@ class StructModel:
         """
         merged = []
         for m in members:
+            # 兼容舊格式: 若只有 length，轉為 bit_size
+            if "length" in m and "bit_size" not in m and "byte_size" not in m:
+                merged.append({
+                    "name": m["name"],
+                    "byte_size": 0,
+                    "bit_size": m["length"]
+                })
+                continue
             byte_size = m.get("byte_size", 0)
             bit_size = m.get("bit_size", 0)
             if bit_size > 0:
@@ -254,12 +262,13 @@ class StructModel:
                     "byte_size": 0,
                     "bit_size": byte_size * 8 + bit_size
                 })
-            else:
+            elif byte_size > 0:
                 merged.append({
                     "name": m["name"],
                     "byte_size": byte_size,
                     "bit_size": 0
                 })
+            # byte_size=0 且 bit_size=0 的 member 直接略過
         return merged
 
     def set_manual_struct(self, members, total_size):
@@ -326,22 +335,27 @@ class StructModel:
         return parsed_values
 
     def validate_manual_struct(self, members, total_size):
-        new_members = self._merge_byte_and_bit_size(members)
+        # 先對原始 members 做型別與正整數驗證
         errors = []
-        for m in new_members:
-            if not isinstance(m["byte_size"], int) or m["byte_size"] < 0:
-                errors.append(f"member '{m['name']}' byte_size 需為 0 或正整數")
-            if not isinstance(m["bit_size"], int) or m["bit_size"] < 0:
-                errors.append(f"member '{m['name']}' bit_size 需為 0 或正整數")
+        for m in members:
+            if not isinstance(m.get("byte_size", 0), int) or m.get("byte_size", 0) < 0:
+                errors.append(f"member '{m.get('name', '?')}' byte_size 需為 0 或正整數")
+            if not isinstance(m.get("bit_size", 0), int) or m.get("bit_size", 0) < 0:
+                errors.append(f"member '{m.get('name', '?')}' bit_size 需為 0 或正整數")
+        # 其餘驗證仍用合併後的 members
+        new_members = self._merge_byte_and_bit_size(members)
         names = [m["name"] for m in new_members]
         if len(set(names)) != len(names):
             for n in set([x for x in names if names.count(x) > 1]):
                 errors.append(f"成員名稱 '{n}' 重複")
         if not isinstance(total_size, int) or total_size <= 0:
             errors.append("結構體大小需為正整數")
-        total_bits = sum(m["byte_size"] * 8 + m["bit_size"] for m in new_members)
+            return errors  # 如果 total_size 無效，直接返回，不進行 layout 驗證
+        # 新驗證：layout 所有 entry（含 padding）的 bit_size 總和 == struct 總大小（bytes）× 8
+        layout = self.calculate_manual_layout(members, total_size)
+        total_bits = sum(item["bit_size"] for item in layout)
         if total_size > 0 and total_bits != total_size * 8:
-            errors.append(f"Member 總長度 ({total_bits} bits) 不等於結構體大小 ({total_size*8} bits)")
+            errors.append(f"Layout 總長度 ({total_bits} bits) 不等於結構體大小 ({total_size*8} bits)")
         return errors
 
     def calculate_manual_layout(self, members, total_size):
@@ -351,10 +365,19 @@ class StructModel:
         bit_offset = 0
         for m in new_members:
             if m["bit_size"] > 0:
+                # 計算 bitfield 的 storage unit size
+                # 如果 bit_offset + bit_size 超過 8 bits，需要新的 storage unit
+                if bit_offset + m["bit_size"] > 8:
+                    # 需要新的 storage unit，通常是 1 byte (8 bits)
+                    storage_size = 1
+                else:
+                    # 使用現有的 storage unit
+                    storage_size = 0 if bit_offset == 0 else 1
+                
                 layout.append({
                     "name": m["name"],
                     "type": "bitfield",
-                    "size": 1 if bit_offset + m["bit_size"] > 8 else 0,
+                    "size": storage_size,
                     "offset": byte_offset,
                     "is_bitfield": True,
                     "bit_offset": bit_offset,
@@ -374,19 +397,19 @@ class StructModel:
                     "bit_size": m["byte_size"] * 8
                 })
                 byte_offset += m["byte_size"]
-        # 補齊 struct 總大小
-        max_end = 0
-        for item in layout:
-            max_end = max(max_end, item["offset"] + item["size"])
-        if max_end < total_size:
+        # 補齊 struct 總大小（以 bit 為單位，不再強制 byte 對齊）
+        total_bits = total_size * 8
+        used_bits = byte_offset * 8 + bit_offset
+        if used_bits < total_bits:
+            # 補一個 bit padding
             layout.append({
                 "name": "(manual final padding)",
                 "type": "padding",
-                "size": total_size - max_end,
-                "offset": max_end,
+                "size": 0,  # 不再以 byte 計算
+                "offset": byte_offset,
                 "is_bitfield": False,
-                "bit_offset": 0,
-                "bit_size": (total_size - max_end) * 8
+                "bit_offset": bit_offset,
+                "bit_size": total_bits - used_bits
             })
         return layout
 

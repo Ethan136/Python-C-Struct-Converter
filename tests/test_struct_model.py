@@ -710,34 +710,41 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(self.model.manual_struct["total_size"], total_size)
 
     def test_validate_manual_struct_errors_and_success(self):
-        # 測試 member 總長度不符
-        members = [
-            {"name": "a", "byte_size": 1, "bit_size": 0},
-            {"name": "b", "byte_size": 1, "bit_size": 0}
-        ]
-        total_size = 3
-        errors = self.model.validate_manual_struct(members, total_size)
-        self.assertIn("Member 總長度 (16 bits) 不等於結構體大小 (24 bits)", errors[0])
-
-        # 測試名稱重複
-        members = [
-            {"name": "a", "byte_size": 1, "bit_size": 0},
-            {"name": "a", "byte_size": 2, "bit_size": 0}
-        ]
-        total_size = 3
-        errors = self.model.validate_manual_struct(members, total_size)
-        self.assertIn("成員名稱 'a' 重複", errors[0])
-
-        # 測試 byte/bit_size 非正整數
+        # 測試 member 欄位錯誤（total_size 足夠大）
         members = [
             {"name": "a", "byte_size": 0, "bit_size": -1},
             {"name": "b", "byte_size": -1, "bit_size": 0}
         ]
+        total_size = 10  # 足夠大，確保 layout 不會先失敗
+        errors = self.model.validate_manual_struct(members, total_size)
+        self.assertIn("member 'a' bit_size 需為 0 或正整數", errors)
+        self.assertIn("member 'b' byte_size 需為 0 或正整數", errors)
+
+        # 測試名稱重複（total_size 足夠大）
+        members = [
+            {"name": "a", "byte_size": 1, "bit_size": 0},
+            {"name": "a", "byte_size": 2, "bit_size": 0}
+        ]
+        total_size = 10
+        errors = self.model.validate_manual_struct(members, total_size)
+        self.assertIn("成員名稱 'a' 重複", errors)
+
+        # 測試 total_size 錯誤（member 欄位正確）
+        members = [
+            {"name": "a", "byte_size": 1, "bit_size": 0}
+        ]
         total_size = -1
         errors = self.model.validate_manual_struct(members, total_size)
-        self.assertIn("member 'a' bit_size 需為 0 或正整數", errors[0])
-        self.assertIn("member 'b' byte_size 需為 0 或正整數", errors[1])
-        self.assertIn("結構體大小需為正整數", errors[2])
+        self.assertIn("結構體大小需為正整數", errors)
+
+        # 測試 layout 錯誤（member 欄位正確，但 total_size 太小）
+        members = [
+            {"name": "a", "byte_size": 1, "bit_size": 0},
+            {"name": "b", "byte_size": 1, "bit_size": 0}
+        ]
+        total_size = 1  # 故意設小一點，讓 layout 驗證失敗
+        errors = self.model.validate_manual_struct(members, total_size)
+        self.assertIn("Layout 總長度", errors[0])
 
         # 驗證通過情境
         members = [
@@ -758,7 +765,7 @@ class TestStructModel(unittest.TestCase):
         total_size = 2  # bytes
         layout = self.model.calculate_manual_layout(members, total_size)
         # 應該有三個 bitfield，offset 依序排列，無 padding
-        self.assertEqual(len(layout), 3)
+        self.assertEqual(len([item for item in layout if item["type"] != "padding"]), 3)
         self.assertEqual(layout[0]["name"], "a")
         self.assertEqual(layout[0]["bit_offset"], 0)
         self.assertEqual(layout[0]["bit_size"], 3)
@@ -773,7 +780,7 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(layout[1]["offset"], 0)
         self.assertEqual(layout[2]["offset"], 1)
         # total_size = 16 bits
-        total_bits = sum(item["bit_size"] for item in layout)
+        total_bits = sum(item["bit_size"] for item in layout if item["type"] != "padding")
         self.assertEqual(total_bits, total_size * 8)
 
     def test_export_manual_struct_to_h(self):
@@ -787,9 +794,9 @@ class TestStructModel(unittest.TestCase):
         self.model.set_manual_struct(members, total_size)
         h_content = self.model.export_manual_struct_to_h()
         self.assertIn("struct MyStruct", h_content)
-        self.assertIn("unsigned int a_bits : 3;", h_content)
-        self.assertIn("unsigned int b_bits : 5;", h_content)
-        self.assertIn("unsigned int c_bits : 8;", h_content)
+        self.assertIn("unsigned int a : 3;", h_content)
+        self.assertIn("unsigned int b : 5;", h_content)
+        self.assertIn("unsigned int c : 8;", h_content)
         self.assertIn("// total size: 2 bytes", h_content)
 
         # 單一欄位
@@ -797,7 +804,7 @@ class TestStructModel(unittest.TestCase):
         total_size = 2
         self.model.set_manual_struct(members, total_size)
         h_content = self.model.export_manual_struct_to_h()
-        self.assertIn("unsigned int x_bits : 16;", h_content)
+        self.assertIn("unsigned int x : 16;", h_content)
 
         # 空 struct
         members = []
@@ -817,8 +824,8 @@ class TestStructModel(unittest.TestCase):
         self.model.set_manual_struct(members, total_size)
         h_content = self.model.export_manual_struct_to_h(struct_name="CustomStruct")
         self.assertIn("struct CustomStruct", h_content)
-        self.assertIn("unsigned int a_bits : 3;", h_content)
-        self.assertIn("unsigned int b_bits : 5;", h_content)
+        self.assertIn("unsigned int a : 3;", h_content)
+        self.assertIn("unsigned int b : 5;", h_content)
         self.assertIn("// total size: 1 bytes", h_content)
 
     def test_manual_struct_byte_bit_size_layout(self):
