@@ -24,6 +24,13 @@ class StructView(tk.Tk):
         self._create_manual_struct_frame(self.tab_manual)
 
     def _create_manual_struct_frame(self, parent):
+        # 結構體名稱
+        name_frame = tk.Frame(parent)
+        name_frame.pack(anchor="w", pady=5)
+        tk.Label(name_frame, text="struct 名稱:").pack(side=tk.LEFT)
+        self.struct_name_var = tk.StringVar(value="MyStruct")
+        tk.Entry(name_frame, textvariable=self.struct_name_var, width=20).pack(side=tk.LEFT)
+
         # 結構體大小
         size_frame = tk.Frame(parent)
         size_frame.pack(anchor="w", pady=5)
@@ -66,7 +73,12 @@ class StructView(tk.Tk):
             length_var = tk.IntVar(value=bf.get("length", 1))
             tk.Entry(self.bitfield_frame, textvariable=name_var, width=10).grid(row=idx+1, column=1)
             tk.Entry(self.bitfield_frame, textvariable=length_var, width=6).grid(row=idx+1, column=2)
-            tk.Button(self.bitfield_frame, text="刪除", command=lambda i=idx: self._delete_bitfield(i)).grid(row=idx+1, column=3)
+            op_frame = tk.Frame(self.bitfield_frame)
+            op_frame.grid(row=idx+1, column=3)
+            tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_bitfield(i)).pack(side=tk.LEFT)
+            tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_bitfield_up(i)).pack(side=tk.LEFT)
+            tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_bitfield_down(i)).pack(side=tk.LEFT)
+            tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_bitfield(i)).pack(side=tk.LEFT)
             # 綁定變更
             name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_bitfield_name(i, v))
             length_var.trace_add("write", lambda *_, i=idx, v=length_var: self._update_bitfield_length(i, v))
@@ -94,6 +106,33 @@ class StructView(tk.Tk):
             self.bitfields[idx]["length"] = 0
         self._on_manual_struct_change()
 
+    def _move_bitfield_up(self, idx):
+        if idx > 0:
+            self.bitfields[idx-1], self.bitfields[idx] = self.bitfields[idx], self.bitfields[idx-1]
+            self._render_bitfield_table()
+            self._on_manual_struct_change()
+
+    def _move_bitfield_down(self, idx):
+        if idx < len(self.bitfields) - 1:
+            self.bitfields[idx+1], self.bitfields[idx] = self.bitfields[idx], self.bitfields[idx+1]
+            self._render_bitfield_table()
+            self._on_manual_struct_change()
+
+    def _copy_bitfield(self, idx):
+        orig = self.bitfields[idx]
+        base_name = orig["name"]
+        # 自動命名：a_copy, a_copy2, a_copy3...
+        new_name = base_name + "_copy"
+        existing_names = {bf["name"] for bf in self.bitfields}
+        count = 2
+        while new_name in existing_names:
+            new_name = f"{base_name}_copy{count}"
+            count += 1
+        new_bf = {"name": new_name, "length": orig["length"]}
+        self.bitfields.insert(idx+1, new_bf)
+        self._render_bitfield_table()
+        self._on_manual_struct_change()
+
     def _reset_manual_struct(self):
         self.size_var.set(0)
         self.bitfields.clear()
@@ -107,6 +146,7 @@ class StructView(tk.Tk):
 
     def get_manual_struct_definition(self):
         return {
+            "struct_name": self.struct_name_var.get(),
             "total_size": self.size_var.get(),
             "members": [{"name": bf["name"], "length": bf["length"]} for bf in self.bitfields]
         }

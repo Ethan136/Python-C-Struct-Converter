@@ -772,7 +772,7 @@ class TestStructModel(unittest.TestCase):
         total_size = 16
         self.model.set_manual_struct(members, total_size)
         h_content = self.model.export_manual_struct_to_h()
-        self.assertIn("struct ManualStruct", h_content)
+        self.assertIn("struct MyStruct", h_content)
         self.assertIn("unsigned int a : 3;", h_content)
         self.assertIn("unsigned int b : 5;", h_content)
         self.assertIn("unsigned int c : 8;", h_content)
@@ -790,7 +790,7 @@ class TestStructModel(unittest.TestCase):
         total_size = 0
         self.model.set_manual_struct(members, total_size)
         h_content = self.model.export_manual_struct_to_h()
-        self.assertIn("struct ManualStruct", h_content)
+        self.assertIn("struct MyStruct", h_content)
         self.assertIn("// total size: 0 bits", h_content)
 
 

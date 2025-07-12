@@ -355,13 +355,14 @@ class StructModel:
             bit_offset += m["length"]
         return layout
 
-    def export_manual_struct_to_h(self):
+    def export_manual_struct_to_h(self, struct_name=None):
         """
         產生對應的 C struct bitfield 語法（無 padding），回傳 .h 檔內容字串。
         """
         members = self.manual_struct["members"] if self.manual_struct else []
         total_size = self.manual_struct["total_size"] if self.manual_struct else 0
-        lines = ["struct ManualStruct {"]
+        struct_name = struct_name or "MyStruct"
+        lines = [f"struct {struct_name} {{"]
         for m in members:
             lines.append(f"    unsigned int {m['name']} : {m['length']};")
         lines.append("};")

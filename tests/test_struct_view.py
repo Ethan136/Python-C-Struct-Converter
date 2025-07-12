@@ -58,5 +58,146 @@ class TestStructView(unittest.TestCase):
         self.view.on_export_manual_struct()
         self.assertTrue(self.presenter.export_called)
 
+    def test_move_bitfield_up(self):
+        # 新增三個 bitfield
+        self.view.bitfields = [
+            {"name": "a", "length": 8},
+            {"name": "b", "length": 8},
+            {"name": "c", "length": 8},
+        ]
+        self.view._render_bitfield_table()
+        # 對 b 執行上移
+        self.view._move_bitfield_up(1)
+        names = [bf["name"] for bf in self.view.bitfields]
+        self.assertEqual(names, ["b", "a", "c"])
+
+    def test_move_bitfield_down(self):
+        self.view.bitfields = [
+            {"name": "a", "length": 8},
+            {"name": "b", "length": 8},
+            {"name": "c", "length": 8},
+        ]
+        self.view._render_bitfield_table()
+        # 對 b 執行下移
+        self.view._move_bitfield_down(1)
+        names = [bf["name"] for bf in self.view.bitfields]
+        self.assertEqual(names, ["a", "c", "b"])
+
+    def test_move_bitfield_up_at_top_noop(self):
+        self.view.bitfields = [
+            {"name": "a", "length": 8},
+            {"name": "b", "length": 8},
+        ]
+        self.view._render_bitfield_table()
+        # 對第一個執行上移，應無變化
+        self.view._move_bitfield_up(0)
+        names = [bf["name"] for bf in self.view.bitfields]
+        self.assertEqual(names, ["a", "b"])
+
+    def test_move_bitfield_down_at_bottom_noop(self):
+        self.view.bitfields = [
+            {"name": "a", "length": 8},
+            {"name": "b", "length": 8},
+        ]
+        self.view._render_bitfield_table()
+        # 對最後一個執行下移，應無變化
+        self.view._move_bitfield_down(1)
+        names = [bf["name"] for bf in self.view.bitfields]
+        self.assertEqual(names, ["a", "b"])
+
+    def test_struct_name_input_and_export(self):
+        # 設定 struct 名稱
+        self.view.struct_name_var.set("MyStruct")
+        self.view.bitfields = [
+            {"name": "a", "length": 8},
+        ]
+        self.view.size_var.set(8)
+        # 匯出
+        self.view.on_export_manual_struct()
+        # 應該有 struct_name 傳給 Presenter
+        self.assertTrue(hasattr(self.presenter, 'last_struct_data'))
+        self.assertEqual(self.presenter.last_struct_data.get('struct_name'), "MyStruct")
+
+    def test_struct_name_default_value(self):
+        # 預設值應為 'MyStruct'
+        self.assertEqual(self.view.struct_name_var.get(), "MyStruct")
+        # 匯出時未修改名稱，Presenter 應收到預設值
+        self.view.bitfields = [
+            {"name": "a", "length": 8},
+        ]
+        self.view.size_var.set(8)
+        self.view.on_export_manual_struct()
+        self.assertEqual(self.presenter.last_struct_data.get('struct_name'), "MyStruct")
+
+    def test_copy_bitfield_creates_duplicate(self):
+        self.view.bitfields = [
+            {"name": "a", "length": 8},
+            {"name": "b", "length": 16},
+        ]
+        self.view._render_bitfield_table()
+        # 複製第一個欄位
+        self.view._copy_bitfield(0)
+        self.assertEqual(len(self.view.bitfields), 3)
+        self.assertEqual(self.view.bitfields[0]["name"], "a")
+        self.assertEqual(self.view.bitfields[1]["name"], "a_copy")
+        self.assertEqual(self.view.bitfields[1]["length"], 8)
+        self.assertEqual(self.view.bitfields[2]["name"], "b")
+
+    def test_copy_bitfield_auto_rename(self):
+        self.view.bitfields = [
+            {"name": "a", "length": 8},
+            {"name": "a_copy", "length": 8},
+        ]
+        self.view._render_bitfield_table()
+        # 複製第一個欄位
+        self.view._copy_bitfield(0)
+        self.assertEqual(self.view.bitfields[1]["name"], "a_copy2")
+
+    def test_duplicate_name_highlight_and_error(self):
+        self.view.bitfields = [
+            {"name": "a", "length": 8},
+            {"name": "a", "length": 16},
+        ]
+        self.view._render_bitfield_table()
+        self.view.show_manual_struct_validation(["成員名稱 'a' 重複"])
+        # 應有高亮（紅底）與錯誤訊息
+        for idx, bf in enumerate(self.view.bitfields):
+            entry = self.view.bitfield_frame.grid_slaves(row=idx+1, column=1)[0]
+            self.assertEqual(entry.cget("bg"), "#ffcccc")
+        # 應有錯誤訊息顯示
+        self.assertIn("重複", self.view.validation_label.cget("text"))
+
+    def test_invalid_length_highlight_and_error(self):
+        self.view.bitfields = [
+            {"name": "a", "length": 0},
+            {"name": "b", "length": -1},
+        ]
+        self.view._render_bitfield_table()
+        self.view.show_manual_struct_validation(["bitfield 'a' 長度需為正整數", "bitfield 'b' 長度需為正整數"])
+        # 應有高亮（紅底）
+        for idx, bf in enumerate(self.view.bitfields):
+            entry = self.view.bitfield_frame.grid_slaves(row=idx+1, column=2)[0]
+            self.assertEqual(entry.cget("bg"), "#ffcccc")
+        # 應有錯誤訊息顯示
+        self.assertIn("長度需為正整數", self.view.validation_label.cget("text"))
+
+    def test_error_highlight_clears_on_fix(self):
+        self.view.bitfields = [
+            {"name": "a", "length": 8},
+            {"name": "a", "length": 16},
+        ]
+        self.view._render_bitfield_table()
+        self.view.show_manual_struct_validation(["成員名稱 'a' 重複"])
+        # 修正名稱
+        self.view.bitfields[1]["name"] = "b"
+        self.view._render_bitfield_table()
+        self.view.show_manual_struct_validation([])
+        # 應無高亮
+        for idx, bf in enumerate(self.view.bitfields):
+            entry = self.view.bitfield_frame.grid_slaves(row=idx+1, column=1)[0]
+            self.assertNotEqual(entry.cget("bg"), "#ffcccc")
+        # 應無錯誤訊息
+        self.assertIn("設定正確", self.view.validation_label.cget("text"))
+
 if __name__ == "__main__":
     unittest.main()

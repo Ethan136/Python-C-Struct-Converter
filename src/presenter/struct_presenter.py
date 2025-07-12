@@ -147,5 +147,7 @@ class StructPresenter:
         self.view.show_manual_struct_validation(errors)
 
     def on_export_manual_struct(self):
-        h_content = self.model.export_manual_struct_to_h()
+        struct_data = self.view.get_manual_struct_definition()
+        struct_name = struct_data.get("struct_name", "MyStruct")
+        h_content = self.model.export_manual_struct_to_h(struct_name)
         self.view.show_exported_struct(h_content)
