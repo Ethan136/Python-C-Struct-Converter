@@ -13,11 +13,10 @@ Usage:
 
 import sys
 import os
+import runpy
 
 # Add src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from main import main
-
 if __name__ == "__main__":
-    main() 
+    runpy.run_module("src.main", run_name="__main__") 

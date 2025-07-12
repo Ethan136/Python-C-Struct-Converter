@@ -4,10 +4,10 @@ import os
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '')))
 
-from model import StructModel
-from view import StructView
-from presenter import StructPresenter
-from config import load_ui_strings
+from .model import StructModel
+from .view import StructView
+from .presenter import StructPresenter
+from .config import load_ui_strings
 
 def main():
     """Main application entry point"""

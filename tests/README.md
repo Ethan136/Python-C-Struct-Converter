@@ -208,6 +208,8 @@ python3 -m unittest tests.test_struct_parsing_core.TestStructParsingCore.test_al
 ### 概述
 專案新增完整的 bitfield 支援測試，涵蓋 C/C++ bitfield 語法的所有方面。
 
+> **Note:** Manual struct mode does not support padding; all members are tightly packed. GUI tests are automatically skipped in headless environments.
+
 ### 測試範圍
 - **Bitfield 解析**: 測試 `int a : 1;` 語法解析
 - **Storage Unit 管理**: 測試 bitfield 在 storage unit 內的分配
@@ -237,6 +239,8 @@ python3 -m unittest tests.test_struct_model.TestStructModel.test_parse_hex_data_
 
 ### 概述
 測試手動 struct 定義功能，包括 GUI 介面、驗證邏輯、匯出功能等。
+
+> **Note:** Manual struct mode does not support padding; all members are tightly packed. GUI tests are automatically skipped in headless environments.
 
 ### 測試範圍
 - **GUI 介面**: Tab 切換、成員表格、即時驗證

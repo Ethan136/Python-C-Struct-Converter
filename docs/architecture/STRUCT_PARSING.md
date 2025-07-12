@@ -72,6 +72,8 @@ Each struct member (including padding and bitfields) is stored as a dictionary. 
 ### Overview
 The system supports manual struct definition through GUI interface, allowing users to create structs without external header files.
 
+> **Note:** Manual struct mode does not support padding or advanced C features (e.g., union, nested struct, #pragma pack). All members are tightly packed.
+
 ### Manual Layout Calculation
 - **Function**: `calculate_manual_layout(members, total_size)`
 - **Purpose**: Calculate layout for manually defined structs without padding
@@ -198,6 +200,7 @@ The struct parsing system follows TDD principles with comprehensive test coverag
 - 只支援單一 struct 解析，不支援多 struct 同時解析。
 - bitfield 只支援 int/unsigned int/char/unsigned char 等基本型別，不支援 pointer bitfield。
 - 手動 struct 定義目前不支援 padding，所有成員緊密排列。
+> **Note:** Manual struct mode does not support padding or advanced C features (e.g., union, nested struct, #pragma pack). All members are tightly packed.
 
 ## Future Enhancements
 

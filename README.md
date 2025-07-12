@@ -195,6 +195,8 @@ python3 run.py
 4. **Export to Header**:
    - Export the manually defined struct to a C header file with proper bitfield syntax.
 
+> **Note:** Manual struct mode does not support padding; all members are tightly packed. Only basic types (int, unsigned int, char, unsigned char) are supported for bitfields.
+
 ## Example File
 
 An `examples/example.h` file is included in the project to demonstrate the functionality with a struct that requires memory padding and includes bitfield members.
