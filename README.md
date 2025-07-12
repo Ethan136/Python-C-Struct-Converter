@@ -39,14 +39,18 @@ This project provides a graphical user interface (GUI) tool built with Python an
 │       └── ui_strings.xml
 ├── tests/                    # Test files
 │   ├── __init__.py
-│   └── test_string_parser.py
+│   ├── README.md             # Test documentation
+│   ├── test_string_parser.py
+│   └── test_input_conversion.py
 ├── docs/                     # Documentation
 │   ├── ARCHITECTURE.md
 │   └── string_refactor_plan.md
 ├── example.h                 # Example C++ struct file
 ├── run.py                    # Application launcher
+├── run_tests.py              # Test runner
 ├── setup.py                  # Package configuration
 ├── requirements.txt          # Dependencies
+├── input_conversion_analysis.md  # Input conversion analysis
 └── README.md                 # This file
 ```
 
@@ -62,6 +66,26 @@ This project provides a graphical user interface (GUI) tool built with Python an
 - **Auto-Padding Hex Input**: Automatically pads shorter hexadecimal inputs with leading zeros to match the expected chunk size (e.g., `12` in a 4-byte field becomes `00000012`).
 - **Configurable Byte Order**: Choose between Little Endian and Big Endian for data interpretation.
 - **Clear Results Display**: Shows the parsed values for each member in both decimal and hexadecimal formats.
+
+## Input Conversion Mechanism
+
+The application implements a robust input conversion mechanism that handles various input scenarios:
+
+### Field Expansion
+- **4-byte fields**: Input `12` → Expands to `00000012` → Applies endianness
+- **8-byte fields**: Input `123` → Expands to `0000000000000123` → Applies endianness
+- **1-byte fields**: Input `1` → Expands to `01` → Applies endianness
+
+### Empty Field Handling
+- Empty 1/4/8 byte fields are automatically treated as all zeros
+- Ensures consistent behavior regardless of user input completeness
+
+### Endianness Support
+- **Big Endian**: Most significant byte first
+- **Little Endian**: Least significant byte first
+- Consistent application across all field sizes
+
+For detailed analysis, see [input_conversion_analysis.md](input_conversion_analysis.md).
 
 ## Requirements
 
@@ -128,11 +152,29 @@ An `example.h` file is included in the project root to demonstrate the functiona
 ### Running Tests
 ```bash
 # Run all tests
-python -m pytest tests/
+python3 -m unittest discover tests -v
 
-# Run specific test
-python -m pytest tests/test_string_parser.py
+# Run specific test module
+python3 -m unittest tests.test_input_conversion -v
+python3 -m unittest tests.test_string_parser -v
+
+# Use the test runner
+python3 run_tests.py
+python3 run_tests.py --test test_input_conversion
+
+# Run from tests directory
+cd tests
+python3 -m unittest test_input_conversion -v
 ```
+
+### Test Coverage
+The test suite covers:
+- ✅ Input conversion mechanism (field expansion, endianness, validation)
+- ✅ String parser functionality
+- ✅ Model integration
+- ✅ Error handling and edge cases
+
+For detailed test information, see [tests/README.md](tests/README.md).
 
 ### Code Quality
 ```bash
