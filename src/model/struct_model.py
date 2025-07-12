@@ -140,8 +140,8 @@ class StructModel:
             offset, size, name = item['offset'], item['size'], item['name']
             member_bytes = data_bytes[offset : offset + size]
             value = int.from_bytes(member_bytes, byte_order)
-            # hex_raw 一律直接顯示記憶體內容
-            hex_value = member_bytes.hex()
+            # hex_raw 一律用 big endian 顯示
+            hex_value = int.from_bytes(member_bytes, 'big').to_bytes(size, 'big').hex()
             display_value = str(bool(value)) if item['type'] == 'bool' else str(value)
             parsed_values.append({
                 "name": name,
