@@ -140,15 +140,8 @@ class StructModel:
             offset, size, name = item['offset'], item['size'], item['name']
             member_bytes = data_bytes[offset : offset + size]
             value = int.from_bytes(member_bytes, byte_order)
-            # 修正 hex_raw 顯示順序：
-            # little endian: 顯示低位在前的 hex 字串
-            # big endian: 顯示高位在前的 hex 字串
-            if byte_order == "little":
-                # 將數值轉換為 little endian 的 hex 表示（低位在前）
-                hex_value = value.to_bytes(size, "little").hex()
-            else:
-                # big endian: 直接顯示原始 bytes 的 hex
-                hex_value = member_bytes.hex()
+            # hex_raw 一律直接顯示記憶體內容
+            hex_value = member_bytes.hex()
             display_value = str(bool(value)) if item['type'] == 'bool' else str(value)
             parsed_values.append({
                 "name": name,
