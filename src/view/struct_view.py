@@ -29,8 +29,17 @@ class StructView(tk.Tk):
                                   text=get_string("layout_frame_title"),
                                   padx=10, pady=10)
         info_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        self.info_text = scrolledtext.ScrolledText(info_frame, wrap=tk.WORD, height=10, state=tk.DISABLED)
-        self.info_text.pack(fill=tk.BOTH, expand=True)
+        # --- 新增：左右分割 ---
+        info_split_frame = tk.Frame(info_frame)
+        info_split_frame.pack(fill=tk.BOTH, expand=True)
+        info_split_frame.columnconfigure(0, weight=1)
+        info_split_frame.columnconfigure(1, weight=1)
+        # 左：struct layout
+        self.info_text = scrolledtext.ScrolledText(info_split_frame, wrap=tk.WORD, height=10, state=tk.DISABLED)
+        self.info_text.grid(row=0, column=0, sticky="nsew", padx=(0,5))
+        # 右：debug struct 原始內容
+        self.struct_debug_text = scrolledtext.ScrolledText(info_split_frame, wrap=tk.WORD, height=10, state=tk.DISABLED, font=("Courier", 10))
+        self.struct_debug_text.grid(row=0, column=1, sticky="nsew", padx=(5,0))
 
         # Frame for hex input
         input_frame = tk.LabelFrame(self,
@@ -140,14 +149,20 @@ class StructView(tk.Tk):
 
     def show_struct_layout(self, struct_name, layout, total_size, struct_align):
         info_str = f"Struct: {struct_name}\nAlignment: {struct_align} bytes\nTotal Size: {total_size} bytes\n\n"
-        info_str += "{:<18} {:<20} {:<6} {:<8}\n".format("Member", "Type", "Size", "Offset") + "-" * 55 + "\n"
+        # 新增 bit 欄位資訊欄位
+        info_str += "{:<18} {:<20} {:<6} {:<8} {:<10} {:<10} {:<10}\n".format(
+            "Member", "Type", "Size", "Offset", "is_bitfield", "bit_offset", "bit_size") + "-" * 85 + "\n"
         for item in layout:
             # Display padding differently
             if item['type'] == "padding":
-                info_str += "{:<18} {:<20} {:<6} {:<8}\n".format(item['name'], "-", item['size'], item['offset'])
+                info_str += "{:<18} {:<20} {:<6} {:<8} {:<10} {:<10} {:<10}\n".format(
+                    item['name'], "-", item['size'], item['offset'], "-", "-", "-")
             else:
-                info_str += "{:<18} {:<20} {:<6} {:<8}\n".format(item['name'], item['type'], item['size'], item['offset'])
-        
+                is_bf = str(item.get("is_bitfield", False))
+                bit_off = str(item.get("bit_offset", "-"))
+                bit_sz = str(item.get("bit_size", "-"))
+                info_str += "{:<18} {:<20} {:<6} {:<8} {:<10} {:<10} {:<10}\n".format(
+                    item['name'], item['type'], item['size'], item['offset'], is_bf, bit_off, bit_sz)
         self.info_text.config(state=tk.NORMAL); self.info_text.delete('1.0', tk.END); self.info_text.insert(tk.END, info_str); self.info_text.config(state=tk.DISABLED)
 
     def update_hex_input_status(self, expected_chars):
@@ -164,6 +179,11 @@ class StructView(tk.Tk):
         self.result_text.config(state=tk.NORMAL); self.result_text.delete('1.0', tk.END); self.result_text.config(state=tk.DISABLED)
 
     def show_parsed_values(self, parsed_values, byte_order_str):
+        # 嘗試取得 layout 以便標示 bitfield
+        layout_map = {}
+        if hasattr(self, 'model') and hasattr(self.model, 'layout'):
+            for item in getattr(self.model, 'layout', []):
+                layout_map[item['name']] = item
         result_str = f"Parsed Values (using {byte_order_str})\n"
         result_str += "{:<18} {:<25} {}\n".format("Member", "Value (Decimal/Bool)", "Hex (Value)")
         result_str += "-" * 70 + "\n"
@@ -175,9 +195,12 @@ class StructView(tk.Tk):
             size = None
             for p in parsed_values:
                 if p['name'] == name:
-                    # padding 也會有 hex_raw，但 value 是 "-"
                     size = len(item['hex_raw']) // 2 if item['hex_raw'] else 0
                     break
+            # bitfield 標示
+            bf_tag = ""
+            if name in layout_map and layout_map[name].get("is_bitfield", False):
+                bf_tag = f" [bitfield bit_offset={layout_map[name]['bit_offset']} bit_size={layout_map[name]['bit_size']}]"
             # padding 顯示 -
             if value == "-":
                 hex_value = "-"
@@ -188,7 +211,7 @@ class StructView(tk.Tk):
                     hex_value = "0x" + hex_value
                 except Exception:
                     hex_value = str(value)
-            result_str += "{:<18} {:<25} {}\n".format(name, value, hex_value)
+            result_str += "{:<18} {:<25} {}{}\n".format(name, value, hex_value, bf_tag)
 
         self.result_text.config(state=tk.NORMAL); self.result_text.delete('1.0', tk.END); self.result_text.insert(tk.END, result_str); self.result_text.config(state=tk.DISABLED)
 
@@ -260,39 +283,42 @@ class StructView(tk.Tk):
         layout: list of dict with struct layout information
         """
         debug_str = "Struct Member Debug Info\n"
-        debug_str += "{:<18} {:<8} {:<8} {:<20} {}\n".format("Member", "Offset", "Size", "Bytes (Raw)", "Bytes (Formatted)")
-        debug_str += "-" * 80 + "\n"
-        
+        debug_str += "{:<18} {:<8} {:<8} {:<20} {:<30} {}\n".format(
+            "Member", "Offset", "Size", "Bytes (Raw)", "BitField Info", "Bytes (Formatted)")
+        debug_str += "-" * 120 + "\n"
         for item in parsed_values:
             member_name = item['name']
             hex_raw = item['hex_raw']
-            
             # Find corresponding layout info
             layout_info = None
             for layout_item in layout:
                 if layout_item['name'] == member_name:
                     layout_info = layout_item
                     break
-            
             if layout_info:
                 offset = layout_info['offset']
                 size = layout_info['size']
-                
+                # Bitfield info
+                bf_info = ""
+                if layout_info.get("is_bitfield", False):
+                    bf_info = f"is_bitfield=True bit_offset={layout_info['bit_offset']} bit_size={layout_info['bit_size']}"
                 # Format bytes for display
                 if hex_raw:
-                    # Show raw hex
                     raw_bytes = hex_raw
-                    # Show formatted bytes (space separated)
                     formatted_bytes = ' '.join([hex_raw[i:i+2] for i in range(0, len(hex_raw), 2)])
                 else:
                     raw_bytes = "00" * size
                     formatted_bytes = "00 " * size
-                
-                debug_str += "{:<18} {:<8} {:<8} {:<20} {}\n".format(
-                    member_name, offset, size, raw_bytes, formatted_bytes
+                debug_str += "{:<18} {:<8} {:<8} {:<20} {:<30} {}\n".format(
+                    member_name, offset, size, raw_bytes, bf_info, formatted_bytes
                 )
-        
         self.debug_result_text.config(state=tk.NORMAL)
         self.debug_result_text.delete('1.0', tk.END)
         self.debug_result_text.insert(tk.END, debug_str)
         self.debug_result_text.config(state=tk.DISABLED)
+
+    def show_struct_debug(self, struct_content):
+        self.struct_debug_text.config(state=tk.NORMAL)
+        self.struct_debug_text.delete('1.0', tk.END)
+        self.struct_debug_text.insert(tk.END, struct_content)
+        self.struct_debug_text.config(state=tk.DISABLED)

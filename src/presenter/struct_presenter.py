@@ -18,9 +18,13 @@ class StructPresenter:
             return
 
         try:
+            # 讀取原始 struct 檔案內容，傳給 debug 區
+            with open(file_path, 'r') as f:
+                struct_content = f.read()
             struct_name, layout, total_size, struct_align = self.model.load_struct_from_file(file_path)
             self.view.show_file_path(file_path)
             self.view.show_struct_layout(struct_name, layout, total_size, struct_align)
+            self.view.show_struct_debug(struct_content)
             self.view.enable_parse_button()
             self.view.clear_results()
             

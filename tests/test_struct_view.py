@@ -2,6 +2,8 @@ import unittest
 from unittest.mock import Mock, patch
 import tkinter as tk
 from src.view.struct_view import StructView
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 
 class TestStructView(unittest.TestCase):
 
@@ -68,6 +70,63 @@ class TestStructView(unittest.TestCase):
         error_message = "This is a test error."
         self.view.show_error(error_title, error_message)
         mock_showerror.assert_called_once_with(error_title, error_message)
+
+    def test_show_struct_layout_bitfield(self):
+        """Test that struct layout display includes bit field info for bitfield members."""
+        struct_name = "BitFieldStruct"
+        layout = [
+            {"name": "a", "type": "int", "size": 4, "offset": 0, "is_bitfield": True, "bit_offset": 0, "bit_size": 1},
+            {"name": "b", "type": "int", "size": 4, "offset": 0, "is_bitfield": True, "bit_offset": 1, "bit_size": 2},
+            {"name": "c", "type": "int", "size": 4, "offset": 0, "is_bitfield": True, "bit_offset": 3, "bit_size": 5},
+        ]
+        total_size = 4
+        struct_align = 4
+        self.view.show_struct_layout(struct_name, layout, total_size, struct_align)
+        text = self.view.info_text.get("1.0", "end")
+        # 應該包含 bit_offset, bit_size, is_bitfield 關鍵字或數值
+        self.assertIn("bit_offset", text)
+        self.assertIn("bit_size", text)
+        self.assertIn("is_bitfield", text)
+
+    def test_show_parsed_values_bitfield(self):
+        """Test that parsed values display bit field info for bitfield members."""
+        parsed_values = [
+            {"name": "a", "value": "1", "hex_raw": "01"},
+            {"name": "b", "value": "2", "hex_raw": "02"},
+            {"name": "c", "value": "17", "hex_raw": "11"},
+        ]
+        # layout info for bitfield
+        self.view.model = Mock()
+        self.view.model.layout = [
+            {"name": "a", "type": "int", "size": 4, "offset": 0, "is_bitfield": True, "bit_offset": 0, "bit_size": 1},
+            {"name": "b", "type": "int", "size": 4, "offset": 0, "is_bitfield": True, "bit_offset": 1, "bit_size": 2},
+            {"name": "c", "type": "int", "size": 4, "offset": 0, "is_bitfield": True, "bit_offset": 3, "bit_size": 5},
+        ]
+        self.view.show_parsed_values(parsed_values, "Little Endian")
+        text = self.view.result_text.get("1.0", "end")
+        # 應該包含完整 bitfield 標示
+        self.assertIn("[bitfield bit_offset=0 bit_size=1]", text)
+        self.assertIn("[bitfield bit_offset=1 bit_size=2]", text)
+        self.assertIn("[bitfield bit_offset=3 bit_size=5]", text)
+
+    def test_show_struct_member_debug_bitfield(self):
+        """Test that struct member debug info includes bit field info for bitfield members."""
+        parsed_values = [
+            {"name": "a", "value": "1", "hex_raw": "01"},
+            {"name": "b", "value": "2", "hex_raw": "02"},
+            {"name": "c", "value": "17", "hex_raw": "11"},
+        ]
+        layout = [
+            {"name": "a", "type": "int", "size": 4, "offset": 0, "is_bitfield": True, "bit_offset": 0, "bit_size": 1},
+            {"name": "b", "type": "int", "size": 4, "offset": 0, "is_bitfield": True, "bit_offset": 1, "bit_size": 2},
+            {"name": "c", "type": "int", "size": 4, "offset": 0, "is_bitfield": True, "bit_offset": 3, "bit_size": 5},
+        ]
+        self.view.show_struct_member_debug(parsed_values, layout)
+        text = self.view.debug_result_text.get("1.0", "end")
+        # 應該包含 bit_offset, bit_size, is_bitfield
+        self.assertIn("bit_offset=0", text)
+        self.assertIn("bit_size=1", text)
+        self.assertIn("is_bitfield=True", text)
 
 if __name__ == '__main__':
     unittest.main()
