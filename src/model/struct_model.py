@@ -88,91 +88,137 @@ def calculate_layout(members):
     """Calculates the memory layout of a struct, including padding and bit fields."""
     if not members:
         return [], 0, 1
-    layout = []
-    current_offset = 0
-    max_alignment = 1
-    bitfield_unit_type = None
-    bitfield_unit_size = 0
-    bitfield_unit_align = 0
-    bitfield_bit_offset = 0
-    bitfield_unit_offset = 0
-    for member in members:
-        # Bit field member (dict)
-        if isinstance(member, dict) and member.get("is_bitfield", False):
-            mtype = member["type"]
-            mname = member["name"]
-            mbit_size = member["bit_size"]
-            info = TYPE_INFO[mtype]
-            size, alignment = info["size"], info["align"]
-            if bitfield_unit_type != mtype or bitfield_bit_offset + mbit_size > size * 8:
-                # New storage unit needed (type changed or overflow)
-                # Align to storage unit
-                padding = (alignment - (current_offset % alignment)) % alignment
-                if padding > 0:
-                    layout.append({
-                        "name": "(padding)",
-                        "type": "padding",
-                        "size": padding,
-                        "offset": current_offset
-                    })
-                    current_offset += padding
-                bitfield_unit_type = mtype
-                bitfield_unit_size = size
-                bitfield_unit_align = alignment
-                bitfield_bit_offset = 0
-                bitfield_unit_offset = current_offset
-                # Update struct's max alignment
-                if alignment > max_alignment:
-                    max_alignment = alignment
-                current_offset += size
-            layout.append({
-                "name": mname,
-                "type": mtype,
-                "size": bitfield_unit_size,
-                "offset": bitfield_unit_offset,
-                "is_bitfield": True,
-                "bit_offset": bitfield_bit_offset,
-                "bit_size": mbit_size
-            })
-            bitfield_bit_offset += mbit_size
-        else:
-            # End any open bitfield unit
-            bitfield_unit_type = None
-            bitfield_bit_offset = 0
-            # Old tuple logic
+    
+    layout_calculator = LayoutCalculator()
+    return layout_calculator.calculate(members)
+
+
+class LayoutCalculator:
+    """Helper class for calculating struct memory layout."""
+    
+    def __init__(self):
+        self.layout = []
+        self.current_offset = 0
+        self.max_alignment = 1
+        self.bitfield_unit_type = None
+        self.bitfield_unit_size = 0
+        self.bitfield_unit_align = 0
+        self.bitfield_bit_offset = 0
+        self.bitfield_unit_offset = 0
+    
+    def calculate(self, members):
+        """Calculate the complete memory layout for the struct."""
+        for member in members:
+            if isinstance(member, dict) and member.get("is_bitfield", False):
+                self._process_bitfield_member(member)
+            else:
+                self._process_regular_member(member)
+        
+        self._add_final_padding()
+        return self.layout, self.current_offset, self.max_alignment
+    
+    def _process_bitfield_member(self, member):
+        """Process a bitfield member."""
+        mtype = member["type"]
+        mname = member["name"]
+        mbit_size = member["bit_size"]
+        info = TYPE_INFO[mtype]
+        size, alignment = info["size"], info["align"]
+        
+        if self._needs_new_bitfield_unit(mtype, mbit_size):
+            self._start_new_bitfield_unit(mtype, size, alignment)
+        
+        self._add_bitfield_to_layout(mname, mtype, mbit_size)
+        self.bitfield_bit_offset += mbit_size
+    
+    def _process_regular_member(self, member):
+        """Process a regular (non-bitfield) member."""
+        # End any open bitfield unit
+        self.bitfield_unit_type = None
+        self.bitfield_bit_offset = 0
+        
+        # Handle both tuple and dict formats for backward compatibility
+        if isinstance(member, tuple):
             member_type, member_name = member
-            info = TYPE_INFO[member_type]
-            size, alignment = info["size"], info["align"]
-            if alignment > max_alignment:
-                max_alignment = alignment
-            padding = (alignment - (current_offset % alignment)) % alignment
-            if padding > 0:
-                layout.append({
-                    "name": "(padding)",
-                    "type": "padding",
-                    "size": padding,
-                    "offset": current_offset
-                })
-                current_offset += padding
-            layout.append({
-                "name": member_name,
-                "type": member_type,
-                "size": size,
-                "offset": current_offset
-            })
-            current_offset += size
-    # Add final padding to align the whole struct
-    final_padding = (max_alignment - (current_offset % max_alignment)) % max_alignment
-    if final_padding > 0:
-        layout.append({
-            "name": "(final padding)",
-            "type": "padding",
-            "size": final_padding,
-            "offset": current_offset
+        elif isinstance(member, dict):
+            member_type = member["type"]
+            member_name = member["name"]
+        else:
+            raise ValueError(f"Invalid member format: {member}")
+        
+        info = TYPE_INFO[member_type]
+        size, alignment = info["size"], info["align"]
+        
+        if alignment > self.max_alignment:
+            self.max_alignment = alignment
+        
+        self._add_padding_if_needed(alignment)
+        self._add_member_to_layout(member_name, member_type, size)
+        self.current_offset += size
+    
+    def _needs_new_bitfield_unit(self, mtype, mbit_size):
+        """Check if a new bitfield storage unit is needed."""
+        return (self.bitfield_unit_type != mtype or 
+                self.bitfield_bit_offset + mbit_size > self.bitfield_unit_size * 8)
+    
+    def _start_new_bitfield_unit(self, mtype, size, alignment):
+        """Start a new bitfield storage unit."""
+        self._add_padding_if_needed(alignment)
+        self.bitfield_unit_type = mtype
+        self.bitfield_unit_size = size
+        self.bitfield_unit_align = alignment
+        self.bitfield_bit_offset = 0
+        self.bitfield_unit_offset = self.current_offset
+        
+        if alignment > self.max_alignment:
+            self.max_alignment = alignment
+        
+        self.current_offset += size
+    
+    def _add_bitfield_to_layout(self, name, mtype, bit_size):
+        """Add a bitfield member to the layout."""
+        self.layout.append({
+            "name": name,
+            "type": mtype,
+            "size": self.bitfield_unit_size,
+            "offset": self.bitfield_unit_offset,
+            "is_bitfield": True,
+            "bit_offset": self.bitfield_bit_offset,
+            "bit_size": bit_size
         })
-        current_offset += final_padding
-    total_size = current_offset
-    return layout, total_size, max_alignment
+    
+    def _add_member_to_layout(self, name, member_type, size):
+        """Add a regular member to the layout."""
+        self.layout.append({
+            "name": name,
+            "type": member_type,
+            "size": size,
+            "offset": self.current_offset
+        })
+    
+    def _add_padding_if_needed(self, alignment):
+        """Add padding if needed to meet alignment requirements."""
+        padding = (alignment - (self.current_offset % alignment)) % alignment
+        if padding > 0:
+            self.layout.append({
+                "name": "(padding)",
+                "type": "padding",
+                "size": padding,
+                "offset": self.current_offset
+            })
+            self.current_offset += padding
+    
+    def _add_final_padding(self):
+        """Add final padding to align the whole struct."""
+        final_padding = (self.max_alignment - (self.current_offset % self.max_alignment)) % self.max_alignment
+        if final_padding > 0:
+            self.layout.append({
+                "name": "(final padding)",
+                "type": "padding",
+                "size": final_padding,
+                "offset": self.current_offset
+            })
+            self.current_offset += final_padding
 
 class StructModel:
     def __init__(self):

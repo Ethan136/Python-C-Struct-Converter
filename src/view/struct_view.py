@@ -11,8 +11,15 @@ class StructView(tk.Tk):
 
         self.hex_entries = []
 
-        # --- Widgets ---
-        # Frame for file selection
+        # Initialize UI components
+        self._create_file_selection_frame()
+        self._create_struct_layout_frame()
+        self._create_hex_input_frame()
+        self._create_parse_button()
+        self._create_results_frame()
+
+    def _create_file_selection_frame(self):
+        """Create the file selection frame with browse button."""
         file_frame = tk.Frame(self, pady=5)
         file_frame.pack(fill=tk.X, padx=10)
         self.file_label = tk.Label(file_frame,
@@ -24,32 +31,43 @@ class StructView(tk.Tk):
                                   command=self.presenter.browse_file if self.presenter else None)
         self.browse_button.pack(side=tk.RIGHT)
 
-        # Frame for struct layout info
+    def _create_struct_layout_frame(self):
+        """Create the struct layout information frame with split view."""
         info_frame = tk.LabelFrame(self,
                                   text=get_string("layout_frame_title"),
                                   padx=10, pady=10)
         info_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        # --- 新增：左右分割 ---
+        
+        # Split frame for layout and debug
         info_split_frame = tk.Frame(info_frame)
         info_split_frame.pack(fill=tk.BOTH, expand=True)
         info_split_frame.columnconfigure(0, weight=1)
         info_split_frame.columnconfigure(1, weight=1)
-        # 左：struct layout
+        
+        # Left: struct layout
         self.info_text = scrolledtext.ScrolledText(info_split_frame, wrap=tk.WORD, height=10, state=tk.DISABLED)
         self.info_text.grid(row=0, column=0, sticky="nsew", padx=(0,5))
-        # 右：debug struct 原始內容
+        
+        # Right: debug struct original content
         self.struct_debug_text = scrolledtext.ScrolledText(info_split_frame, wrap=tk.WORD, height=10, state=tk.DISABLED, font=("Courier", 10))
         self.struct_debug_text.grid(row=0, column=1, sticky="nsew", padx=(5,0))
 
-        # Frame for hex input
+    def _create_hex_input_frame(self):
+        """Create the hex input frame with controls and grid."""
         input_frame = tk.LabelFrame(self,
                                    text=get_string("hex_input_title"),
                                    padx=10, pady=10)
         input_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        # Control sub-frame for unit selection and endianness
-        control_frame = tk.Frame(input_frame)
+        self._create_input_controls(input_frame)
+        self._create_input_debug_split(input_frame)
+
+    def _create_input_controls(self, parent_frame):
+        """Create the input control sub-frame for unit selection and endianness."""
+        control_frame = tk.Frame(parent_frame)
         control_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        # Unit size selection
         tk.Label(control_frame,
                  text=get_string("input_unit_size")).pack(side=tk.LEFT, padx=(0, 10))
         self.unit_size_var = tk.StringVar(value="1 Byte")
@@ -57,21 +75,22 @@ class StructView(tk.Tk):
         self.unit_menu = tk.OptionMenu(control_frame, self.unit_size_var, *unit_options, command=self._dispatch_on_unit_size_change)
         self.unit_menu.pack(side=tk.LEFT)
 
+        # Endianness selection
         tk.Label(control_frame,
                  text=get_string("byte_order")).pack(side=tk.LEFT, padx=(20, 10))
         self.endian_var = tk.StringVar(value="Little Endian")
         endian_options = ["Little Endian", "Big Endian"]
-        # Add command to trigger re-parsing when endianness changes
         self.endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=self._dispatch_on_endianness_change)
         self.endian_menu.pack(side=tk.LEFT)
 
-        # --- 水平排列：左邊 hex input，右邊 debug ---
-        input_debug_frame = tk.Frame(input_frame)
+    def _create_input_debug_split(self, parent_frame):
+        """Create the split frame for hex input grid and debug bytes."""
+        input_debug_frame = tk.Frame(parent_frame)
         input_debug_frame.pack(fill=tk.BOTH, expand=True)
         input_debug_frame.columnconfigure(0, weight=1)
         input_debug_frame.columnconfigure(1, weight=1)
 
-        # 左邊：Canvas with scrollbar for the entry grid
+        # Left: Canvas with scrollbar for the entry grid
         left_frame = tk.Frame(input_debug_frame)
         left_frame.grid(row=0, column=0, sticky="nsew")
         
@@ -85,7 +104,7 @@ class StructView(tk.Tk):
         canvas.create_window((4,4), window=self.hex_grid_frame, anchor="nw")
         self.hex_grid_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
-        # 右邊：Debug Bytes Frame
+        # Right: Debug Bytes Frame
         right_frame = tk.Frame(input_debug_frame)
         right_frame.grid(row=0, column=1, sticky="nsew")
         
@@ -95,33 +114,35 @@ class StructView(tk.Tk):
         self.debug_text = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, width=40, height=8, state=tk.DISABLED, font=("Courier", 10))
         self.debug_text.pack(fill=tk.BOTH, expand=True)
 
-        # Parse Button
+    def _create_parse_button(self):
+        """Create the parse button."""
         self.parse_button = tk.Button(self,
                                       text=get_string("parse_button"),
                                       command=self.presenter.parse_hex_data if self.presenter else None,
                                       state=tk.DISABLED)
         self.parse_button.pack(pady=10)
 
-        # Frame for results
+    def _create_results_frame(self):
+        """Create the results frame with split view for parsed values and debug."""
         result_frame = tk.LabelFrame(self,
                                      text=get_string("parsed_values_title"),
                                      padx=10, pady=10)
         result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # --- 水平排列：左邊 parse result，右邊 struct member debug ---
+        # Split frame for results and debug
         result_debug_frame = tk.Frame(result_frame)
         result_debug_frame.pack(fill=tk.BOTH, expand=True)
         result_debug_frame.columnconfigure(0, weight=1)
         result_debug_frame.columnconfigure(1, weight=1)
 
-        # 左邊：Parse Results
+        # Left: Parse Results
         left_result_frame = tk.Frame(result_debug_frame)
         left_result_frame.grid(row=0, column=0, sticky="nsew")
 
         self.result_text = scrolledtext.ScrolledText(left_result_frame, wrap=tk.WORD, height=10, state=tk.DISABLED, font=("Courier", 10))
         self.result_text.pack(fill=tk.BOTH, expand=True)
 
-        # 右邊：Struct Member Debug
+        # Right: Struct Member Debug
         right_result_frame = tk.Frame(result_debug_frame)
         right_result_frame.grid(row=0, column=1, sticky="nsew")
 

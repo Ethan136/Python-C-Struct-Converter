@@ -25,6 +25,35 @@ Tests for the input conversion mechanism.
 - Tests integration with model parsing
 - **支援 XML array 格式自動化測試**
 
+### `test_input_field_processor.py`
+Tests for the InputFieldProcessor module.
+- Tests hex input padding functionality
+- Tests raw byte conversion with endianness
+- Tests complete input processing pipeline
+- Tests error handling and edge cases
+- Tests supported field size validation
+
+### `test_struct_parsing.py` *(新增)*
+Tests for struct parsing and layout calculation.
+- Tests struct definition parsing (parse_struct_definition)
+- Tests bitfield parsing and validation
+- Tests pointer type handling
+- Tests unsigned type support
+- Tests LayoutCalculator class functionality
+- Tests memory layout calculation with padding
+- Tests bitfield layout calculation
+
+### `test_struct_model_integration.py` *(新增)*
+Tests for StructModel integration functionality.
+- Tests StructModel initialization and state management
+- Tests struct loading from files
+- Tests hex data parsing with various scenarios
+- Tests endianness handling
+- Tests bitfield data extraction
+- Tests boolean and pointer value parsing
+- Tests padding handling in parsed data
+- Tests short input handling and zero padding
+
 ### `test_struct_parsing_core.py`
 Tests for core struct parsing functionality without GUI.
 - Tests struct definition loading from .h files
@@ -34,6 +63,28 @@ Tests for core struct parsing functionality without GUI.
 - Tests mixed field sizes (char, short, int, long long)
 - Tests empty input handling
 - **支援 XML 配置檔案自動化測試**
+
+### `test_gui_input_validation.py`
+Tests for GUI input validation and length limiting.
+- Tests hex character validation
+- Tests input length limiting
+- Tests control key handling
+- Tests auto-focus removal verification
+- Tests input validation binding
+
+### `test_struct_view.py`
+Tests for GUI view functionality.
+- Tests UI component initialization
+- Tests presenter wiring
+- Tests error message display
+- Tests bitfield display in parsed values
+- Tests struct layout display with bitfield info
+
+### `test_config_parser.py`
+Tests for XML configuration parsing.
+- Tests XML configuration file loading
+- Tests configuration validation
+- Tests test case extraction from XML
 
 ## 核心功能測試 (Core Function Testing)
 
@@ -163,12 +214,20 @@ python3 run_tests.py
 # From project root
 python3 -m unittest tests.test_input_conversion -v
 python3 -m unittest tests.test_string_parser -v
+python3 -m unittest tests.test_struct_parsing -v
+python3 -m unittest tests.test_struct_model_integration -v
 python3 -m unittest tests.test_struct_parsing_core -v
+python3 -m unittest tests.test_gui_input_validation -v
+python3 -m unittest tests.test_struct_view -v
 
 # Or use the test runner
 python3 run_tests.py --test test_input_conversion
 python3 run_tests.py --test test_string_parser
+python3 run_tests.py --test test_struct_parsing
+python3 run_tests.py --test test_struct_model_integration
 python3 run_tests.py --test test_struct_parsing_core
+python3 run_tests.py --test test_gui_input_validation
+python3 run_tests.py --test test_struct_view
 ```
 
 ### Run Specific Test Method
@@ -182,7 +241,11 @@ python3 -m unittest tests.test_input_conversion.TestInputConversion.test_4byte_f
 cd tests
 python3 -m unittest test_input_conversion -v
 python3 -m unittest test_string_parser -v
+python3 -m unittest test_struct_parsing -v
+python3 -m unittest test_struct_model_integration -v
 python3 -m unittest test_struct_parsing_core -v
+python3 -m unittest test_gui_input_validation -v
+python3 -m unittest test_struct_view -v
 ```
 
 ## Test Coverage
@@ -200,9 +263,37 @@ The tests cover the following areas:
 - ✅ **Invalid input handling**: Rejects non-hex characters
 - ✅ **Model integration**: Works with struct parsing
 
+### Input Field Processor (`test_input_field_processor.py`)
+- ✅ **Hex input padding**: Automatic zero padding
+- ✅ **Raw byte conversion**: Endianness handling
+- ✅ **Complete pipeline**: End-to-end processing
+- ✅ **Error handling**: Invalid inputs and edge cases
+- ✅ **Field size validation**: Supported size checking
+
+### Struct Parsing (`test_struct_parsing.py`)
+- ✅ **Struct definition parsing**: Valid and invalid structs
+- ✅ **Bitfield parsing**: Bit field member extraction
+- ✅ **Pointer type handling**: Pointer member recognition
+- ✅ **Layout calculation**: Memory layout with padding
+- ✅ **Bitfield layout**: Bit field storage unit management
+
+### Struct Model Integration (`test_struct_model_integration.py`)
+- ✅ **Model initialization**: State management
+- ✅ **File loading**: Struct loading from files
+- ✅ **Hex data parsing**: Various parsing scenarios
+- ✅ **Endianness handling**: Big/little endian support
+- ✅ **Bitfield extraction**: Bit field value extraction
+- ✅ **Type-specific parsing**: Bool, pointer, padding handling
+
 ### String Parser (`test_string_parser.py`)
 - ✅ **XML loading**: Loads UI strings from XML files
 - ✅ **String retrieval**: Gets strings with fallback handling
+
+### GUI Input Validation (`test_gui_input_validation.py`)
+- ✅ **Hex validation**: Only hex characters allowed
+- ✅ **Length limiting**: Input length restrictions
+- ✅ **Control key handling**: Navigation and shortcuts
+- ✅ **Auto-focus removal**: No automatic field jumping
 
 ### Core Struct Parsing (`test_struct_parsing_core.py`)
 - ✅ **Struct definition loading**: Loads struct definitions from .h files
@@ -212,6 +303,13 @@ The tests cover the following areas:
 - ✅ **Mixed field sizes**: Supports char, short, int, long long
 - ✅ **Empty input handling**: Converts empty inputs to zero values
 - ✅ **Value validation**: Validates parsed results against expected values
+
+### GUI View (`test_struct_view.py`)
+- ✅ **UI initialization**: All components properly created
+- ✅ **Presenter wiring**: Button and command connections
+- ✅ **Error display**: Error message handling
+- ✅ **Bitfield display**: Bit field information in results
+- ✅ **Layout display**: Struct layout with bit field info
 
 ## Test Structure
 
@@ -267,4 +365,16 @@ These tests are designed to be run in CI/CD pipelines. The test runner (`run_tes
 - GUI 與 Presenter wiring、錯誤處理、UI 狀態
 - 測試資料與範例 struct 覆蓋多種結構
 
-所有 public API 均有單元測試，並涵蓋異常/邊界情境。 
+所有 public API 均有單元測試，並涵蓋異常/邊界情境。
+
+## 重構說明
+
+### 程式碼重構
+- **StructView**: 將 `__init__` 方法拆分為多個私有方法，提高可讀性
+- **StructModel**: 將 `calculate_layout` 拆分為 `LayoutCalculator` 類別，改善複雜度
+- **測試檔案**: 將肥大的 `test_struct_model.py` 拆分為多個專責測試檔案
+
+### 測試檔案重構
+- `test_struct_parsing.py`: 專門測試 struct 解析和 layout 計算
+- `test_struct_model_integration.py`: 專門測試 StructModel 整合功能
+- 保留原有測試檔案，確保向後相容性 
