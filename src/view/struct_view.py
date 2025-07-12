@@ -1,12 +1,12 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
-from utils import string_parser
+from config import get_string
 
 class StructView(tk.Tk):
     def __init__(self, presenter):
         super().__init__()
         self.presenter = presenter
-        self.title(string_parser.get_string("app_title"))
+        self.title(get_string("app_title"))
         self.geometry("750x800")
 
         self.hex_entries = []
@@ -16,17 +16,17 @@ class StructView(tk.Tk):
         file_frame = tk.Frame(self, pady=5)
         file_frame.pack(fill=tk.X, padx=10)
         self.file_label = tk.Label(file_frame,
-                                    text=string_parser.get_string("no_file_selected"),
+                                    text=get_string("no_file_selected"),
                                     anchor="w", justify=tk.LEFT)
         self.file_label.pack(side=tk.LEFT, expand=True, fill=tk.X)
         browse_button = tk.Button(file_frame,
-                                  text=string_parser.get_string("browse_button"),
+                                  text=get_string("browse_button"),
                                   command=self.presenter.browse_file)
         browse_button.pack(side=tk.RIGHT)
 
         # Frame for struct layout info
         info_frame = tk.LabelFrame(self,
-                                  text=string_parser.get_string("layout_frame_title"),
+                                  text=get_string("layout_frame_title"),
                                   padx=10, pady=10)
         info_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         self.info_text = scrolledtext.ScrolledText(info_frame, wrap=tk.WORD, height=10, state=tk.DISABLED)
@@ -34,7 +34,7 @@ class StructView(tk.Tk):
 
         # Frame for hex input
         input_frame = tk.LabelFrame(self,
-                                   text=string_parser.get_string("hex_input_title"),
+                                   text=get_string("hex_input_title"),
                                    padx=10, pady=10)
         input_frame.pack(fill=tk.X, padx=10, pady=5)
         
@@ -42,14 +42,14 @@ class StructView(tk.Tk):
         control_frame = tk.Frame(input_frame)
         control_frame.pack(fill=tk.X, pady=(0, 5))
         tk.Label(control_frame,
-                 text=string_parser.get_string("input_unit_size")).pack(side=tk.LEFT, padx=(0, 10))
+                 text=get_string("input_unit_size")).pack(side=tk.LEFT, padx=(0, 10))
         self.unit_size_var = tk.StringVar(value="1 Byte")
         unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
         unit_menu = tk.OptionMenu(control_frame, self.unit_size_var, *unit_options, command=self.presenter.on_unit_size_change)
         unit_menu.pack(side=tk.LEFT)
 
         tk.Label(control_frame,
-                 text=string_parser.get_string("byte_order")).pack(side=tk.LEFT, padx=(20, 10))
+                 text=get_string("byte_order")).pack(side=tk.LEFT, padx=(20, 10))
         self.endian_var = tk.StringVar(value="Little Endian")
         endian_options = ["Little Endian", "Big Endian"]
         # Add command to trigger re-parsing when endianness changes
@@ -69,14 +69,14 @@ class StructView(tk.Tk):
 
         # Parse Button
         self.parse_button = tk.Button(self,
-                                      text=string_parser.get_string("parse_button"),
+                                      text=get_string("parse_button"),
                                       command=self.presenter.parse_hex_data,
                                       state=tk.DISABLED)
         self.parse_button.pack(pady=10)
 
         # Frame for results
         result_frame = tk.LabelFrame(self,
-                                     text=string_parser.get_string("parsed_values_title"),
+                                     text=get_string("parsed_values_title"),
                                      padx=10, pady=10)
         result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         self.result_text = scrolledtext.ScrolledText(result_frame, wrap=tk.WORD, height=10, state=tk.DISABLED, font=("Courier", 10))

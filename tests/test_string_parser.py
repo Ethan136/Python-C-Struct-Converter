@@ -1,7 +1,7 @@
 import unittest
 import tempfile
 import os
-from src.utils import string_parser
+from src.config import ui_strings
 
 SAMPLE_XML = """<strings>
     <string name='greet'>Hello</string>
@@ -18,14 +18,14 @@ class TestStringParser(unittest.TestCase):
         os.unlink(self.tmp.name)
 
     def test_load_ui_strings(self):
-        data = string_parser.load_ui_strings(self.tmp.name)
+        data = ui_strings.load_ui_strings(self.tmp.name)
         self.assertEqual(data['greet'], 'Hello')
         self.assertEqual(data['farewell'], 'Goodbye')
 
     def test_get_string(self):
-        string_parser.load_ui_strings(self.tmp.name)
-        self.assertEqual(string_parser.get_string('greet'), 'Hello')
-        self.assertEqual(string_parser.get_string('missing'), 'missing')
+        ui_strings.load_ui_strings(self.tmp.name)
+        self.assertEqual(ui_strings.get_string('greet'), 'Hello')
+        self.assertEqual(ui_strings.get_string('missing'), 'missing')
 
 if __name__ == '__main__':
     unittest.main()
