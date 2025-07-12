@@ -21,7 +21,7 @@ TYPE_INFO = {
 }
 
 def parse_struct_definition(file_content):
-    """Parses C++ struct definition from a string."""
+    """Parses C++ struct definition from a string, including bit fields."""
     struct_match = re.search(r"struct\s+(\w+)\s*\{([^}]+)\};", file_content, re.DOTALL)
     if not struct_match:
         return None, None
@@ -29,9 +29,26 @@ def parse_struct_definition(file_content):
     struct_content = struct_match.group(2)
     # 移除 // 註解
     struct_content = re.sub(r'//.*', '', struct_content)
+    # 支援 bit field: type name : bits;
+    bitfield_matches = re.findall(r"\s*([\w\s\*]+?)\s+([\w\[\]]+)\s*:\s*(\d+)\s*;", struct_content)
     member_matches = re.findall(r"\s*([\w\s\*]+?)\s+([\w\[\]]+);", struct_content)
+    # 移除 bitfield 已經 match 過的欄位
+    bitfield_names = set(name for _, name, _ in bitfield_matches)
     members = []
+    for type_str, name, bits in bitfield_matches:
+        clean_type = " ".join(type_str.strip().split())
+        if "*" in clean_type:
+            continue  # 不支援 pointer bit field
+        if clean_type in TYPE_INFO:
+            members.append({
+                "type": clean_type,
+                "name": name,
+                "is_bitfield": True,
+                "bit_size": int(bits)
+            })
     for type_str, name in member_matches:
+        if name in bitfield_names:
+            continue  # 已處理過 bitfield
         clean_type = " ".join(type_str.strip().split())
         if "*" in clean_type:
             members.append(("pointer", name))
@@ -40,42 +57,82 @@ def parse_struct_definition(file_content):
     return struct_name, members
 
 def calculate_layout(members):
-    """Calculates the memory layout of a struct, including padding."""
+    """Calculates the memory layout of a struct, including padding and bit fields."""
     if not members:
         return [], 0, 1
     layout = []
     current_offset = 0
     max_alignment = 1
-    for member_type, member_name in members:
-        info = TYPE_INFO[member_type]
-        size, alignment = info["size"], info["align"]
-
-        # Update struct's max alignment
-        if alignment > max_alignment:
-            max_alignment = alignment
-
-        # Add padding to align the current member
-        padding = (alignment - (current_offset % alignment)) % alignment
-        if padding > 0:
+    bitfield_unit_type = None
+    bitfield_unit_size = 0
+    bitfield_unit_align = 0
+    bitfield_bit_offset = 0
+    bitfield_unit_offset = 0
+    for member in members:
+        # Bit field member (dict)
+        if isinstance(member, dict) and member.get("is_bitfield", False):
+            mtype = member["type"]
+            mname = member["name"]
+            mbit_size = member["bit_size"]
+            info = TYPE_INFO[mtype]
+            size, alignment = info["size"], info["align"]
+            if bitfield_unit_type != mtype or bitfield_bit_offset + mbit_size > size * 8:
+                # New storage unit needed (type changed or overflow)
+                # Align to storage unit
+                padding = (alignment - (current_offset % alignment)) % alignment
+                if padding > 0:
+                    layout.append({
+                        "name": "(padding)",
+                        "type": "padding",
+                        "size": padding,
+                        "offset": current_offset
+                    })
+                    current_offset += padding
+                bitfield_unit_type = mtype
+                bitfield_unit_size = size
+                bitfield_unit_align = alignment
+                bitfield_bit_offset = 0
+                bitfield_unit_offset = current_offset
+                # Update struct's max alignment
+                if alignment > max_alignment:
+                    max_alignment = alignment
+                current_offset += size
             layout.append({
-                "name": "(padding)",
-                "type": "padding",
-                "size": padding,
+                "name": mname,
+                "type": mtype,
+                "size": bitfield_unit_size,
+                "offset": bitfield_unit_offset,
+                "is_bitfield": True,
+                "bit_offset": bitfield_bit_offset,
+                "bit_size": mbit_size
+            })
+            bitfield_bit_offset += mbit_size
+        else:
+            # End any open bitfield unit
+            bitfield_unit_type = None
+            bitfield_bit_offset = 0
+            # Old tuple logic
+            member_type, member_name = member
+            info = TYPE_INFO[member_type]
+            size, alignment = info["size"], info["align"]
+            if alignment > max_alignment:
+                max_alignment = alignment
+            padding = (alignment - (current_offset % alignment)) % alignment
+            if padding > 0:
+                layout.append({
+                    "name": "(padding)",
+                    "type": "padding",
+                    "size": padding,
+                    "offset": current_offset
+                })
+                current_offset += padding
+            layout.append({
+                "name": member_name,
+                "type": member_type,
+                "size": size,
                 "offset": current_offset
             })
-            current_offset += padding
-
-        # Store member layout info
-        layout.append({
-            "name": member_name,
-            "type": member_type,
-            "size": size,
-            "offset": current_offset
-        })
-
-        # Move offset to the end of the current member
-        current_offset += size
-
+            current_offset += size
     # Add final padding to align the whole struct
     final_padding = (max_alignment - (current_offset % max_alignment)) % max_alignment
     if final_padding > 0:
@@ -86,9 +143,7 @@ def calculate_layout(members):
             "offset": current_offset
         })
         current_offset += final_padding
-
     total_size = current_offset
-
     return layout, total_size, max_alignment
 
 class StructModel:
@@ -139,10 +194,19 @@ class StructModel:
 
             offset, size, name = item['offset'], item['size'], item['name']
             member_bytes = data_bytes[offset : offset + size]
-            value = int.from_bytes(member_bytes, byte_order)
+            if item.get("is_bitfield", False):
+                # Extract the storage unit as int
+                storage_int = int.from_bytes(member_bytes, byte_order)
+                bit_offset = item["bit_offset"]
+                bit_size = item["bit_size"]
+                mask = (1 << bit_size) - 1
+                value = (storage_int >> bit_offset) & mask
+                display_value = str(value)
+            else:
+                value = int.from_bytes(member_bytes, byte_order)
+                display_value = str(bool(value)) if item['type'] == 'bool' else str(value)
             # hex_raw 一律用 big endian 顯示
             hex_value = int.from_bytes(member_bytes, 'big').to_bytes(size, 'big').hex()
-            display_value = str(bool(value)) if item['type'] == 'bool' else str(value)
             parsed_values.append({
                 "name": name,
                 "value": display_value,

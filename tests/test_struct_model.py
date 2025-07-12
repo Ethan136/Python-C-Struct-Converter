@@ -80,6 +80,32 @@ class TestParseStructDefinition(unittest.TestCase):
         self.assertEqual(members[0], ("int", "value1"))
         self.assertEqual(members[1], ("char", "value2"))
     
+    def test_struct_with_bitfields(self):
+        """Test parsing struct with bit field members."""
+        struct_content = """
+        struct BitFieldStruct {
+            int a : 1;
+            int b : 2;
+            int c : 5;
+        };
+        """
+        struct_name, members = parse_struct_definition(struct_content)
+        self.assertEqual(struct_name, "BitFieldStruct")
+        self.assertEqual(len(members), 3)
+        # Each member should be a dict with type, name, is_bitfield, bit_size
+        self.assertEqual(members[0]["type"], "int")
+        self.assertEqual(members[0]["name"], "a")
+        self.assertTrue(members[0]["is_bitfield"])
+        self.assertEqual(members[0]["bit_size"], 1)
+        self.assertEqual(members[1]["type"], "int")
+        self.assertEqual(members[1]["name"], "b")
+        self.assertTrue(members[1]["is_bitfield"])
+        self.assertEqual(members[1]["bit_size"], 2)
+        self.assertEqual(members[2]["type"], "int")
+        self.assertEqual(members[2]["name"], "c")
+        self.assertTrue(members[2]["is_bitfield"])
+        self.assertEqual(members[2]["bit_size"], 5)
+    
     def test_invalid_struct_no_match(self):
         """Test parsing invalid struct that doesn't match pattern."""
         struct_content = "This is not a struct definition"
@@ -225,6 +251,35 @@ class TestCalculateLayout(unittest.TestCase):
         self.assertEqual(layout[2]["type"], "pointer")
         self.assertEqual(layout[2]["size"], 8)
         self.assertEqual(layout[2]["offset"], 8)
+
+    def test_bitfield_layout(self):
+        """Test layout calculation for struct with bit fields."""
+        members = [
+            {"type": "int", "name": "a", "is_bitfield": True, "bit_size": 1},
+            {"type": "int", "name": "b", "is_bitfield": True, "bit_size": 2},
+            {"type": "int", "name": "c", "is_bitfield": True, "bit_size": 5},
+        ]
+        layout, total_size, max_alignment = calculate_layout(members)
+        # All bit fields should be packed into a single int (4 bytes)
+        self.assertEqual(len(layout), 3)
+        self.assertEqual(layout[0]["name"], "a")
+        self.assertTrue(layout[0]["is_bitfield"])
+        self.assertEqual(layout[0]["bit_offset"], 0)
+        self.assertEqual(layout[0]["bit_size"], 1)
+        self.assertEqual(layout[1]["name"], "b")
+        self.assertTrue(layout[1]["is_bitfield"])
+        self.assertEqual(layout[1]["bit_offset"], 1)
+        self.assertEqual(layout[1]["bit_size"], 2)
+        self.assertEqual(layout[2]["name"], "c")
+        self.assertTrue(layout[2]["is_bitfield"])
+        self.assertEqual(layout[2]["bit_offset"], 3)
+        self.assertEqual(layout[2]["bit_size"], 5)
+        # All should share the same storage unit (offset 0, size 4)
+        for item in layout:
+            self.assertEqual(item["offset"], 0)
+            self.assertEqual(item["size"], 4)
+        self.assertEqual(total_size, 4)
+        self.assertEqual(max_alignment, 4)
 
 
 class TestStructModel(unittest.TestCase):
@@ -597,6 +652,30 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(result[1]["hex_raw"], "000000")  # 3 bytes padding
         self.assertEqual(result[2]["hex_raw"], "00000123")  # 4 bytes
         self.assertEqual(result[3]["hex_raw"], "0000000004567890")  # 8 bytes
+
+    def test_parse_hex_data_bitfields(self):
+        """Test parsing hex data for struct with bit fields."""
+        # struct BitFieldStruct { int a:1; int b:2; int c:5; };
+        # Layout: all packed in 1 int (4 bytes), a=bit0, b=bit1-2, c=bit3-7
+        struct_content = """
+        struct BitFieldStruct {
+            int a : 1;
+            int b : 2;
+            int c : 5;
+        };
+        """
+        with patch("builtins.open", mock_open(read_data=struct_content)):
+            self.model.load_struct_from_file("test_file.h")
+        # a=1, b=2, c=17 -> bits: 1 (a), 10 (b), 10001 (c) => 1 10 10001 = 0b10001101 = 0x8D
+        # Little endian: 0x8D 00 00 00
+        hex_data = "8d000000"
+        result = self.model.parse_hex_data(hex_data, "little")
+        self.assertEqual(result[0]["name"], "a")
+        self.assertEqual(result[0]["value"], "1")
+        self.assertEqual(result[1]["name"], "b")
+        self.assertEqual(result[1]["value"], "2")
+        self.assertEqual(result[2]["name"], "c")
+        self.assertEqual(result[2]["value"], "17")
 
 
 class TestTypeInfo(unittest.TestCase):

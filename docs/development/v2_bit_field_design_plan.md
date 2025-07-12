@@ -123,3 +123,37 @@
 - 不同型別斷開：`struct C { int a:3; char b:2; int c:5; };`
 - 混合 bit field 與一般欄位：`struct D { int a:1; int b; int c:2; };`
 - 測試 little/big endian 下 bit field 解析結果。 
+
+---
+
+## 2024/07/07 進度與實作說明
+
+### 已完成項目
+
+#### 1. struct 解析
+- `parse_struct_definition` 已支援 `type name : bits;` 語法，能正確解析 bit field 欄位，並以 dict 格式記錄 type、name、is_bitfield、bit_size。
+- 單元測試：`test_struct_with_bitfields` 驗證 bit 欄位解析正確。
+
+#### 2. 記憶體佈局計算
+- `calculate_layout` 已依據 C/C++ bit field packing 規則，計算 bit offset、storage unit，並於 layout dict 增加 `is_bitfield`、`bit_offset`、`bit_size` 欄位。
+- 支援同一 storage unit 連續 bit field、自動斷開不同型別或超過 storage unit 大小時換新單元。
+- 單元測試：`test_bitfield_layout` 驗證 bit 欄位 layout 正確（offset、bit_offset、bit_size）。
+
+#### 3. hex 資料解析
+- `parse_hex_data` 已能根據 layout，從 bytes 取出正確 bit 區段，還原 bit field 數值，並考慮 endianness。
+- 單元測試：`test_parse_hex_data_bitfields` 驗證 bit 欄位值解析正確，並以 little endian 測試 C 語言 bitfield 實際行為。
+
+#### 4. TDD 流程
+- 每個功能皆先撰寫/調整對應單元測試，確保測試失敗後再實作，並於實作後測試通過。
+- 目前所有 bit field 相關測試皆已通過。
+
+#### 5. 尚未實作/待辦
+- `input_field_processor.py` 尚未支援 bit 欄位專用輸入驗證/轉換。
+- GUI（Presenter/View）尚未支援 bit 欄位顯示、輸入、驗證。
+- 測試 XML、其他跨 byte/型別/混合欄位案例、文件補充等。
+
+#### 6. 主要修改檔案
+- `src/model/struct_model.py`：三大核心 function 均已支援 bit field。
+- `tests/test_struct_model.py`：新增/擴充 bit field 解析、layout、hex 解析單元測試。
+
+--- 
