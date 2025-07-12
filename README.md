@@ -200,6 +200,16 @@ python3 run.py
 
 > **Note:** Manual struct mode now fully supports C++-style alignment and padding. All members are automatically aligned and padded as in C++.
 
+## Recent Improvements
+
+### Input Validation Enhancement (2024)
+- **Robust Error Handling**: The application now gracefully handles invalid input in the struct size field (e.g., non-numeric characters like "把6")
+- **Crash Prevention**: Prevents application crashes when users enter unexpected data types
+- **Safe Defaults**: Automatically converts invalid inputs to safe default values (0) without throwing exceptions
+- **TDD Implementation**: All improvements are thoroughly tested using Test-Driven Development methodology
+
+For detailed technical information about recent improvements, see [docs/development/v3_define_struct_input2_design_plan.md](docs/development/v3_define_struct_input2_design_plan.md).
+
 ## Example File
 
 An `examples/example.h`

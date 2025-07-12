@@ -254,5 +254,11 @@ class TestStructView(unittest.TestCase):
         # 驗證表格有正確顯示
         self.assertEqual(len(self.view.members), 3)
 
+    def test_size_var_non_numeric_should_return_zero(self):
+        self.view.size_var.set("把6")
+        # 不應拋出例外，total_size 應為 0
+        struct_data = self.view.get_manual_struct_definition()
+        self.assertEqual(struct_data["total_size"], 0)
+
 if __name__ == "__main__":
     unittest.main()

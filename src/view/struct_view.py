@@ -367,10 +367,14 @@ class StructView(tk.Tk):
                 {"name": m["name"], "byte_size": m.get("byte_size", 0), "bit_size": m["bit_size"]}
                 for m in self.members
             ]
-        
+        # 防呆：size_var 只允許數字
+        try:
+            total_size = self.size_var.get()
+        except Exception:
+            total_size = 0
         return {
             "struct_name": self.struct_name_var.get(),
-            "total_size": self.size_var.get(),
+            "total_size": total_size,
             "members": members_data
         }
 
