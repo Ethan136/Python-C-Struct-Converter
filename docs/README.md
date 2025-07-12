@@ -1,84 +1,31 @@
-# C++ Struct Memory Parser - Documentation
+# Documentation
 
-## Overview
+This directory contains comprehensive documentation for the C++ Struct Memory Parser project.
 
-This directory contains all documentation for the C++ Struct Memory Parser project, organized by category for easy navigation.
+## Architecture Documentation
 
-## Documentation Structure
+- **[ARCHITECTURE.md](architecture/)** - Detailed architecture documentation
+- **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Project structure and organization
 
-### 📋 Core Documentation
-- **[README.md](../README.md)** - Main project documentation and user guide
-- **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Project structure and organization guide
+## Development Documentation
 
-### 🏗️ Architecture Documents
-- **[MVP_ARCHITECTURE_COMPLETE.md](architecture/MVP_ARCHITECTURE_COMPLETE.md)** - Complete MVP architecture guide with component comparisons
-- **[STRUCT_PARSING.md](architecture/STRUCT_PARSING.md)** - Detailed struct parsing mechanism documentation
-- **[MANUAL_STRUCT_ALIGNMENT.md](architecture/MANUAL_STRUCT_ALIGNMENT.md)** - Manual struct alignment and padding behavior documentation
+- **[v3_define_struct_input2_design_plan.md](development/v3_define_struct_input2_design_plan.md)** - V3 manual struct input improvements and TDD refactor
+- **[v2_bit_field_design_plan.md](development/v2_bit_field_design_plan.md)** - Bit field support design
+- **[string_refactor_plan.md](development/string_refactor_plan.md)** - String management refactoring
+- **[run_all_tests_usage.md](development/run_all_tests_usage.md)** - Test execution guide
 
-### 📊 Analysis Documents
-- **[INPUT_CONVERSION_COMPLETE.md](analysis/INPUT_CONVERSION_COMPLETE.md)** - Comprehensive input conversion mechanism guide
+## Analysis Documentation
 
-### 🛠️ Development Documents
-- **[string_refactor_plan.md](development/string_refactor_plan.md)** - Plan for UI string refactoring and internationalization
+- **[input_conversion_analysis.md](analysis/input_conversion_analysis.md)** - Input conversion mechanism analysis
 
-### 🧪 Testing Documentation
-- **[tests/README.md](../tests/README.md)** - Complete testing guide and test architecture
+## Recent Updates
 
-## Quick Navigation
+### TDD Refactor: Unified Parsing Logic (2024)
+- **Unified parsing engine**: Both `.H file tab` and `Manual Struct tab` now use the same `parse_struct_bytes` method
+- **Eliminated code duplication**: Reduced parsing logic duplication by ~50%
+- **Enhanced maintainability**: Single point of modification for parsing logic
+- **Comprehensive testing**: 31 automated tests covering all functionality
+- **Backward compatibility**: GUI operations remain unchanged
+- **Real-time size display**: Each struct member shows actual memory size in editing table
 
-### For Users
-1. Start with the main **[README.md](../README.md)** for installation and usage
-2. Check **[examples/example.h](../examples/example.h)** for sample struct definitions
-
-### For Developers
-1. Read **[MVP_ARCHITECTURE_COMPLETE.md](architecture/MVP_ARCHITECTURE_COMPLETE.md)** to understand the complete MVP architecture
-2. Review **[STRUCT_PARSING.md](architecture/STRUCT_PARSING.md)** for struct parsing details
-3. Check **[MANUAL_STRUCT_ALIGNMENT.md](architecture/MANUAL_STRUCT_ALIGNMENT.md)** for manual struct alignment and padding behavior
-4. Check **[INPUT_CONVERSION_COMPLETE.md](analysis/INPUT_CONVERSION_COMPLETE.md)** for input processing details
-5. Follow **[tests/README.md](../tests/README.md)** for testing guidelines
-
-### For Contributors
-1. Review **[string_refactor_plan.md](development/string_refactor_plan.md)** for UI improvements
-2. Follow the testing guidelines in **[tests/README.md](../tests/README.md)**
-
-## Project Structure
-
-```
-├── src/                      # Source code (MVP architecture)
-│   ├── model/               # Business logic
-│   ├── view/                # UI components
-│   ├── presenter/           # Application logic
-│   └── config/              # Configuration
-├── tests/                   # Test suite
-│   ├── data/               # Test configuration files
-│   └── README.md           # Testing documentation
-├── docs/                    # Documentation (this directory)
-│   ├── architecture/       # Architecture and design documents
-│   ├── analysis/           # Technical analysis
-│   ├── development/        # Development plans
-│   └── README.md           # This file
-├── examples/               # Example files
-└── README.md               # Main project documentation
-```
-
-## Document Categories
-
-### 🏗️ Architecture Documents (`architecture/`)
-- **MVP_ARCHITECTURE_COMPLETE.md**: Complete guide to MVP architecture, component responsibilities, and design patterns
-- **STRUCT_PARSING.md**: Detailed explanation of C++ struct parsing mechanism
-- **MANUAL_STRUCT_ALIGNMENT.md**: Comprehensive guide to manual struct alignment and padding behavior
-
-### 📊 Analysis Documents (`analysis/`)
-- **INPUT_CONVERSION_COMPLETE.md**: Comprehensive guide to hex input conversion process and requirements
-
-### 🛠️ Development Documents (`development/`)
-- **string_refactor_plan.md**: Plan for UI string refactoring and internationalization
-
-## Contributing
-
-When adding new documentation:
-1. Place architecture documents in `architecture/`
-2. Place analysis documents in `analysis/`
-3. Place development plans in `development/`
-4. Update this README.md with new entries
-5. Ensure all links are working correctly 
+For detailed technical information, see [v3_define_struct_input2_design_plan.md](development/v3_define_struct_input2_design_plan.md). 

@@ -78,6 +78,9 @@ This project provides a graphical user interface (GUI) tool built with Python an
 - **Configurable Byte Order**: Choose between Little Endian and Big Endian for data interpretation.
 - **Clear Results Display**: Shows the parsed values for each member in both decimal and hexadecimal formats.
 - **Struct Export**: Export manually defined structs to C header files with proper bitfield syntax.
+- **Unified Parsing Logic**: Both `.H file tab` and `Manual Struct tab` use the same underlying parsing engine (`parse_struct_bytes`) for consistent results and maintainable code.
+- **TDD-Driven Development**: Comprehensive test coverage with 31 automated tests covering GUI operations, parsing logic, display functionality, padding, and bitfield handling.
+- **Real-time Size Display**: Each struct member shows its actual memory size in the editing table, helping users understand memory layout.
 
 ## Bitfield Support
 

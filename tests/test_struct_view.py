@@ -8,6 +8,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 from src.view.struct_view import StructView
+from src.presenter.struct_presenter import StructPresenter
 
 class PresenterStub:
     def __init__(self):
@@ -259,6 +260,392 @@ class TestStructView(unittest.TestCase):
         # 不應拋出例外，total_size 應為 0
         struct_data = self.view.get_manual_struct_definition()
         self.assertEqual(struct_data["total_size"], 0)
+
+    def test_manual_struct_hex_input_and_parse_debug(self):
+        # 切換到 manual struct tab
+        self.view.tab_control.select(self.view.tab_manual)
+        # 設定 struct size 與 unit size
+        self.view.size_var.set(8)
+        self.view.manual_unit_size_var.set("4 Bytes")
+        self.view._rebuild_manual_hex_grid()
+        # 輸入 hex raw data
+        for idx, (entry, box_len) in enumerate(self.view.manual_hex_entries):
+            entry.delete(0, "end")
+            entry.insert(0, "12".zfill(box_len))
+        # 點擊解析
+        self.view._on_parse_manual_hex()
+        # 檢查 debug 區有正確顯示 hex_parts
+        debug_text = self.view.manual_debug_text.get("1.0", "end")
+        self.assertIn("hex_parts", debug_text)
+        self.assertIn("12", debug_text)
+
+    def test_manual_struct_hex_parse_shows_member_value(self):
+        # 模擬 presenter 支援解析
+        class PresenterWithParse:
+            def __init__(self, view):
+                self.view = view
+            def parse_manual_hex_data(self, hex_parts, struct_def, endian):
+                # 假設 struct 有一個 int 欄位，hex_parts = [("01020304", 8)]
+                # 解析 hex 並顯示在 manual_member_tree
+                value = int(hex_parts[0][0], 16)
+                self.view.manual_member_tree.delete(*self.view.manual_member_tree.get_children())
+                self.view.manual_member_tree.insert("", "end", values=(struct_def["members"][0]["name"], str(value), hex(value), hex_parts[0][0]))
+                self.view.manual_debug_text.config(state="normal")
+                self.view.manual_debug_text.delete("1.0", "end")
+                self.view.manual_debug_text.insert("1.0", f"value: {value}")
+                self.view.manual_debug_text.config(state="disabled")
+        # 切換到 manual struct tab
+        self.view.tab_control.select(self.view.tab_manual)
+        # 設定 struct: 一個 int 欄位
+        self.view.members = [{"name": "a", "type": "int", "bit_size": 0}]
+        self.view.size_var.set(4)
+        self.view.manual_unit_size_var.set("4 Bytes")
+        self.view._render_member_table()
+        self.view._rebuild_manual_hex_grid()
+        # 輸入 hex raw data
+        (entry, box_len) = self.view.manual_hex_entries[0]
+        entry.delete(0, "end")
+        entry.insert(0, "01020304")
+        # 注入 presenter
+        self.view.presenter = PresenterWithParse(self.view)
+        # 點擊解析
+        self.view._on_parse_manual_hex()
+        # 檢查 manual_member_tree 有正確欄位與值
+        items = self.view.manual_member_tree.get_children()
+        self.assertEqual(len(items), 1)
+        values = self.view.manual_member_tree.item(items[0], "values")
+        self.assertEqual(values[0], "a")
+        self.assertEqual(values[1], str(int("01020304", 16)))
+
+    def test_manual_struct_hex_parse_multi_fields_endian(self):
+        # presenter 支援多欄位與大小端解析
+        class PresenterWithMultiParse:
+            def __init__(self, view):
+                self.view = view
+            def parse_manual_hex_data(self, hex_parts, struct_def, endian):
+                # struct: int(4 bytes), char(1), short(2)
+                hex_str = ''.join([h[0] for h in hex_parts])
+                # 4+1+2=7 bytes, 例如: 01020304 61 0b0c (int=0x01020304, char='a'=0x61, short=0x0b0c)
+                b = bytes.fromhex(hex_str)
+                if endian == 'Little Endian':
+                    int_val = int.from_bytes(b[0:4], 'little')
+                    char_val = chr(b[4])
+                    short_val = int.from_bytes(b[5:7], 'little')
+                else:
+                    int_val = int.from_bytes(b[0:4], 'big')
+                    char_val = chr(b[4])
+                    short_val = int.from_bytes(b[5:7], 'big')
+                self.view.manual_member_tree.delete(*self.view.manual_member_tree.get_children())
+                self.view.manual_member_tree.insert("", "end", values=(struct_def["members"][0]["name"], str(int_val), hex(int_val), hex_str[0:8]))
+                self.view.manual_member_tree.insert("", "end", values=(struct_def["members"][1]["name"], char_val, hex(ord(char_val)), hex_str[8:10]))
+                self.view.manual_member_tree.insert("", "end", values=(struct_def["members"][2]["name"], str(short_val), hex(short_val), hex_str[10:14]))
+        # 切換到 manual struct tab
+        self.view.tab_control.select(self.view.tab_manual)
+        # 設定 struct: int, char, short
+        self.view.members = [
+            {"name": "a", "type": "int", "bit_size": 0},
+            {"name": "b", "type": "char", "bit_size": 0},
+            {"name": "c", "type": "short", "bit_size": 0}
+        ]
+        self.view.size_var.set(7)
+        self.view.manual_unit_size_var.set("1 Byte")
+        self.view._render_member_table()
+        self.view._rebuild_manual_hex_grid()
+        # Little Endian 測試
+        hex_bytes = ["04", "03", "02", "01", "61", "0c", "0b"]  # int=0x01020304, char='a', short=0x0b0c
+        for (entry, box_len), val in zip(self.view.manual_hex_entries, hex_bytes):
+            entry.delete(0, "end"); entry.insert(0, val.zfill(box_len))
+        self.view.presenter = PresenterWithMultiParse(self.view)
+        self.view.manual_endian_var.set("Little Endian")
+        self.view._on_parse_manual_hex()
+        items = self.view.manual_member_tree.get_children()
+        self.assertEqual(self.view.manual_member_tree.item(items[0], "values")[1], str(int("01020304", 16)))
+        self.assertEqual(self.view.manual_member_tree.item(items[1], "values")[1], "a")
+        self.assertEqual(self.view.manual_member_tree.item(items[2], "values")[1], str(int("0b0c", 16)))
+        # Big Endian 測試
+        hex_bytes = ["01", "02", "03", "04", "61", "0b", "0c"]  # int=0x01020304, char='a', short=0x0b0c
+        for (entry, box_len), val in zip(self.view.manual_hex_entries, hex_bytes):
+            entry.delete(0, "end"); entry.insert(0, val.zfill(box_len))
+        self.view.presenter = PresenterWithMultiParse(self.view)
+        self.view.manual_endian_var.set("Big Endian")
+        self.view._on_parse_manual_hex()
+        items = self.view.manual_member_tree.get_children()
+        self.assertEqual(self.view.manual_member_tree.item(items[0], "values")[1], str(int("01020304", 16)))
+        self.assertEqual(self.view.manual_member_tree.item(items[1], "values")[1], "a")
+        self.assertEqual(self.view.manual_member_tree.item(items[2], "values")[1], str(int("0b0c", 16)))
+
+    def test_manual_struct_member_table_position(self):
+        self.view.tab_control.select(self.view.tab_manual)
+        # 取得 scrollable_frame
+        canvas = [w for w in self.view.tab_manual.winfo_children() if isinstance(w, tk.Canvas)][0]
+        scrollable_frame = canvas.winfo_children()[0]
+        children = scrollable_frame.winfo_children()
+        # 找出 member_frame 與 manual_hex_grid_frame 的順序
+        member_idx = [i for i, w in enumerate(children) if w is self.view.member_frame]
+        hex_idx = [i for i, w in enumerate(children) if w is self.view.manual_hex_grid_frame]
+        self.assertTrue(member_idx and hex_idx and member_idx[0] < hex_idx[0])
+
+    def test_tab_has_scrollbar(self):
+        # 檢查 MyStruct tab 右側有 scroll bar
+        self.view.tab_control.select(self.view.tab_manual)
+        # 應有一個 Scrollbar widget
+        scrollbars = [w for w in self.view.tab_manual.winfo_children() if isinstance(w, tk.Scrollbar)]
+        self.assertTrue(scrollbars)
+
+    def test_manual_struct_hex_parse_real_model(self):
+        # 使用真實 presenter/model 串接
+        from src.model.struct_model import StructModel
+        class RealPresenter:
+            def __init__(self, view):
+                self.view = view
+                self.model = StructModel()
+            def parse_manual_hex_data(self, hex_parts, struct_def, endian):
+                # 將 hex_parts 組成 bytes
+                hex_str = ''.join([h[0].zfill(h[1]) for h in hex_parts])
+                b = bytes.fromhex(hex_str)
+                layout = self.model.calculate_manual_layout(struct_def['members'], struct_def['total_size'])
+                results = []
+                offset = 0
+                for m in layout:
+                    if m['type'] == 'padding':
+                        offset += m['size']
+                        continue
+                    size = m['size']
+                    val_bytes = b[offset:offset+size]
+                    if endian == 'Little Endian':
+                        value = int.from_bytes(val_bytes, 'little')
+                    else:
+                        value = int.from_bytes(val_bytes, 'big')
+                    results.append((m['name'], value, hex(value), val_bytes.hex()))
+                    offset += size
+                self.view.manual_member_tree.delete(*self.view.manual_member_tree.get_children())
+                for r in results:
+                    self.view.manual_member_tree.insert('', 'end', values=r)
+        # 切換到 manual struct tab
+        self.view.tab_control.select(self.view.tab_manual)
+        # 設定 struct: int, char, short
+        self.view.members = [
+            {"name": "a", "type": "int", "bit_size": 0},
+            {"name": "b", "type": "char", "bit_size": 0},
+            {"name": "c", "type": "short", "bit_size": 0}
+        ]
+        self.view.size_var.set(7)
+        self.view.manual_unit_size_var.set("1 Byte")
+        self.view._render_member_table()
+        self.view._rebuild_manual_hex_grid()
+        # Little Endian 測試
+        hex_bytes = ["04", "03", "02", "01", "61", "0c", "0b"]  # int=0x01020304, char='a', short=0x0b0c
+        for (entry, box_len), val in zip(self.view.manual_hex_entries, hex_bytes):
+            entry.delete(0, "end"); entry.insert(0, val.zfill(box_len))
+        self.view.presenter = RealPresenter(self.view)
+        self.view.manual_endian_var.set("Little Endian")
+        # debug print layout
+        model = StructModel()
+        layout = model.calculate_manual_layout(self.view.members, self.view.size_var.get())
+        hex_str = ''.join([val.zfill(box_len) for (entry, box_len), val in zip(self.view.manual_hex_entries, hex_bytes)])
+        b = bytes.fromhex(hex_str)
+        self.view._on_parse_manual_hex()
+        items = self.view.manual_member_tree.get_children()
+        self.assertEqual(self.view.manual_member_tree.item(items[0], "values")[0], "a")
+        self.assertEqual(self.view.manual_member_tree.item(items[0], "values")[1], str(int("01020304", 16)))
+        self.assertEqual(self.view.manual_member_tree.item(items[1], "values")[0], "b")
+        self.assertEqual(self.view.manual_member_tree.item(items[1], "values")[1], str(int("61", 16)))
+        self.assertEqual(self.view.manual_member_tree.item(items[2], "values")[0], "c")
+        # 直接用 layout offset/size 取 bytes 驗證
+        c_layout = [m for m in layout if m['name'] == 'c'][0]
+        c_bytes = b[c_layout['offset']:c_layout['offset']+c_layout['size']]
+        expected_short = int.from_bytes(c_bytes, 'little')
+        self.assertEqual(self.view.manual_member_tree.item(items[2], "values")[1], str(expected_short))
+
+    def test_manual_struct_parse_calls_view_display_method(self):
+        """測試 MyStruct tab 解析後會呼叫 view 的顯示方法"""
+        # 模擬 presenter 有 parse_manual_hex_data 方法
+        class MockPresenter:
+            def __init__(self, view):
+                self.view = view
+                self.parse_called = False
+                self.display_called = False
+            
+            def parse_manual_hex_data(self, hex_parts, struct_def, endian):
+                self.parse_called = True
+                # 模擬解析結果
+                parsed_values = [
+                    {"name": "a", "value": "123", "hex_value": "0x7b", "hex_raw": "7b000000"},
+                    {"name": "b", "value": "65", "hex_value": "0x41", "hex_raw": "41"}
+                ]
+                # 呼叫 view 的顯示方法
+                if hasattr(self.view, 'show_manual_parsed_values'):
+                    self.view.show_manual_parsed_values(parsed_values, endian)
+                    self.display_called = True
+        
+        # 切換到 manual struct tab
+        self.view.tab_control.select(self.view.tab_manual)
+        
+        # 設定 struct
+        self.view.members = [
+            {"name": "a", "type": "int", "bit_size": 0},
+            {"name": "b", "type": "char", "bit_size": 0}
+        ]
+        self.view.size_var.set(5)
+        self.view.manual_unit_size_var.set("1 Byte")
+        self.view._render_member_table()
+        self.view._rebuild_manual_hex_grid()
+        
+        # 輸入 hex data
+        hex_bytes = ["7b", "00", "00", "00", "41"]  # int=123, char='A'
+        for (entry, box_len), val in zip(self.view.manual_hex_entries, hex_bytes):
+            entry.delete(0, "end")
+            entry.insert(0, val.zfill(box_len))
+        
+        # 注入 mock presenter
+        mock_presenter = MockPresenter(self.view)
+        self.view.presenter = mock_presenter
+        
+        # 執行解析
+        self.view._on_parse_manual_hex()
+        
+        # 驗證 presenter 的 parse_manual_hex_data 被呼叫
+        self.assertTrue(mock_presenter.parse_called, "presenter.parse_manual_hex_data 應該被呼叫")
+        
+        # 驗證 view 的顯示方法被呼叫（如果實作了的話）
+        if hasattr(self.view, 'show_manual_parsed_values'):
+            self.assertTrue(mock_presenter.display_called, "view.show_manual_parsed_values 應該被呼叫")
+
+    def test_show_manual_parsed_values_displays_correctly(self):
+        """測試 show_manual_parsed_values 方法正確顯示欄位值"""
+        # 切換到 manual struct tab
+        self.view.tab_control.select(self.view.tab_manual)
+        
+        # 準備測試資料
+        parsed_values = [
+            {"name": "field1", "value": "123", "hex_value": "0x7b", "hex_raw": "7b000000"},
+            {"name": "field2", "value": "65", "hex_value": "0x41", "hex_raw": "41"},
+            {"name": "field3", "value": "258", "hex_value": "0x102", "hex_raw": "0201"}
+        ]
+        
+        # 呼叫顯示方法
+        self.view.show_manual_parsed_values(parsed_values, "Little Endian")
+        
+        # 驗證 manual_member_tree 有正確的資料
+        items = self.view.manual_member_tree.get_children()
+        self.assertEqual(len(items), 3, "應該有 3 個欄位")
+        
+        # 驗證第一個欄位
+        values1 = self.view.manual_member_tree.item(items[0], "values")
+        self.assertEqual(values1[0], "field1", "欄位名稱應該正確")
+        self.assertEqual(values1[1], "123", "欄位值應該正確")
+        self.assertEqual(values1[2], "0x7b", "hex value 應該正確")
+        self.assertEqual(values1[3], "7b000000", "hex raw 應該正確")
+        
+        # 驗證第二個欄位
+        values2 = self.view.manual_member_tree.item(items[1], "values")
+        self.assertEqual(values2[0], "field2", "欄位名稱應該正確")
+        self.assertEqual(values2[1], "65", "欄位值應該正確")
+        self.assertEqual(values2[2], "0x41", "hex value 應該正確")
+        self.assertEqual(values2[3], "41", "hex raw 應該正確")
+        
+        # 驗證第三個欄位
+        values3 = self.view.manual_member_tree.item(items[2], "values")
+        self.assertEqual(values3[0], "field3", "欄位名稱應該正確")
+        self.assertEqual(values3[1], "258", "欄位值應該正確")
+        self.assertEqual(values3[2], "0x102", "hex value 應該正確")
+        self.assertEqual(values3[3], "0201", "hex raw 應該正確")
+
+    def test_manual_struct_real_presenter_integration(self):
+        """測試真實 presenter 與 MyStruct tab 的整合"""
+        from src.model.struct_model import StructModel
+        
+        # 建立真實 presenter
+        model = StructModel()
+        presenter = StructPresenter(model, self.view)
+        self.view.presenter = presenter
+        
+        # 切換到 manual struct tab
+        self.view.tab_control.select(self.view.tab_manual)
+        
+        # 設定 struct: int, char, short
+        self.view.members = [
+            {"name": "a", "type": "int", "bit_size": 0},
+            {"name": "b", "type": "char", "bit_size": 0},
+            {"name": "c", "type": "short", "bit_size": 0}
+        ]
+        self.view.size_var.set(8)  # 修正為 8 bytes（包含 padding）
+        self.view.manual_unit_size_var.set("1 Byte")
+        self.view._render_member_table()
+        self.view._rebuild_manual_hex_grid()
+        
+        # 輸入 hex data (Little Endian) - 8 bytes: int(4) + char(1) + padding(1) + short(2)
+        hex_bytes = ["04", "03", "02", "01", "61", "00", "0c", "0b"]  # int=0x01020304, char='a', padding=0x00, short=0x0b0c
+        for (entry, box_len), val in zip(self.view.manual_hex_entries, hex_bytes):
+            entry.delete(0, "end")
+            entry.insert(0, val.zfill(box_len))
+        
+        self.view.manual_endian_var.set("Little Endian")
+        
+        # 執行解析
+        self.view._on_parse_manual_hex()
+        
+        # 驗證 manual_member_tree 有正確的資料（包含 padding）
+        items = self.view.manual_member_tree.get_children()
+        self.assertEqual(len(items), 4, "應該有 4 個欄位（包含 padding）")
+        
+        # 驗證欄位值
+        values1 = self.view.manual_member_tree.item(items[0], "values")
+        self.assertEqual(values1[0], "a", "欄位名稱應該正確")
+        self.assertEqual(values1[1], str(int("01020304", 16)), "int 欄位值應該正確")
+        
+        values2 = self.view.manual_member_tree.item(items[1], "values")
+        self.assertEqual(values2[0], "b", "欄位名稱應該正確")
+        self.assertEqual(values2[1], "97", "char 欄位值應該正確")  # 'a' = 97
+        
+        values3 = self.view.manual_member_tree.item(items[2], "values")
+        self.assertEqual(values3[0], "(padding)", "padding 欄位名稱應該正確")
+        self.assertEqual(values3[1], "-", "padding 欄位值應該為 -")
+        
+        values4 = self.view.manual_member_tree.item(items[3], "values")
+        self.assertEqual(values4[0], "c", "欄位名稱應該正確")
+        self.assertEqual(values4[1], str(int("0b0c", 16)), "short 欄位值應該正確")
+
+    def test_manual_struct_member_table_shows_size_column(self):
+        """測試 MyStruct member 編輯表格有 size 欄位且顯示正確"""
+        self.view.tab_control.select(self.view.tab_manual)
+        # 設定 struct: int, char, short, bitfield
+        self.view.members = [
+            {"name": "a", "type": "int", "bit_size": 0},
+            {"name": "b", "type": "char", "bit_size": 0},
+            {"name": "c", "type": "short", "bit_size": 0},
+            {"name": "d", "type": "int", "bit_size": 3},
+        ]
+        self.view.size_var.set(12)
+        self.view._render_member_table()
+        # 取得 member_frame 內所有 row widget
+        rows = [w for w in self.view.member_frame.winfo_children() if isinstance(w, tk.Label)]
+        # 應有 size 欄位標題
+        header_texts = [w.cget("text") for w in rows[:6]]
+        self.assertIn("size", ''.join(header_texts).lower())
+        # 應有每個欄位的 size 顯示（只讀）
+        # 取得所有 size 欄位的值（假設在 column 4）
+        size_labels = [w for w in self.view.member_frame.winfo_children() if hasattr(w, 'is_size_label') and w.is_size_label]
+        self.assertEqual(len(size_labels), 4)
+        # 驗證 int/char/short/bitfield 的 size
+        size_texts = [l.cget("text") for l in size_labels]
+        # int=4, char=1, short=2, bitfield(int)=4
+        self.assertEqual(size_texts, ["4", "1", "2", "4"])
+
+    def test_manual_struct_member_table_size_column_padding(self):
+        """測試 struct 有 padding 時，size 欄位顯示正確"""
+        self.view.tab_control.select(self.view.tab_manual)
+        # 設定 struct: char, int
+        self.view.members = [
+            {"name": "a", "type": "char", "bit_size": 0},
+            {"name": "b", "type": "int", "bit_size": 0},
+        ]
+        self.view.size_var.set(8)
+        self.view._render_member_table()
+        # 取得 size 欄位的值
+        size_labels = [w for w in self.view.member_frame.winfo_children() if hasattr(w, 'is_size_label') and w.is_size_label]
+        # char=1, padding=3, int=4
+        self.assertEqual([l.cget("text") for l in size_labels], ["1", "4"])
 
 if __name__ == "__main__":
     unittest.main()

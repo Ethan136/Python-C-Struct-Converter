@@ -333,6 +333,54 @@ class StructModel:
             })
         return parsed_values
 
+    def parse_manual_hex_data(self, hex_data, byte_order, layout):
+        """解析 MyStruct tab 的 hex 資料"""
+        if not layout:
+            raise ValueError("No manual struct layout provided.")
+
+        # 使用 input field processor 處理 hex 資料
+        total_size = sum(item['size'] for item in layout)
+        padded_hex = self.input_processor.pad_hex_input(hex_data, total_size)
+        data_bytes = bytes.fromhex(padded_hex)
+        
+        parsed_values = []
+        for item in layout:
+            # 只解析實際成員，跳過 padding
+            if item['type'] == "padding":
+                padding_bytes = data_bytes[item['offset'] : item['offset'] + item['size']]
+                hex_value = padding_bytes.hex()
+                parsed_values.append({
+                    "name": item['name'],
+                    "value": "-", # padding 沒有值
+                    "hex_raw": hex_value
+                })
+                continue
+
+            offset, size, name = item['offset'], item['size'], item['name']
+            member_bytes = data_bytes[offset : offset + size]
+            
+            if item.get("is_bitfield", False):
+                # 處理 bitfield
+                storage_int = int.from_bytes(member_bytes, byte_order)
+                bit_offset = item["bit_offset"]
+                bit_size = item["bit_size"]
+                mask = (1 << bit_size) - 1
+                value = (storage_int >> bit_offset) & mask
+                display_value = str(value)
+            else:
+                # 處理普通欄位
+                value = int.from_bytes(member_bytes, byte_order)
+                display_value = str(bool(value)) if item['type'] == 'bool' else str(value)
+            
+            # hex_raw 一律用 big endian 顯示
+            hex_value = int.from_bytes(member_bytes, 'big').to_bytes(size, 'big').hex()
+            parsed_values.append({
+                "name": name,
+                "value": display_value,
+                "hex_raw": hex_value
+            })
+        return parsed_values
+
     def _convert_legacy_member(self, member):
         """支援舊格式的 member（包含 byte_size）"""
         if "byte_size" in member and "type" not in member:

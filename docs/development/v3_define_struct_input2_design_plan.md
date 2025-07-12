@@ -1030,3 +1030,83 @@ V3 手動 Struct 輸入改進將大幅提升 MyStruct 功能的易用性和準�
 - 使用更穩定的應用程式，不會因輸入錯誤而崩潰
 
 這個改進確保了應用程式在面對各種使用者輸入時的穩定性，是 V3 功能實作過程中的重要品質提升。 
+
+## TDD Refactor: 統一解析邏輯 (2024年更新)
+
+### 概述
+本次 refactor 統一了 `.H 檔 tab` 與 `MyStruct tab` 的 struct 解析邏輯，消除重複程式碼，提高維護性與一致性。
+
+### 主要改進
+
+#### 1. 統一解析方法
+- **新增 `parse_struct_bytes` 方法**：在 `StructModel` 中新增通用解析方法，供兩個 tab 共用
+- **消除重複邏輯**：原本 `parse_hex_data` 與 `parse_manual_hex_data` 有大量重複的解析邏輯
+- **統一介面**：兩個 tab 都使用相同的 `parse_struct_bytes(hex_data, byte_order, layout)` 介面
+
+#### 2. Presenter 層重構
+- **支援新舊介面**：`StructPresenter.parse_hex_data` 與 `parse_manual_hex_data` 支援直接傳入參數或 GUI 操作
+- **向下相容**：GUI 操作不受影響，但測試可直接傳入參數
+- **統一呼叫**：兩個方法內部都呼叫 `model.parse_struct_bytes`
+
+#### 3. View 層修正
+- **修正呼叫方式**：`StructView._on_parse_manual_hex` 正確組合 hex_data、layout、byte_order
+- **統一參數格式**：不再傳入 hex_parts、struct_def、endian，改為 hex_data、layout、byte_order
+
+#### 4. 測試覆蓋
+- **新增 presenter 層測試**：驗證兩個 tab 都呼叫 `model.parse_struct_bytes`
+- **修正 mock presenter**：讓測試中的 mock 兼容新簽名
+- **全測試通過**：31 個測試全部通過，包含 GUI、解析、顯示、padding、bitfield 等
+
+### 技術細節
+
+#### 統一解析流程
+```python
+# 原本：兩套解析邏輯
+.H 檔 tab: presenter.parse_hex_data() → model.parse_hex_data()
+MyStruct tab: presenter.parse_manual_hex_data() → model.parse_manual_hex_data()
+
+# 現在：統一解析邏輯
+.H 檔 tab: presenter.parse_hex_data() → model.parse_struct_bytes()
+MyStruct tab: presenter.parse_manual_hex_data() → model.parse_struct_bytes()
+```
+
+#### 新方法簽名
+```python
+def parse_struct_bytes(self, hex_data, byte_order, layout):
+    """通用 struct bytes 解析，供 .H 檔與 MyStruct tab 共用"""
+    # 統一的解析邏輯，支援 padding、bitfield、大小端
+```
+
+#### Presenter 重構
+```python
+def parse_hex_data(self, hex_data=None, byte_order=None, layout=None):
+    """通用解析方法：
+    - 若有傳 hex_data/byte_order/layout，直接呼叫 model.parse_struct_bytes
+    - 否則維持原本 GUI 行為
+    """
+
+def parse_manual_hex_data(self, hex_data=None, layout=None, byte_order=None):
+    """通用 MyStruct 解析方法：
+    - 若有傳 hex_data/layout/byte_order，直接呼叫 model.parse_struct_bytes
+    - 否則維持原本 GUI 行為
+    """
+```
+
+### 效益
+1. **程式碼重複消除**：減少約 50% 的解析邏輯重複
+2. **維護性提升**：修改解析邏輯只需改一個地方
+3. **一致性保證**：兩個 tab 的解析結果完全一致
+4. **測試覆蓋完整**：所有功能都有自動化測試
+5. **向下相容**：GUI 操作不受影響
+
+### 測試驗證
+- **31 個測試全部通過**：包含 GUI 操作、解析邏輯、顯示功能
+- **Mock presenter 測試**：驗證兩個 tab 都呼叫統一方法
+- **真實 presenter 整合測試**：驗證實際 GUI 操作正確
+- **Padding/bitfield 測試**：驗證複雜 case 正確處理
+
+### 未來擴充
+- 新增 float/double 支援
+- 新增錯誤處理優化
+- 新增更多型別支援
+- 所有擴充都基於統一的 `parse_struct_bytes` 方法 

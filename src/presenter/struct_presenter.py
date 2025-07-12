@@ -1,4 +1,5 @@
 import re
+import tkinter as tk
 from tkinter import filedialog
 from src.config import get_string
 from src.model.input_field_processor import InputFieldProcessor
@@ -151,3 +152,33 @@ class StructPresenter:
         struct_name = struct_data.get("struct_name", "MyStruct")
         h_content = self.model.export_manual_struct_to_h(struct_name)
         self.view.show_exported_struct(h_content)
+
+    def parse_manual_hex_data(self, hex_parts, struct_def, endian):
+        """解析 MyStruct tab 的 hex 資料並顯示結果"""
+        try:
+            # 將 hex_parts 組成完整的 hex 字串
+            hex_str = ''.join([h[0].zfill(h[1]) for h in hex_parts])
+            
+            # 設定 model 的 manual struct
+            self.model.set_manual_struct(struct_def['members'], struct_def['total_size'])
+            
+            # 計算 layout
+            layout = self.model.calculate_manual_layout(struct_def['members'], struct_def['total_size'])
+            
+            # 解析 hex 資料
+            byte_order = 'little' if endian == "Little Endian" else 'big'
+            parsed_values = self.model.parse_manual_hex_data(hex_str, byte_order, layout)
+            
+            # 呼叫 view 的顯示方法
+            self.view.show_manual_parsed_values(parsed_values, endian)
+            
+            # 顯示 debug 資訊
+            self.view.manual_debug_text.config(state="normal")
+            self.view.manual_debug_text.delete("1.0", tk.END)
+            self.view.manual_debug_text.insert("1.0", f"Parsed {len(parsed_values)} fields\nHex data: {hex_str}\nEndian: {endian}")
+            self.view.manual_debug_text.config(state="disabled")
+            
+        except Exception as e:
+            self.view.show_error("解析錯誤", f"解析 hex 資料時發生錯誤: {e}")
+            # 清空顯示
+            self.view.manual_member_tree.delete(*self.view.manual_member_tree.get_children())
