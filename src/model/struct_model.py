@@ -1,3 +1,25 @@
+"""
+struct_model.py
+
+C/C++ struct 解析與記憶體佈局計算核心模組。
+支援 struct 欄位型別：char, int, long long, unsigned, pointer, 以及 bit field (type name : bits)。
+支援自動計算 padding、alignment、bitfield packing（同 storage unit 內連續 bitfield）。
+主要 API:
+- parse_struct_definition: 解析 struct 定義，回傳 struct 名稱與欄位 members（含 bitfield 資訊）。
+- calculate_layout: 根據 members 計算記憶體佈局，回傳 layout list（含 offset, size, is_bitfield, bit_offset, bit_size）。
+- StructModel: struct 解析與 hex 資料解析高階介面。
+
+layout 內每個欄位 dict 格式：
+{
+  "name": 欄位名稱,
+  "type": 型別,
+  "size": 占用 bytes 數,
+  "offset": 在 struct 內的 byte offset,
+  "is_bitfield": 是否為 bitfield 欄位 (bool, optional),
+  "bit_offset": 若為 bitfield，於 storage unit 內的 bit offset (int, optional),
+  "bit_size": 若為 bitfield，bitfield 欄位寬度 (int, optional)
+}
+"""
 import re
 from .input_field_processor import InputFieldProcessor
 
@@ -21,7 +43,7 @@ TYPE_INFO = {
 }
 
 def parse_struct_definition(file_content):
-    """Parses C++ struct definition from a string, including bit fields."""
+    """Parses C++ struct definition from a string, including bit fields, preserving field order."""
     struct_match = re.search(r"struct\s+(\w+)\s*\{([^}]+)\};", file_content, re.DOTALL)
     if not struct_match:
         return None, None
@@ -29,31 +51,37 @@ def parse_struct_definition(file_content):
     struct_content = struct_match.group(2)
     # 移除 // 註解
     struct_content = re.sub(r'//.*', '', struct_content)
-    # 支援 bit field: type name : bits;
-    bitfield_matches = re.findall(r"\s*([\w\s\*]+?)\s+([\w\[\]]+)\s*:\s*(\d+)\s*;", struct_content)
-    member_matches = re.findall(r"\s*([\w\s\*]+?)\s+([\w\[\]]+);", struct_content)
-    # 移除 bitfield 已經 match 過的欄位
-    bitfield_names = set(name for _, name, _ in bitfield_matches)
+    # 逐行解析，保留順序
+    lines = struct_content.split(';')
     members = []
-    for type_str, name, bits in bitfield_matches:
-        clean_type = " ".join(type_str.strip().split())
-        if "*" in clean_type:
-            continue  # 不支援 pointer bit field
-        if clean_type in TYPE_INFO:
-            members.append({
-                "type": clean_type,
-                "name": name,
-                "is_bitfield": True,
-                "bit_size": int(bits)
-            })
-    for type_str, name in member_matches:
-        if name in bitfield_names:
-            continue  # 已處理過 bitfield
-        clean_type = " ".join(type_str.strip().split())
-        if "*" in clean_type:
-            members.append(("pointer", name))
-        elif clean_type in TYPE_INFO:
-            members.append((clean_type, name))
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        # bitfield: type name : bits
+        bitfield_match = re.match(r"(.+?)\s+([\w\[\]]+)\s*:\s*(\d+)$", line)
+        if bitfield_match:
+            type_str, name, bits = bitfield_match.groups()
+            clean_type = " ".join(type_str.strip().split())
+            if "*" in clean_type:
+                continue  # 不支援 pointer bit field
+            if clean_type in TYPE_INFO:
+                members.append({
+                    "type": clean_type,
+                    "name": name,
+                    "is_bitfield": True,
+                    "bit_size": int(bits)
+                })
+            continue
+        # 普通欄位: type name
+        member_match = re.match(r"(.+?)\s+([\w\[\]]+)$", line)
+        if member_match:
+            type_str, name = member_match.groups()
+            clean_type = " ".join(type_str.strip().split())
+            if "*" in clean_type:
+                members.append(("pointer", name))
+            elif clean_type in TYPE_INFO:
+                members.append((clean_type, name))
     return struct_name, members
 
 def calculate_layout(members):

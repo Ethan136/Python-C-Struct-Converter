@@ -13,7 +13,7 @@ Python C Struct Converter/
 │   ├── main.py                      # Application entry point
 │   ├── 📁 model/                    # Model layer (Business Logic)
 │   │   ├── __init__.py
-│   │   ├── struct_model.py          # Core struct parsing logic
+│   │   ├── struct_model.py          # Core struct parsing logic (supports bitfield, padding, pointer, mixed fields)
 │   │   └── STRUCT_PARSING.md        # Model documentation
 │   ├── 📁 view/                     # View layer (UI Components)
 │   │   ├── __init__.py
@@ -25,7 +25,7 @@ Python C Struct Converter/
 │       ├── __init__.py
 │       ├── ui_strings.py            # String management utilities
 │       └── ui_strings.xml           # Localized UI strings
-├── 📁 tests/                        # Test suite
+├── 📁 tests/                        # Test suite (covers bitfield, padding, pointer, mixed fields, etc.)
 │   ├── __init__.py
 │   ├── README.md                    # Comprehensive testing documentation
 │   ├── test_input_conversion.py     # Input conversion mechanism tests
@@ -41,7 +41,7 @@ Python C Struct Converter/
 │   │   └── input_conversion_analysis.md  # Input conversion analysis
 │   └── 📁 development/              # Development plans and proposals
 │       └── string_refactor_plan.md  # UI string refactoring plan
-├── 📁 examples/                     # Example files
+├── 📁 examples/                     # Example files (example.h covers bitfield and padding)
 │   └── example.h                    # Sample C++ struct definition
 ├── 📄 README.md                     # Main project documentation
 ├── 📄 PROJECT_STRUCTURE.md          # This file

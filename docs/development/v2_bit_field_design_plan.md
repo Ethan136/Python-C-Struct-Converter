@@ -178,3 +178,69 @@
 - `src/view/README.md`（文件補充）
 
 --- 
+
+## [2024-07-09] GUI struct layout 顯示錯誤排查紀錄
+
+### 問題現象
+- 以 `examples/example.h` 的 struct 作為輸入，GUI 顯示 struct layout 時：
+    - 欄位順序錯誤（bitfield 欄位全部排在最前面，與原始 struct 不符）
+    - offset/size 計算錯誤
+    - 部分欄位（如 e, f, g）完全沒顯示
+    - bitfield 只顯示 c1, c2, c3，其他欄位缺失
+
+### 主要原因
+- `parse_struct_definition` 目前是：
+    1. 先用 regex 抓所有 bitfield 欄位，依序加入 members
+    2. 再抓所有普通欄位，跳過已經 match 過的 bitfield
+    3. 這會導致 bitfield 欄位永遠排在最前面，欄位順序與原始 struct 不符
+    4. 若 struct 欄位有交錯（bitfield 與普通欄位混用），順序就會錯誤
+    5. 若 regex 沒有 match 到所有欄位，會造成欄位遺失
+
+### code 檢查重點
+- `parse_struct_definition` 需改為：
+    - 依照原始 struct 內容逐行解析
+    - 每一行判斷是 bitfield 還是普通欄位，依序加入 members
+    - 這樣才能保證欄位順序正確，bitfield 與普通欄位混用時也不會出錯
+
+### 待修正事項
+- [ ] 重構 `parse_struct_definition`，改為逐行解析、順序保留
+- [ ] 增加單元測試，驗證 bitfield 與普通欄位混用時順序正確
+- [ ] 驗證 GUI layout 顯示與 C++ 編譯器一致 
+
+### 資料結構範例
+
+- layout 內每個欄位 dict 格式：
+  ```python
+  {
+    "name": "欄位名稱",
+    "type": "型別",
+    "size": 4,           # 占用 bytes 數
+    "offset": 0,         # 在 struct 內的 byte offset
+    "is_bitfield": True, # 是否為 bitfield 欄位 (optional)
+    "bit_offset": 0,     # 若為 bitfield，於 storage unit 內的 bit offset (optional)
+    "bit_size": 1        # 若為 bitfield，bitfield 欄位寬度 (optional)
+  }
+  ```
+- members list 範例：
+  ```python
+  [
+    ("char", "a"),
+    ("int", "b"),
+    {"type": "int", "name": "c1", "is_bitfield": True, "bit_size": 1},
+    ...
+  ]
+  ```
+
+### 支援限制
+- 目前不支援 union、enum、typedef、nested struct、#pragma pack、__attribute__ 等 C/C++ 語法。
+- 只支援單一 struct 解析，不支援多 struct 同時解析。
+- bitfield 只支援 int/unsigned int/char/unsigned char 等基本型別，不支援 pointer bitfield。
+
+### 測試覆蓋清單
+- 基本型別 struct
+- bitfield struct（連續/跨 storage unit）
+- padding/alignment struct
+- pointer struct
+- 混合欄位 struct
+- 複雜 struct（如 example.h 的 CombinedExample）
+- hex 資料解析（含 bitfield、padding、pointer） 

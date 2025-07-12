@@ -117,4 +117,8 @@ This document outlines the requirements and design for a new module responsible 
 - Support for different number bases (binary, decimal)
 - Custom padding patterns
 - Input validation and sanitization
-- Performance optimizations for large datasets 
+- Performance optimizations for large datasets
+- **Bitfield input validation and processing:**
+  - Future versions will support direct input and validation for bitfield fields (e.g., restrict input to valid bit width, auto-pack user input into correct storage unit for struct_model.py integration).
+  - Will provide helper functions to convert user bitfield input into packed integer values, and vice versa.
+  - Will integrate with struct_model.py to ensure bitfield input/output is consistent with memory layout and parsing logic. 

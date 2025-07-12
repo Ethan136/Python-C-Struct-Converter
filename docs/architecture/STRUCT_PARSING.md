@@ -5,20 +5,19 @@ This document explains how `struct_model.py` parses a C++ `struct` and computes 
 ## Overview
 - The parser is implemented in `src/model/struct_model.py`.
 - Only `struct` definitions are supported; `union` parsing is not implemented.
+- **Supports bitfield members (e.g., `int a : 1;`), including bitfield packing and storage unit alignment.**
 
 ## Steps
 1. **Regex Extraction (Intermediate Representation)**
-   - `parse_struct_definition()` first extracts member types and names into a temporary list of tuples. For example, `struct { char s; long long val; }` becomes `[('char', 's'), ('long long', 'val')]`. This provides a simple, intermediate representation.
+   - `parse_struct_definition()` extracts member types and names (including bitfields) into a temporary list, preserving declaration order. Bitfields are represented as dicts with `is_bitfield` and `bit_size`.
 
 2. **Layout Calculation (Final Data Structure)**
    - The intermediate list is processed by `calculate_layout()`, which computes the final memory layout.
-   - This final layout is stored as a **list of dictionaries**, where each dictionary represents a single member, including padding. This structure is the definitive representation of the struct's memory map.
+   - This final layout is stored as a **list of dictionaries**, where each dictionary represents a single member, including padding and bitfield info.
 
 ### Final Data Structure Details
 
-When parsing is complete, the information for each struct member (including padding) is stored in a **dictionary**. The entire struct layout is represented by a **list of these dictionaries**, which is stored in the `StructModel`'s `self.layout` attribute.
-
-For example, `struct UserProfile { char status; long long user_id; };` is converted into:
+Each struct member (including padding and bitfields) is stored as a dictionary. Example:
 ```python
 [
     {
@@ -34,13 +33,25 @@ For example, `struct UserProfile { char status; long long user_id; };` is conver
         "offset": 1
     },
     {
-        "name": "user_id",
-        "type": "long long",
-        "size": 8,
-        "offset": 8
+        "name": "flags",
+        "type": "int",
+        "size": 4,
+        "offset": 8,
+        "is_bitfield": True,
+        "bit_offset": 0,
+        "bit_size": 3
     }
 ]
 ```
+- `is_bitfield` (bool): 是否為 bitfield 欄位
+- `bit_offset` (int): 在 storage unit 內的 bit offset
+- `bit_size` (int): bitfield 欄位寬度
+
+#### Bitfield Packing/Storage Unit 規則
+- 連續同型別 bitfield 會共用同一 storage unit（如 int 4 bytes 32 bits），依序分配 bit_offset。
+- 若 bitfield 超過 storage unit 大小，或型別不同，則開新 storage unit。
+- storage unit 會依 alignment 規則對齊。
+- 普通欄位與 bitfield 欄位可混用，順序與原始 struct 宣告一致。
 
 #### Rationale for this Structure
 
@@ -99,3 +110,8 @@ Offset:  0   1   2   3   4   5   6   7   8   9  10  11
 - The struct's memory is a contiguous block, with each member occupying a specific region defined by the layout.
 - Padding ensures correct alignment but does not store member values.
 - The value of each member is stored as raw bytes at its offset, and can be read/written by slicing the memory block accordingly.
+
+## 支援限制
+- 不支援 union、enum、typedef、nested struct、#pragma pack、__attribute__ 等 C/C++ 語法。
+- 只支援單一 struct 解析，不支援多 struct 同時解析。
+- bitfield 只支援 int/unsigned int/char/unsigned char 等基本型別，不支援 pointer bitfield。
