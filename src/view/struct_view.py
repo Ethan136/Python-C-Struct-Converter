@@ -261,7 +261,15 @@ class StructView(tk.Tk):
         if errors:
             self.validation_label.config(text="; ".join(errors), fg="red")
         else:
-            self.validation_label.config(text="設定正確", fg="green")
+            # 顯示剩餘可用空間
+            struct_data = self.get_manual_struct_definition()
+            total_bits = struct_data["total_size"] * 8
+            used_bits = sum(m.get("byte_size", 0) * 8 + m.get("bit_size", 0) for m in struct_data["members"])
+            remaining_bits = max(0, total_bits - used_bits)
+            remaining_bytes = remaining_bits // 8
+            msg = "設定正確"
+            msg += f"（剩餘可用空間：{remaining_bits} bits（{remaining_bytes} bytes））"
+            self.validation_label.config(text=msg, fg="green")
 
     def on_export_manual_struct(self):
         if self.presenter:

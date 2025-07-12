@@ -211,5 +211,32 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(self.view.hex_entries[1][1], 8)
         self.assertEqual(self.view.hex_entries[2][1], 2)
 
+    def test_show_manual_struct_validation_remaining_bits(self):
+        # Case 1: 剛好填滿
+        self.view.size_var.set(2)  # 2 bytes = 16 bits
+        self.view.members = [
+            {"name": "a", "byte_size": 1, "bit_size": 0},  # 8 bits
+            {"name": "b", "byte_size": 0, "bit_size": 8}, # 8 bits
+        ]
+        self.view.show_manual_struct_validation([])
+        label = self.view.validation_label.cget("text")
+        self.assertIn("剩餘可用空間：0 bits（0 bytes）", label)
+
+        # Case 2: 有剩餘空間
+        self.view.size_var.set(2)  # 2 bytes = 16 bits
+        self.view.members = [
+            {"name": "a", "byte_size": 1, "bit_size": 0},  # 8 bits
+        ]
+        self.view.show_manual_struct_validation([])
+        label = self.view.validation_label.cget("text")
+        self.assertIn("剩餘可用空間：8 bits（1 bytes）", label)
+
+        # Case 3: 空 struct
+        self.view.size_var.set(2)
+        self.view.members = []
+        self.view.show_manual_struct_validation([])
+        label = self.view.validation_label.cget("text")
+        self.assertIn("剩餘可用空間：16 bits（2 bytes）", label)
+
 if __name__ == "__main__":
     unittest.main()
