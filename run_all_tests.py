@@ -1,19 +1,58 @@
 import subprocess
 import sys
+import os
+import unittest
+
+# 強制使用 .venv/bin/python
+VENV_PYTHON = os.path.join(os.path.dirname(__file__), '.venv', 'bin', 'python')
 
 
 def run_pytest(args, desc):
     print(f"\n==== {desc} ====")
-    try:
-        result = subprocess.run(
-            [sys.executable, "-m", "pytest"] + args,
-            check=False
-        )
-        return result.returncode
-    except Exception as e:
-        print(f"執行 {desc} 時發生錯誤: {e}")
-        return 1
+    result = subprocess.run(
+        [VENV_PYTHON, "-m", "pytest"] + args,
+        check=False,
+        capture_output=True,
+        text=True
+    )
+    if result.returncode == 0:
+        return 0
+    # fallback 條件
+    if "No module named pytest" in (result.stderr or ""):
+        print("pytest 未安裝，fallback 用 unittest 執行...")
+        return run_unittest(args, desc)
+    # 其他 pytest 失敗直接顯示
+    print(result.stdout)
+    print(result.stderr)
+    return result.returncode
 
+def iter_test_cases(suite):
+    # 遞迴展開 TestSuite，產生所有 TestCase
+    for test in suite:
+        if isinstance(test, unittest.TestSuite):
+            yield from iter_test_cases(test)
+        else:
+            yield test
+
+def run_unittest(args, desc):
+    print(f"[unittest fallback] {desc}")
+    loader = unittest.TestLoader()
+    suite = None
+    if args and args[0].startswith('--ignore='):
+        # 執行所有 tests/ 下的 test_*.py，排除指定檔案
+        ignore_file = args[0].split('=')[1]
+        all_suites = loader.discover('tests', pattern='test_*.py')
+        filtered_tests = [tc for tc in iter_test_cases(all_suites) if ignore_file not in tc.id()]
+        suite = unittest.TestSuite(filtered_tests)
+    elif args and args[0].endswith('.py'):
+        # 只執行指定檔案
+        test_file = os.path.splitext(os.path.basename(args[0]))[0]
+        suite = loader.loadTestsFromName(f"tests.{test_file}")
+    else:
+        suite = loader.discover('tests', pattern='test_*.py')
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite)
+    return 0 if result.wasSuccessful() else 1
 
 def main():
     # Step 1: 執行非 GUI 測試
@@ -31,7 +70,6 @@ def main():
     else:
         print("❌ 有測試失敗")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main() 
