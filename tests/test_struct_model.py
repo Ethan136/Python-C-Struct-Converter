@@ -304,7 +304,7 @@ class TestStructModel(unittest.TestCase):
         # Check int value
         self.assertEqual(result[0]["name"], "value1")
         self.assertEqual(result[0]["value"], "1")
-        self.assertEqual(result[0]["hex_raw"], "01000000")
+        self.assertEqual(result[0]["hex_raw"], "01000000")  # little endian: 數值在 little endian 下的 hex 表示
         
         # Check char value
         self.assertEqual(result[1]["name"], "value2")
@@ -472,7 +472,7 @@ class TestStructModel(unittest.TestCase):
         # Check long long member 'val'
         self.assertEqual(result[2]["name"], "val")
         self.assertEqual(result[2]["value"], "4114")  # 0x1210 = 4114
-        self.assertEqual(result[2]["hex_raw"], "1210000000000000")
+        self.assertEqual(result[2]["hex_raw"], "1210000000000000")  # little endian: 數值在 little endian 下的 hex 表示
         
         # Verify total size is 16 bytes
         self.assertEqual(self.model.total_size, 16)
@@ -536,10 +536,11 @@ class TestStructModel(unittest.TestCase):
         result_little = self.model.parse_hex_data(hex_data, "little")
         result_big = self.model.parse_hex_data(hex_data, "big")
         # bytes: 00 00 00 00 00 00 01 21
-        expected_hex = "0000000000000121"
-        expected_bytes = bytes.fromhex(expected_hex)
-        self.assertEqual(result_little[0]["hex_raw"], expected_hex)
-        self.assertEqual(result_big[0]["hex_raw"], expected_hex)
+        expected_hex_little = "0000000000000121"  # little endian: 數值在 little endian 下的 hex 表示
+        expected_hex_big = "0000000000000121"  # big endian: 直接顯示原始 bytes 的 hex
+        expected_bytes = bytes.fromhex(expected_hex_big)
+        self.assertEqual(result_little[0]["hex_raw"], expected_hex_little)
+        self.assertEqual(result_big[0]["hex_raw"], expected_hex_big)
         # little endian: int.from_bytes(..., 'little')
         self.assertEqual(result_little[0]["value"], str(int.from_bytes(expected_bytes, "little")))
         # big endian: int.from_bytes(..., 'big')
@@ -572,8 +573,9 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(result[2]["name"], "val")
         
         # 驗證 hex_raw 是左補零的結果
-        expected_hex = "0000000000000121"
-        self.assertEqual(result[2]["hex_raw"], expected_hex)
+        expected_hex_little = "0000000000000121"  # little endian: 數值在 little endian 下的 hex 表示
+        expected_hex_big = "0000000000000121"  # big endian: 直接顯示原始 bytes 的 hex
+        self.assertEqual(result[2]["hex_raw"], expected_hex_little)
 
 
 class TestTypeInfo(unittest.TestCase):

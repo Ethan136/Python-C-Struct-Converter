@@ -127,17 +127,28 @@ class StructModel:
         for item in self.layout:
             # Only parse actual members, skip padding entries
             if item['type'] == "padding":
+                # For padding, hex_raw should reflect the actual memory layout without endianness
+                padding_bytes = data_bytes[item['offset'] : item['offset'] + item['size']]
+                hex_value = padding_bytes.hex()
                 parsed_values.append({
                     "name": item['name'],
                     "value": "-", # No value for padding
-                    "hex_raw": data_bytes[item['offset'] : item['offset'] + item['size']].hex()
+                    "hex_raw": hex_value
                 })
                 continue
 
             offset, size, name = item['offset'], item['size'], item['name']
             member_bytes = data_bytes[offset : offset + size]
             value = int.from_bytes(member_bytes, byte_order)
-            hex_value = member_bytes.hex()
+            # 修正 hex_raw 顯示順序：
+            # little endian: 顯示低位在前的 hex 字串
+            # big endian: 顯示高位在前的 hex 字串
+            if byte_order == "little":
+                # 將數值轉換為 little endian 的 hex 表示（低位在前）
+                hex_value = value.to_bytes(size, "little").hex()
+            else:
+                # big endian: 直接顯示原始 bytes 的 hex
+                hex_value = member_bytes.hex()
             display_value = str(bool(value)) if item['type'] == 'bool' else str(value)
             parsed_values.append({
                 "name": name,

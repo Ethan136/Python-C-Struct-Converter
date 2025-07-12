@@ -1,11 +1,13 @@
 import re
 from tkinter import filedialog
 from config import get_string
+from model.input_field_processor import InputFieldProcessor
 
 class StructPresenter:
     def __init__(self, model, view=None):
         self.model = model
         self.view = view # This will be set by main.py after view is instantiated
+        self.input_processor = InputFieldProcessor()
 
     def browse_file(self):
         file_path = filedialog.askopenfilename(
@@ -56,7 +58,7 @@ class StructPresenter:
         byte_order_for_conversion = 'little' if byte_order_str == "Little Endian" else 'big'
 
         final_memory_hex_parts = []
-        debug_bytes_per_box = []  # 新增：收集每個 box 的 bytes
+        debug_bytes_per_box = []  # 收集每個 box 的 bytes
         for raw_part, expected_chars_in_box in hex_parts_with_expected_len:
             # Validate input is hex
             if not re.match(r"^[0-9a-fA-F]*$", raw_part):
@@ -64,22 +66,20 @@ class StructPresenter:
                                    f"Input '{raw_part}' contains non-hexadecimal characters.")
                 return
             
-            # Convert raw_part to integer value
+            # Determine the byte size of the current input chunk (e.g., 1, 4, or 8 bytes)
+            chunk_byte_size = expected_chars_in_box // 2
+
+            # 使用 InputFieldProcessor 進行左補0
             try:
-                # Handle empty string as 0
-                int_value = int(raw_part, 16) if raw_part else 0
+                padded_hex = self.input_processor.pad_hex_input(raw_part, chunk_byte_size)
+                int_value = int(padded_hex, 16) if padded_hex else 0
             except ValueError:
                 self.view.show_error(get_string("dialog_invalid_input"),
                                    f"Could not convert '{raw_part}' to a number.")
                 return
 
-            # Determine the byte size of the current input chunk (e.g., 1, 4, or 8 bytes)
-            chunk_byte_size = expected_chars_in_box // 2
-
             # Convert integer value to bytes using the selected endianness
             try:
-                # Ensure the value fits within the chunk_byte_size
-                # Max value for N bytes is (2**(N*8)) - 1
                 max_val = (2**(chunk_byte_size * 8)) - 1
                 if int_value > max_val:
                     self.view.show_error(get_string("dialog_value_too_large"),

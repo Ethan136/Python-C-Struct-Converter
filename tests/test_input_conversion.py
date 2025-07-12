@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from model.struct_model import StructModel
-from test_config_parser import TestConfigParser
+from tests.test_config_parser import TestConfigParser
 
 class TestInputConversion(unittest.TestCase):
     """Test cases for input conversion mechanism"""
