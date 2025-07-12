@@ -20,8 +20,69 @@ class StructView(tk.Tk):
         self.tab_control.add(self.tab_manual, text="手動設定資料結構")
         self.tab_control.pack(expand=1, fill="both")
 
+        # 在載入.H檔Tab建立UI
+        self._create_file_tab_frame(self.tab_file)
         # 在手動設定Tab建立UI
         self._create_manual_struct_frame(self.tab_manual)
+
+    def _create_file_tab_frame(self, parent):
+        # 單位選擇與 endianness
+        control_frame = tk.Frame(parent)
+        control_frame.pack(fill="x", pady=(5, 2))
+        tk.Label(control_frame, text="單位大小：").pack(side=tk.LEFT)
+        self.unit_size_var = tk.StringVar(value="1 Byte")
+        unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
+        self.unit_menu = tk.OptionMenu(control_frame, self.unit_size_var, *unit_options, command=lambda _: self._on_unit_size_change())
+        self.unit_menu.pack(side=tk.LEFT)
+        tk.Label(control_frame, text="  Endianness：").pack(side=tk.LEFT)
+        self.endian_var = tk.StringVar(value="Little Endian")
+        endian_options = ["Little Endian", "Big Endian"]
+        self.endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=lambda _: self._on_endianness_change())
+        self.endian_menu.pack(side=tk.LEFT)
+
+        # 檔案選擇按鈕
+        tk.Button(parent, text="選擇 .h 檔", command=self._on_browse_file).pack(anchor="w", pady=2)
+        # 檔案路徑顯示
+        self.file_path_label = tk.Label(parent, text="尚未選擇檔案")
+        self.file_path_label.pack(anchor="w", pady=2)
+
+        # hex grid 輸入區
+        self.hex_entries = []
+        self.hex_grid_frame = tk.Frame(parent)
+        self.hex_grid_frame.pack(fill="x", pady=2)
+
+        # 解析按鈕
+        self.parse_button = tk.Button(parent, text="解析", command=self._on_parse_file, state="disabled")
+        self.parse_button.pack(anchor="w", pady=5)
+
+        # struct member value 顯示區
+        member_frame = tk.LabelFrame(parent, text="Struct Member Value")
+        member_frame.pack(fill="x", padx=2, pady=2)
+        self.member_tree = ttk.Treeview(member_frame, columns=("name", "value", "hex_value", "hex_raw"), show="headings", height=6)
+        self.member_tree.heading("name", text="欄位名稱")
+        self.member_tree.heading("value", text="值")
+        self.member_tree.heading("hex_value", text="Hex Value")
+        self.member_tree.heading("hex_raw", text="Hex Raw")
+        self.member_tree.pack(fill="x")
+
+        # debug bytes 顯示區
+        debug_frame = tk.LabelFrame(parent, text="Debug Bytes")
+        debug_frame.pack(fill="x", padx=2, pady=2)
+        self.debug_text = tk.Text(debug_frame, height=4, width=100)
+        self.debug_text.pack(fill="x")
+
+        # struct layout 顯示區
+        layout_frame = tk.LabelFrame(parent, text="Struct Layout")
+        layout_frame.pack(fill="both", expand=True, padx=2, pady=2)
+        self.layout_tree = ttk.Treeview(layout_frame, columns=("name", "type", "offset", "size", "bit_offset", "bit_size", "is_bitfield"), show="headings", height=10)
+        self.layout_tree.heading("name", text="欄位名稱")
+        self.layout_tree.heading("type", text="型別")
+        self.layout_tree.heading("offset", text="Offset")
+        self.layout_tree.heading("size", text="Size")
+        self.layout_tree.heading("bit_offset", text="bit_offset")
+        self.layout_tree.heading("bit_size", text="bit_size")
+        self.layout_tree.heading("is_bitfield", text="is_bitfield")
+        self.layout_tree.pack(fill="both", expand=True)
 
     def _create_manual_struct_frame(self, parent):
         # 結構體名稱
@@ -169,3 +230,146 @@ class StructView(tk.Tk):
         txt.pack()
         txt.insert("1.0", h_content)
         txt.config(state="disabled")
+
+    def _on_browse_file(self):
+        if self.presenter:
+            self.presenter.browse_file()
+
+    def _on_parse_file(self):
+        if self.presenter:
+            self.presenter.parse_hex_data()
+
+    def enable_parse_button(self):
+        self.parse_button.config(state="normal")
+
+    def disable_parse_button(self):
+        self.parse_button.config(state="disabled")
+
+    def show_struct_debug(self, content):
+        # 在 struct_info_text 顯示原始 struct 內容
+        # 全檔案移除 self.struct_info_text 相關操作，確保不再存取不存在的 Text 物件。
+        pass
+
+    def show_error(self, title, message):
+        messagebox.showerror(title, message)
+
+    def show_parsed_values(self, parsed_values, byte_order_str=None):
+        # 清空舊資料
+        for i in self.member_tree.get_children():
+            self.member_tree.delete(i)
+        # 插入新資料
+        for item in parsed_values:
+            value = item.get("value", "")
+            hex_value = ""
+            try:
+                if value != "-":
+                    int_value = int(value)
+                    hex_value = hex(int_value)
+                else:
+                    hex_value = "-"
+            except Exception:
+                hex_value = "-"
+            self.member_tree.insert("", "end", values=(item.get("name", ""), value, hex_value, item.get("hex_raw", "")))
+
+    def show_debug_bytes(self, debug_lines):
+        self.debug_text.config(state="normal")
+        self.debug_text.delete("1.0", tk.END)
+        if debug_lines:
+            self.debug_text.insert("1.0", "\n".join(debug_lines))
+        else:
+            self.debug_text.insert("1.0", "無 debug 資訊")
+        self.debug_text.config(state="disabled")
+
+    def show_struct_member_debug(self, parsed_values, layout):
+        # 顯示 struct layout 與欄位對應
+        # 全檔案移除 self.struct_info_text 相關操作，確保不再存取不存在的 Text 物件。
+        pass
+
+    def show_file_path(self, file_path):
+        self.file_path_label.config(text=f"檔案路徑: {file_path}")
+
+    def show_struct_layout(self, struct_name, layout, total_size, struct_align):
+        # 清空舊資料
+        for i in self.layout_tree.get_children():
+            self.layout_tree.delete(i)
+        # 插入新資料
+        for item in layout:
+            bit_offset = item.get("bit_offset")
+            bit_size = item.get("bit_size")
+            # 無論是否 bitfield，都顯示 bit_offset/bit_size，若無則顯示 '-'
+            bit_offset_str = str(bit_offset) if bit_offset is not None else "-"
+            bit_size_str = str(bit_size) if bit_size is not None else "-"
+            self.layout_tree.insert("", "end", values=(
+                item.get("name", ""),
+                item.get("type", ""),
+                item.get("offset", ""),
+                item.get("size", ""),
+                bit_offset_str,
+                bit_size_str,
+                str(item.get("is_bitfield", False))
+            ))
+
+    def clear_results(self):
+        for entry, _ in self.hex_entries:
+            entry.delete(0, tk.END)
+        for i in self.member_tree.get_children():
+            self.member_tree.delete(i)
+        self.debug_text.config(state="normal")
+        self.debug_text.delete("1.0", tk.END)
+        self.debug_text.config(state="disabled")
+        # 全檔案移除 self.struct_info_text 相關操作，確保不再存取不存在的 Text 物件。
+        pass
+
+    def _on_unit_size_change(self):
+        if self.presenter:
+            self.presenter.on_unit_size_change()
+
+    def _on_endianness_change(self):
+        if self.presenter:
+            self.presenter.on_endianness_change()
+
+    def get_selected_unit_size(self):
+        return int(self.unit_size_var.get().split()[0])
+
+    def get_selected_endianness(self):
+        return self.endian_var.get()
+
+    def rebuild_hex_grid(self, total_size, unit_size):
+        for widget in self.hex_grid_frame.winfo_children():
+            widget.destroy()
+        self.hex_entries.clear()
+        if total_size == 0:
+            return
+        chars_per_box = unit_size * 2
+        num_boxes = (total_size + unit_size - 1) // unit_size
+        cols = 4
+        for i in range(num_boxes):
+            entry = tk.Entry(self.hex_grid_frame, width=chars_per_box + 2, font=("Courier", 10))
+            entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
+            self.hex_entries.append((entry, chars_per_box))
+            entry.bind("<KeyPress>", lambda e, length=chars_per_box: self._validate_input(e, length))
+            entry.bind("<Key>", lambda e, length=chars_per_box: self._limit_input_length(e, length))
+
+    def get_hex_input_parts(self):
+        return [(entry.get().strip(), expected_len) for entry, expected_len in self.hex_entries]
+
+    def _validate_input(self, event, max_length):
+        if event.keysym in ['BackSpace', 'Delete', 'Left', 'Right', 'Home', 'End', 'Tab']:
+            return
+        if event.state & 0x4:
+            if event.keysym in ['a', 'c', 'v', 'x']:
+                return
+        char = event.char.lower()
+        if char not in '0123456789abcdef':
+            return "break"
+
+    def _limit_input_length(self, event, max_length):
+        widget = event.widget
+        current_text = widget.get()
+        if event.keysym in ['BackSpace', 'Delete', 'Left', 'Right', 'Home', 'End', 'Tab']:
+            return
+        if event.state & 0x4:
+            if event.keysym in ['a', 'c', 'v', 'x']:
+                return
+        if len(current_text) >= max_length:
+            return "break"

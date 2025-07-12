@@ -15,9 +15,9 @@ def main():
     load_ui_strings(strings_path)
 
     model = StructModel()
-    view = StructView()
-    presenter = StructPresenter(model, view)
-    view.set_presenter(presenter)
+    presenter = StructPresenter(model)
+    view = StructView(presenter=presenter)
+    presenter.view = view  # 確保 presenter 有 view 屬性
     view.mainloop()
 
 if __name__ == "__main__":

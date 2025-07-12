@@ -193,7 +193,10 @@ class LayoutCalculator:
             "name": name,
             "type": member_type,
             "size": size,
-            "offset": self.current_offset
+            "offset": self.current_offset,
+            "is_bitfield": False,
+            "bit_offset": 0,
+            "bit_size": size * 8
         })
     
     def _add_padding_if_needed(self, alignment):
@@ -204,7 +207,10 @@ class LayoutCalculator:
                 "name": "(padding)",
                 "type": "padding",
                 "size": padding,
-                "offset": self.current_offset
+                "offset": self.current_offset,
+                "is_bitfield": False,
+                "bit_offset": 0,
+                "bit_size": padding * 8
             })
             self.current_offset += padding
     
@@ -216,7 +222,10 @@ class LayoutCalculator:
                 "name": "(final padding)",
                 "type": "padding",
                 "size": final_padding,
-                "offset": self.current_offset
+                "offset": self.current_offset,
+                "is_bitfield": False,
+                "bit_offset": 0,
+                "bit_size": final_padding * 8
             })
             self.current_offset += final_padding
 
