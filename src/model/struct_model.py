@@ -114,7 +114,7 @@ class StructModel:
             raise ValueError("No struct layout loaded. Please load a struct definition first.")
 
         # Pad if the input is shorter (e.g. user didn't fill all boxes)
-        hex_data = hex_data.ljust(self.total_size * 2, '0')
+        hex_data = hex_data.zfill(self.total_size * 2)
         data_bytes = bytes.fromhex(hex_data)
         
         parsed_values = []
