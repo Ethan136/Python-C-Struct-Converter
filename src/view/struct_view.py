@@ -4,6 +4,24 @@ from tkinter import filedialog, messagebox, scrolledtext
 # from config import get_string
 from ..model.struct_model import StructModel
 
+def create_member_treeview(parent):
+    tree = ttk.Treeview(
+        parent,
+        columns=("name", "value", "hex_value", "hex_raw"),
+        show="headings",
+        height=6
+    )
+    tree.heading("name", text="欄位名稱")
+    tree.heading("value", text="值")
+    tree.heading("hex_value", text="Hex Value")
+    tree.heading("hex_raw", text="Hex Raw")
+    tree.column("name", width=120, stretch=False)
+    tree.column("value", width=100, stretch=False)
+    tree.column("hex_value", width=100, stretch=False)
+    tree.column("hex_raw", width=150, stretch=False)
+    tree.pack(fill="x")
+    return tree
+
 class StructView(tk.Tk):
     def __init__(self, presenter=None):
         super().__init__()
@@ -59,17 +77,7 @@ class StructView(tk.Tk):
         # struct member value 顯示區
         member_frame = tk.LabelFrame(parent, text="Struct Member Value")
         member_frame.pack(fill="x", padx=2, pady=2)
-        self.member_tree = ttk.Treeview(member_frame, columns=("name", "value", "hex_value", "hex_raw"), show="headings", height=6)
-        self.member_tree.heading("name", text="欄位名稱")
-        self.member_tree.heading("value", text="值")
-        self.member_tree.heading("hex_value", text="Hex Value")
-        self.member_tree.heading("hex_raw", text="Hex Raw")
-        # 設定欄位寬度
-        self.member_tree.column("name", width=120)
-        self.member_tree.column("value", width=100)
-        self.member_tree.column("hex_value", width=100)
-        self.member_tree.column("hex_raw", width=150)
-        self.member_tree.pack(fill="x")
+        self.member_tree = create_member_treeview(member_frame)
 
         # debug bytes 顯示區
         debug_frame = tk.LabelFrame(parent, text="Debug Bytes")
@@ -95,20 +103,9 @@ class StructView(tk.Tk):
         layout_scrollbar.pack(side="right", fill="y")
 
     def _create_manual_struct_frame(self, parent):
-        # 建立一個可滾動的 Frame
-        canvas = tk.Canvas(parent)
-        scrollbar = tk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas)
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(
-                scrollregion=canvas.bbox("all")
-            )
-        )
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        # 直接使用普通的 Frame，移除滾動機制
+        scrollable_frame = tk.Frame(parent)
+        scrollable_frame.pack(fill="both", expand=True)
 
         # struct 名稱
         name_frame = tk.Frame(scrollable_frame)
@@ -168,17 +165,7 @@ class StructView(tk.Tk):
         # struct member value 顯示區
         manual_member_frame = tk.LabelFrame(scrollable_frame, text="Struct Member Value")
         manual_member_frame.pack(fill="x", padx=2, pady=2)
-        self.manual_member_tree = ttk.Treeview(manual_member_frame, columns=("name", "value", "hex_value", "hex_raw"), show="headings", height=6)
-        self.manual_member_tree.heading("name", text="欄位名稱")
-        self.manual_member_tree.heading("value", text="值")
-        self.manual_member_tree.heading("hex_value", text="Hex Value")
-        self.manual_member_tree.heading("hex_raw", text="Hex Raw")
-        # 設定欄位寬度（與載入.h檔一致）
-        self.manual_member_tree.column("name", width=120)
-        self.manual_member_tree.column("value", width=100)
-        self.manual_member_tree.column("hex_value", width=100)
-        self.manual_member_tree.column("hex_raw", width=150)
-        self.manual_member_tree.pack(fill="x")
+        self.manual_member_tree = create_member_treeview(manual_member_frame)
 
         # debug bytes 顯示區
         manual_debug_frame = tk.LabelFrame(scrollable_frame, text="Debug Bytes")

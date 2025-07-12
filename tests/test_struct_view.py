@@ -386,11 +386,11 @@ class TestStructView(unittest.TestCase):
         self.assertTrue(member_idx and hex_idx and member_idx[0] < hex_idx[0])
 
     def test_tab_has_scrollbar(self):
-        # 檢查 MyStruct tab 右側有 scroll bar
+        # 檢查 MyStruct tab 右側沒有 scroll bar（已移除）
         self.view.tab_control.select(self.view.tab_manual)
-        # 應有一個 Scrollbar widget
+        # 應沒有 Scrollbar widget
         scrollbars = [w for w in self.view.tab_manual.winfo_children() if isinstance(w, tk.Scrollbar)]
-        self.assertTrue(scrollbars)
+        self.assertFalse(scrollbars, "MyStruct tab 應該沒有 scrollbar")
 
     def test_manual_struct_hex_parse_real_model(self):
         # 使用真實 presenter/model 串接
@@ -903,6 +903,20 @@ class TestStructView(unittest.TestCase):
         
         # Big Endian 下，long long e 應該是 0x0102030405060708
         self.assertEqual(values_e_big[1], str(int("0102030405060708", 16)), "Big Endian 下 long long e 的值應該是 0x0102030405060708")
+
+    def test_member_treeview_column_config_consistency(self):
+        """驗證 MyStruct 與 Import .H tab 的 member_tree 欄位設定完全一致"""
+        # 取得兩個 Treeview widget
+        member_tree = self.view.member_tree
+        manual_member_tree = self.view.manual_member_tree
+        # 欄位順序
+        self.assertEqual(member_tree['columns'], manual_member_tree['columns'])
+        # 欄位標題
+        for col in member_tree['columns']:
+            self.assertEqual(member_tree.heading(col)['text'], manual_member_tree.heading(col)['text'], f"欄位 {col} 標題不一致")
+        # 欄位寬度
+        for col in member_tree['columns']:
+            self.assertEqual(member_tree.column(col)['width'], manual_member_tree.column(col)['width'], f"欄位 {col} 寬度不一致")
 
 if __name__ == "__main__":
     unittest.main()

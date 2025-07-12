@@ -1117,3 +1117,28 @@ def parse_manual_hex_data(self, hex_data=None, layout=None, byte_order=None):
 - 新增錯誤處理優化
 - 新增更多型別支援
 - 所有擴充都基於統一的 `parse_struct_bytes` 方法 
+
+## TDD Refactor: 共用 Treeview 樣式元件 (2024年7月)
+
+### 目標
+- 將 MyStruct 與 Import .H 兩個 tab 的 Struct Member Value/Struct Layout 兩個表格（ttk.Treeview）欄位設定、寬度、樣式、標題等封裝成共用 helper function 或 class。
+- 兩個 tab 皆呼叫同一份程式碼，確保欄位寬度、標題、顯示行為完全一致。
+- 未來如需調整欄位設定，只需改一個地方即可。
+
+### TDD 步驟
+1. **Red**：新增測試，驗證兩個 tab 的 Treeview 欄位寬度、標題、順序、樣式完全一致。
+   - 例如：`test_member_treeview_column_config一致`、`test_layout_treeview_column_config一致`
+2. **Green**：實作共用的 `create_member_treeview(parent)`、`create_layout_treeview(parent)` helper function，並讓兩個 tab 都呼叫。
+3. **Refactor**：移除原本重複的 Treeview 欄位設定程式碼，僅保留共用 helper。
+4. **驗證**：所有 GUI 測試必須通過，且兩個 tab 的表格顯示完全一致。
+
+### 預期測試重點
+- 兩個 tab 的欄位名稱、寬度、順序、標題完全一致
+- 欄位內容顯示正確（如 Hex Raw/Hex Value）
+- 未來只需改 helper function 即可同步影響兩個 tab
+- 不影響現有功能與資料顯示
+
+### 技術細節
+- helper function 可先放在 `src/view/struct_view.py`，未來可獨立成 widgets module
+- 若有多種 Treeview（如 Member/Debug/Layout），可依需求封裝多個 helper
+- 測試可用 tkinter widget introspection 驗證欄位屬性 
