@@ -200,6 +200,12 @@ def calculate_manual_layout(self, members, total_size):
 - The previous custom memory layout table has been removed.
 - This behavior is fully verified by automated tests (see tests/test_struct_view_padding.py).
 
+### 2024/07 GUI 顯示一致性更新
+
+- **Scroll Bar 行為**：MyStruct（手動設定資料結構）tab 右側已不再顯示垂直 scroll bar，所有內容直接顯示於單一 Frame。
+- **欄位寬度統一**：MyStruct 與載入.h檔的成員顯示表格（ttk.Treeview）欄位寬度完全一致，提升跨 tab 的視覺一致性與可讀性。
+- **Debug Bytes 格式統一**：兩個 tab 的 Debug Bytes 區塊皆顯示「Box N (X bytes): ...」格式，便於比對與除錯。
+
 ## Testing
 
 ### Alignment Tests

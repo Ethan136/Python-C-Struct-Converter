@@ -27,5 +27,6 @@ This directory contains comprehensive documentation for the C++ Struct Memory Pa
 - **Comprehensive testing**: 31 automated tests covering all functionality
 - **Backward compatibility**: GUI operations remain unchanged
 - **Real-time size display**: Each struct member shows actual memory size in editing table
+- **GUI 一致性提升**：MyStruct 與載入.h檔的成員表格欄位寬度、Debug Bytes 顯示機制完全統一，MyStruct tab 右側 scroll bar 已移除，介面更簡潔。
 
 For detailed technical information, see [v3_define_struct_input2_design_plan.md](development/v3_define_struct_input2_design_plan.md). 

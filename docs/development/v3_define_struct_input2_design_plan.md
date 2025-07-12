@@ -451,6 +451,13 @@ def _copy_member(self, idx):
     self._on_manual_struct_change()
 ```
 
+#### 2.5 2024/07 GUI 顯示一致性與易用性調整
+
+- **MyStruct（手動設定資料結構）tab 右側 scroll bar 已移除**：原本的 Canvas+Scrollbar 機制改為單純 Frame，避免多餘的滾動條，提升視覺簡潔度。
+- **Struct Member Value 欄位寬度統一**：MyStruct 與載入.h檔的成員顯示表格（ttk.Treeview）欄位寬度完全一致，欄位分別為 name: 120px、value: 100px、hex_value: 100px、hex_raw: 150px，確保兩個 tab 顯示一致。
+- **Debug Bytes 顯示機制統一**：MyStruct 與載入.h檔的 Debug Bytes 區塊，皆顯示「Box N (X bytes): ...」格式，完全共用同一套顯示邏輯。
+- **相關測試同步調整**：所有 GUI 測試同步驗證 scroll bar 行為、欄位寬度、Debug Bytes 格式，確保一致性。
+
 ### 階段 3：測試與驗證
 
 #### 3.1 新增 Model 測試
