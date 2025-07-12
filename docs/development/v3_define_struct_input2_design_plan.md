@@ -320,3 +320,29 @@
   - 匯出內容格式
   - 記憶體排列正確性
 - 建議先產生測試檔案與 function stub，再逐步實作。 
+
+---
+
+## 9. View層開發與測試建議
+
+### 9.1 TDD流程與開發步驟
+- 先產生測試 stub（可 mock Presenter，驗證 UI 行為）
+- 再實作 View 層功能骨架
+- 逐步補齊互動與驗證細節
+
+### 9.2 主要測試案例
+- Tab 切換時，正確顯示對應內容
+- 手動 struct 設定 UI 元件渲染、欄位可互動
+- Bitfield 表格可增刪、資料正確回傳
+- 驗證錯誤時紅字顯示，通過時顯示通過
+- 匯出按鈕可觸發 Presenter
+
+### 9.3 建議開發步驟
+1. 產生 `tests/test_struct_view.py` 的測試骨架（mock Presenter，驗證 UI 行為）
+2. 實作 `src/view/struct_view.py` 的 UI 功能骨架
+3. 逐步補齊 bitfield 表格、驗證提示、匯出等互動細節
+
+### 9.4 其他建議
+- 測試可用 unittest + tkinter widget 測試，或 mock Presenter
+- 建議每個互動/功能都先寫測試再實作，確保 UI 可維護性
+- 若需進行更完整的整合測試，可考慮在 tests/ 新增 integration 測試，模擬完整流程（不含 UI） 
