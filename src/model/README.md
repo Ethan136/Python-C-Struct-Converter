@@ -26,4 +26,48 @@
 
 ## 相關設計文檔
 - [結構解析機制說明](../../docs/architecture/STRUCT_PARSING.md)
-- [欄位輸入處理分析](../../docs/analysis/input_field_processor_analysis.md) 
+- [欄位輸入處理分析](../../docs/analysis/input_field_processor_analysis.md)
+
+## Struct 成員資訊的資料結構
+
+StructModel 解析 struct 後，會將每個成員（含 padding）資訊儲存於一個「dict 組成的 list」中，並存放於 `self.layout` 屬性。
+
+每個 dict 代表一個 struct 成員或 padding，包含下列欄位：
+- `name`：成員名稱（或 "(padding)"）
+- `type`：型態名稱（如 char、int、long long、padding 等）
+- `size`：所佔位元組數
+- `offset`：在 struct 記憶體區塊中的起始位移
+
+例如：
+```python
+[
+    {"name": "status", "type": "char", "size": 1, "offset": 0},
+    {"name": "(padding)", "type": "padding", "size": 7, "offset": 1},
+    {"name": "user_id", "type": "long long", "size": 8, "offset": 8}
+]
+```
+
+### 設計理念
+- **可讀性**：以 dict 儲存欄位名稱，易於維護與理解
+- **完整性**：每個成員的型態、大小、位移皆明確記錄，方便後續操作
+- **精確對應記憶體**：padding 也明確標示，確保記憶體佈局正確
+- **擴充性**：未來如需新增屬性，只需於 dict 增加欄位即可
+
+詳細說明請參見 [結構解析機制說明](../../docs/architecture/STRUCT_PARSING.md) 的「Final Data Structure Details」段落。 
+
+### 為什麼 struct member info 沒有「數值」欄位？
+
+- `self.layout`（list of dict）只負責描述 struct 的「靜態結構」與「記憶體配置」，不包含任何成員的實際數值。
+- 這樣設計可分離「結構描述」與「資料內容」，讓同一份 layout 可重複用於不同資料解析。
+- struct member 的「數值」是根據 hex 輸入、endianness 等動態解析出來的，屬於資料處理的結果，不應混入 layout 結構。
+- 當需要 struct member 的數值時，請呼叫 `StructModel.parse_hex_data(hex_data, byte_order)`，它會根據 layout 解析 hex 資料，回傳包含 name、value、hex_raw 等欄位的 list。
+
+例如：
+```python
+[
+    {"name": "user_id", "value": 123456, "hex_raw": "0001e240"},
+    ...
+]
+```
+
+這樣可確保結構與資料分離、重用性高、維護容易。 
