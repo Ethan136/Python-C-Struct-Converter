@@ -1,381 +1,131 @@
 import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog, messagebox, scrolledtext
-from config import get_string
+# from config import get_string
 
 class StructView(tk.Tk):
     def __init__(self, presenter=None):
         super().__init__()
         self.presenter = presenter
-        self.title(get_string("app_title"))
+        self.title("C Struct GUI")
         self.geometry("1200x800")
 
-        self.hex_entries = []
+        self._create_tab_control()
 
-        # Initialize UI components
-        self._create_file_selection_frame()
-        self._create_struct_layout_frame()
-        self._create_hex_input_frame()
-        self._create_parse_button()
-        self._create_results_frame()
+    def _create_tab_control(self):
+        self.tab_control = ttk.Notebook(self)
+        self.tab_file = ttk.Frame(self.tab_control)
+        self.tab_manual = ttk.Frame(self.tab_control)
+        self.tab_control.add(self.tab_file, text="載入.H檔")
+        self.tab_control.add(self.tab_manual, text="手動設定資料結構")
+        self.tab_control.pack(expand=1, fill="both")
 
-    def _create_file_selection_frame(self):
-        """Create the file selection frame with browse button."""
-        file_frame = tk.Frame(self, pady=5)
-        file_frame.pack(fill=tk.X, padx=10)
-        self.file_label = tk.Label(file_frame,
-                                    text=get_string("no_file_selected"),
-                                    anchor="w", justify=tk.LEFT)
-        self.file_label.pack(side=tk.LEFT, expand=True, fill=tk.X)
-        self.browse_button = tk.Button(file_frame,
-                                  text=get_string("browse_button"),
-                                  command=self.presenter.browse_file if self.presenter else None)
-        self.browse_button.pack(side=tk.RIGHT)
+        # 在手動設定Tab建立UI
+        self._create_manual_struct_frame(self.tab_manual)
 
-    def _create_struct_layout_frame(self):
-        """Create the struct layout information frame with split view."""
-        info_frame = tk.LabelFrame(self,
-                                  text=get_string("layout_frame_title"),
-                                  padx=10, pady=10)
-        info_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        # Split frame for layout and debug
-        info_split_frame = tk.Frame(info_frame)
-        info_split_frame.pack(fill=tk.BOTH, expand=True)
-        info_split_frame.columnconfigure(0, weight=1)
-        info_split_frame.columnconfigure(1, weight=1)
-        
-        # Left: struct layout
-        self.info_text = scrolledtext.ScrolledText(info_split_frame, wrap=tk.WORD, height=10, state=tk.DISABLED)
-        self.info_text.grid(row=0, column=0, sticky="nsew", padx=(0,5))
-        
-        # Right: debug struct original content
-        self.struct_debug_text = scrolledtext.ScrolledText(info_split_frame, wrap=tk.WORD, height=10, state=tk.DISABLED, font=("Courier", 10))
-        self.struct_debug_text.grid(row=0, column=1, sticky="nsew", padx=(5,0))
+    def _create_manual_struct_frame(self, parent):
+        # 結構體大小
+        size_frame = tk.Frame(parent)
+        size_frame.pack(anchor="w", pady=5)
+        tk.Label(size_frame, text="結構體總大小 (bits):").pack(side=tk.LEFT)
+        self.size_var = tk.IntVar(value=0)
+        tk.Entry(size_frame, textvariable=self.size_var, width=10).pack(side=tk.LEFT)
 
-    def _create_hex_input_frame(self):
-        """Create the hex input frame with controls and grid."""
-        input_frame = tk.LabelFrame(self,
-                                   text=get_string("hex_input_title"),
-                                   padx=10, pady=10)
-        input_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        self._create_input_controls(input_frame)
-        self._create_input_debug_split(input_frame)
+        # Bitfield表格
+        self.bitfields = []
+        self.bitfield_frame = tk.Frame(parent)
+        self.bitfield_frame.pack(fill="x", pady=5)
+        self._render_bitfield_table()
 
-    def _create_input_controls(self, parent_frame):
-        """Create the input control sub-frame for unit selection and endianness."""
-        control_frame = tk.Frame(parent_frame)
-        control_frame.pack(fill=tk.X, pady=(0, 5))
-        
-        # Unit size selection
-        tk.Label(control_frame,
-                 text=get_string("input_unit_size")).pack(side=tk.LEFT, padx=(0, 10))
-        self.unit_size_var = tk.StringVar(value="1 Byte")
-        unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
-        self.unit_menu = tk.OptionMenu(control_frame, self.unit_size_var, *unit_options, command=self._dispatch_on_unit_size_change)
-        self.unit_menu.pack(side=tk.LEFT)
+        # 新增Bitfield按鈕
+        tk.Button(parent, text="新增Bitfield", command=self._add_bitfield).pack(anchor="w", pady=2)
 
-        # Endianness selection
-        tk.Label(control_frame,
-                 text=get_string("byte_order")).pack(side=tk.LEFT, padx=(20, 10))
-        self.endian_var = tk.StringVar(value="Little Endian")
-        endian_options = ["Little Endian", "Big Endian"]
-        self.endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=self._dispatch_on_endianness_change)
-        self.endian_menu.pack(side=tk.LEFT)
+        # 驗證提示
+        self.validation_label = tk.Label(parent, text="", fg="red")
+        self.validation_label.pack(anchor="w", pady=2)
 
-    def _create_input_debug_split(self, parent_frame):
-        """Create the split frame for hex input grid and debug bytes."""
-        input_debug_frame = tk.Frame(parent_frame)
-        input_debug_frame.pack(fill=tk.BOTH, expand=True)
-        input_debug_frame.columnconfigure(0, weight=1)
-        input_debug_frame.columnconfigure(1, weight=1)
+        # 匯出/儲存/重設按鈕
+        btn_frame = tk.Frame(parent)
+        btn_frame.pack(anchor="w", pady=5)
+        tk.Button(btn_frame, text="匯出為.H檔", command=self.on_export_manual_struct).pack(side=tk.LEFT, padx=2)
+        tk.Button(btn_frame, text="重設", command=self._reset_manual_struct).pack(side=tk.LEFT, padx=2)
 
-        # Left: Canvas with scrollbar for the entry grid
-        left_frame = tk.Frame(input_debug_frame)
-        left_frame.grid(row=0, column=0, sticky="nsew")
-        
-        canvas = tk.Canvas(left_frame, borderwidth=0, height=150)
-        self.hex_grid_frame = tk.Frame(canvas)
-        scrollbar = tk.Scrollbar(left_frame, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        scrollbar.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
-        canvas.create_window((4,4), window=self.hex_grid_frame, anchor="nw")
-        self.hex_grid_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-
-        # Right: Debug Bytes Frame
-        right_frame = tk.Frame(input_debug_frame)
-        right_frame.grid(row=0, column=1, sticky="nsew")
-        
-        debug_label = tk.Label(right_frame, text="Debug: Raw Bytes", font=("Arial", 10, "bold"))
-        debug_label.pack(anchor="w")
-        
-        self.debug_text = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, width=40, height=8, state=tk.DISABLED, font=("Courier", 10))
-        self.debug_text.pack(fill=tk.BOTH, expand=True)
-
-    def _create_parse_button(self):
-        """Create the parse button."""
-        self.parse_button = tk.Button(self,
-                                      text=get_string("parse_button"),
-                                      command=self.presenter.parse_hex_data if self.presenter else None,
-                                      state=tk.DISABLED)
-        self.parse_button.pack(pady=10)
-
-    def _create_results_frame(self):
-        """Create the results frame with split view for parsed values and debug."""
-        result_frame = tk.LabelFrame(self,
-                                     text=get_string("parsed_values_title"),
-                                     padx=10, pady=10)
-        result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # Split frame for results and debug
-        result_debug_frame = tk.Frame(result_frame)
-        result_debug_frame.pack(fill=tk.BOTH, expand=True)
-        result_debug_frame.columnconfigure(0, weight=1)
-        result_debug_frame.columnconfigure(1, weight=1)
-
-        # Left: Parse Results
-        left_result_frame = tk.Frame(result_debug_frame)
-        left_result_frame.grid(row=0, column=0, sticky="nsew")
-
-        self.result_text = scrolledtext.ScrolledText(left_result_frame, wrap=tk.WORD, height=10, state=tk.DISABLED, font=("Courier", 10))
-        self.result_text.pack(fill=tk.BOTH, expand=True)
-
-        # Right: Struct Member Debug
-        right_result_frame = tk.Frame(result_debug_frame)
-        right_result_frame.grid(row=0, column=1, sticky="nsew")
-
-        debug_result_label = tk.Label(right_result_frame, text="Debug: Struct Member Bytes", font=("Arial", 10, "bold"))
-        debug_result_label.pack(anchor="w")
-
-        self.debug_result_text = scrolledtext.ScrolledText(right_result_frame, wrap=tk.WORD, width=80, height=10, state=tk.DISABLED, font=("Courier", 10))
-        self.debug_result_text.pack(fill=tk.BOTH, expand=True)
-
-    def _dispatch_on_unit_size_change(self, *args):
-        if self.presenter:
-            self.presenter.on_unit_size_change(*args)
-
-    def _dispatch_on_endianness_change(self, *args):
-        if self.presenter:
-            self.presenter.on_endianness_change(*args)
-
-    def set_presenter(self, presenter):
-        self.presenter = presenter
-        self.browse_button.config(command=self.presenter.browse_file)
-        self.parse_button.config(command=self.presenter.parse_hex_data)
-
-    def show_file_path(self, path):
-        self.file_label.config(text=path)
-
-    def show_struct_layout(self, struct_name, layout, total_size, struct_align):
-        info_str = f"Struct: {struct_name}\nAlignment: {struct_align} bytes\nTotal Size: {total_size} bytes\n\n"
-        # 新增 bit 欄位資訊欄位
-        info_str += "{:<18} {:<20} {:<6} {:<8} {:<10} {:<10} {:<10}\n".format(
-            "Member", "Type", "Size", "Offset", "is_bitfield", "bit_offset", "bit_size") + "-" * 85 + "\n"
-        for item in layout:
-            # Display padding differently
-            if item['type'] == "padding":
-                info_str += "{:<18} {:<20} {:<6} {:<8} {:<10} {:<10} {:<10}\n".format(
-                    item['name'], "-", item['size'], item['offset'], "-", "-", "-")
-            else:
-                is_bf = str(item.get("is_bitfield", False))
-                bit_off = str(item.get("bit_offset", "-"))
-                bit_sz = str(item.get("bit_size", "-"))
-                info_str += "{:<18} {:<20} {:<6} {:<8} {:<10} {:<10} {:<10}\n".format(
-                    item['name'], item['type'], item['size'], item['offset'], is_bf, bit_off, bit_sz)
-        self.info_text.config(state=tk.NORMAL); self.info_text.delete('1.0', tk.END); self.info_text.insert(tk.END, info_str); self.info_text.config(state=tk.DISABLED)
-
-    def update_hex_input_status(self, expected_chars):
-        # This label is removed in the new grid approach, but keeping for now if needed elsewhere
-        pass
-
-    def enable_parse_button(self):
-        self.parse_button.config(state=tk.NORMAL)
-
-    def disable_parse_button(self):
-        self.parse_button.config(state=tk.DISABLED)
-
-    def clear_results(self):
-        self.result_text.config(state=tk.NORMAL); self.result_text.delete('1.0', tk.END); self.result_text.config(state=tk.DISABLED)
-
-    def show_parsed_values(self, parsed_values, byte_order_str):
-        # 嘗試取得 layout 以便標示 bitfield
-        layout_map = {}
-        if hasattr(self, 'model') and hasattr(self.model, 'layout'):
-            for item in getattr(self.model, 'layout', []):
-                layout_map[item['name']] = item
-        result_str = f"Parsed Values (using {byte_order_str})\n"
-        result_str += "{:<18} {:<25} {}\n".format("Member", "Value (Decimal/Bool)", "Hex (Value)")
-        result_str += "-" * 70 + "\n"
-
-        for item in parsed_values:
-            name = item['name']
-            value = item['value']
-            # 找到對應的 size
-            size = None
-            for p in parsed_values:
-                if p['name'] == name:
-                    size = len(item['hex_raw']) // 2 if item['hex_raw'] else 0
-                    break
-            # bitfield 標示
-            bf_tag = ""
-            if name in layout_map and layout_map[name].get("is_bitfield", False):
-                bf_tag = f" [bitfield bit_offset={layout_map[name]['bit_offset']} bit_size={layout_map[name]['bit_size']}]"
-            # padding 顯示 -
-            if value == "-":
-                hex_value = "-"
-            else:
-                try:
-                    int_value = int(value) if not isinstance(value, bool) else int(value)
-                    hex_value = hex(int_value)[2:].zfill(size * 2) if size else hex(int_value)[2:]
-                    hex_value = "0x" + hex_value
-                except Exception:
-                    hex_value = str(value)
-            result_str += "{:<18} {:<25} {}{}\n".format(name, value, hex_value, bf_tag)
-
-        self.result_text.config(state=tk.NORMAL); self.result_text.delete('1.0', tk.END); self.result_text.insert(tk.END, result_str); self.result_text.config(state=tk.DISABLED)
-
-    def show_error(self, title, message):
-        messagebox.showerror(title, message)
-
-    def show_warning(self, title, message):
-        messagebox.showwarning(title, message)
-
-    def get_selected_unit_size(self):
-        return int(self.unit_size_var.get().split()[0])
-
-    def get_selected_endianness(self):
-        return self.endian_var.get()
-
-    def get_hex_input_parts(self):
-        # Returns a list of (raw_input_string, expected_chars_for_this_box)
-        return [(entry.get().strip(), expected_len) for entry, expected_len in self.hex_entries]
-
-    def rebuild_hex_grid(self, total_size, unit_size):
-        for widget in self.hex_grid_frame.winfo_children():
+    def _render_bitfield_table(self):
+        # 清空現有表格
+        for widget in self.bitfield_frame.winfo_children():
             widget.destroy()
-        self.hex_entries.clear()
+        # 標題
+        tk.Label(self.bitfield_frame, text="#").grid(row=0, column=0)
+        tk.Label(self.bitfield_frame, text="成員名稱").grid(row=0, column=1)
+        tk.Label(self.bitfield_frame, text="長度(bit)").grid(row=0, column=2)
+        tk.Label(self.bitfield_frame, text="操作").grid(row=0, column=3)
+        # 每一列
+        for idx, bf in enumerate(self.bitfields):
+            tk.Label(self.bitfield_frame, text=str(idx+1)).grid(row=idx+1, column=0)
+            name_var = tk.StringVar(value=bf.get("name", ""))
+            length_var = tk.IntVar(value=bf.get("length", 1))
+            tk.Entry(self.bitfield_frame, textvariable=name_var, width=10).grid(row=idx+1, column=1)
+            tk.Entry(self.bitfield_frame, textvariable=length_var, width=6).grid(row=idx+1, column=2)
+            tk.Button(self.bitfield_frame, text="刪除", command=lambda i=idx: self._delete_bitfield(i)).grid(row=idx+1, column=3)
+            # 綁定變更
+            name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_bitfield_name(i, v))
+            length_var.trace_add("write", lambda *_, i=idx, v=length_var: self._update_bitfield_length(i, v))
+            bf["name_var"] = name_var
+            bf["length_var"] = length_var
 
-        if total_size == 0:
-            return
+    def _add_bitfield(self):
+        self.bitfields.append({"name": "", "length": 1})
+        self._render_bitfield_table()
+        self._on_manual_struct_change()
 
-        chars_per_box = unit_size * 2
-        num_boxes = (total_size + unit_size - 1) // unit_size
-        
-        # Calculate columns based on a reasonable entry width, or default to 4 columns
-        # This is a heuristic, actual width depends on font and system
-        entry_approx_width = chars_per_box * 8 + 20 # rough pixel width
-        frame_width = self.hex_grid_frame.winfo_width()
-        if frame_width == 1: # Initial call, frame not yet rendered, use a default
-            cols = 4 
+    def _delete_bitfield(self, idx):
+        del self.bitfields[idx]
+        self._render_bitfield_table()
+        self._on_manual_struct_change()
+
+    def _update_bitfield_name(self, idx, var):
+        self.bitfields[idx]["name"] = var.get()
+        self._on_manual_struct_change()
+
+    def _update_bitfield_length(self, idx, var):
+        try:
+            self.bitfields[idx]["length"] = int(var.get())
+        except ValueError:
+            self.bitfields[idx]["length"] = 0
+        self._on_manual_struct_change()
+
+    def _reset_manual_struct(self):
+        self.size_var.set(0)
+        self.bitfields.clear()
+        self._render_bitfield_table()
+        self.validation_label.config(text="")
+
+    def _on_manual_struct_change(self):
+        struct_data = self.get_manual_struct_definition()
+        if self.presenter:
+            self.presenter.on_manual_struct_change(struct_data)
+
+    def get_manual_struct_definition(self):
+        return {
+            "total_size": self.size_var.get(),
+            "members": [{"name": bf["name"], "length": bf["length"]} for bf in self.bitfields]
+        }
+
+    def show_manual_struct_validation(self, errors):
+        if errors:
+            self.validation_label.config(text="; ".join(errors), fg="red")
         else:
-            cols = max(1, frame_width // entry_approx_width)
-        
-        for i in range(num_boxes):
-            entry = tk.Entry(self.hex_grid_frame, width=chars_per_box + 2, font=("Courier", 10))
-            entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
-            # Store the entry widget along with its expected character length
-            self.hex_entries.append((entry, chars_per_box))
-            
-            # Bind input validation (不再自動 focus)
-            entry.bind("<KeyPress>", lambda e, length=chars_per_box: self._validate_input(e, length))
-            entry.bind("<Key>", lambda e, length=chars_per_box: self._limit_input_length(e, length))
+            self.validation_label.config(text="設定正確", fg="green")
 
-    def _validate_input(self, event, max_length):
-        """
-        Validate input to ensure only hexadecimal characters are entered.
-        """
-        # Allow control keys (backspace, delete, etc.)
-        if event.keysym in ['BackSpace', 'Delete', 'Left', 'Right', 'Home', 'End', 'Tab']:
-            return
-        
-        # Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
-        if event.state & 0x4:  # Ctrl key
-            if event.keysym in ['a', 'c', 'v', 'x']:
-                return
-        
-        # Check if the character is a valid hex character
-        char = event.char.lower()
-        if char not in '0123456789abcdef':
-            # Prevent the character from being entered
-            return "break"
-    
-    def _limit_input_length(self, event, max_length):
-        """
-        Limit input length to prevent exceeding the field's byte limit.
-        """
-        widget = event.widget
-        current_text = widget.get()
-        
-        # Allow control keys
-        if event.keysym in ['BackSpace', 'Delete', 'Left', 'Right', 'Home', 'End', 'Tab']:
-            return
-        
-        # Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
-        if event.state & 0x4:  # Ctrl key
-            if event.keysym in ['a', 'c', 'v', 'x']:
-                return
-        
-        # Check if adding this character would exceed the limit
-        if len(current_text) >= max_length:
-            # Prevent the character from being entered
-            return "break"
-    
-    def show_debug_bytes(self, debug_lines):
-        """
-        Show the debug byte content for each input box.
-        debug_lines: list of str, each line is one row of bytes (already formatted)
-        """
-        self.debug_text.config(state=tk.NORMAL)
-        self.debug_text.delete('1.0', tk.END)
-        for line in debug_lines:
-            self.debug_text.insert(tk.END, line + '\n')
-        self.debug_text.config(state=tk.DISABLED)
+    def on_export_manual_struct(self):
+        if self.presenter:
+            self.presenter.on_export_manual_struct()
 
-    def show_struct_member_debug(self, parsed_values, layout):
-        """
-        Show debug information for each struct member including byte values and offset.
-        parsed_values: list of dict with parsed member data
-        layout: list of dict with struct layout information
-        """
-        debug_str = "Struct Member Debug Info\n"
-        debug_str += "{:<18} {:<8} {:<8} {:<20} {:<30} {}\n".format(
-            "Member", "Offset", "Size", "Bytes (Raw)", "BitField Info", "Bytes (Formatted)")
-        debug_str += "-" * 120 + "\n"
-        for item in parsed_values:
-            member_name = item['name']
-            hex_raw = item['hex_raw']
-            # Find corresponding layout info
-            layout_info = None
-            for layout_item in layout:
-                if layout_item['name'] == member_name:
-                    layout_info = layout_item
-                    break
-            if layout_info:
-                offset = layout_info['offset']
-                size = layout_info['size']
-                # Bitfield info
-                bf_info = ""
-                if layout_info.get("is_bitfield", False):
-                    bf_info = f"is_bitfield=True bit_offset={layout_info['bit_offset']} bit_size={layout_info['bit_size']}"
-                # Format bytes for display
-                if hex_raw:
-                    raw_bytes = hex_raw
-                    formatted_bytes = ' '.join([hex_raw[i:i+2] for i in range(0, len(hex_raw), 2)])
-                else:
-                    raw_bytes = "00" * size
-                    formatted_bytes = "00 " * size
-                debug_str += "{:<18} {:<8} {:<8} {:<20} {:<30} {}\n".format(
-                    member_name, offset, size, raw_bytes, bf_info, formatted_bytes
-                )
-        self.debug_result_text.config(state=tk.NORMAL)
-        self.debug_result_text.delete('1.0', tk.END)
-        self.debug_result_text.insert(tk.END, debug_str)
-        self.debug_result_text.config(state=tk.DISABLED)
-
-    def show_struct_debug(self, struct_content):
-        self.struct_debug_text.config(state=tk.NORMAL)
-        self.struct_debug_text.delete('1.0', tk.END)
-        self.struct_debug_text.insert(tk.END, struct_content)
-        self.struct_debug_text.config(state=tk.DISABLED)
+    def show_exported_struct(self, h_content):
+        # 可彈出新視窗顯示匯出內容
+        win = tk.Toplevel(self)
+        win.title("匯出 .h 檔內容")
+        txt = tk.Text(win, width=60, height=20)
+        txt.pack()
+        txt.insert("1.0", h_content)
+        txt.config(state="disabled")

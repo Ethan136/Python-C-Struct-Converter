@@ -158,6 +158,16 @@ For all test-related documentation, including how to run, extend, and automate t
 
 👉 [tests/README.md](tests/README.md)
 
+### 測試自動化入口
+
+推薦使用專案根目錄的 `run_all_tests.py` 腳本進行所有測試：
+
+```bash
+python run_all_tests.py
+```
+- 此腳本會自動分開執行 GUI 測試與非 GUI 測試，並彙總結果，適用於 Windows、macOS、Linux。
+- 詳細說明請見：[docs/development/run_all_tests_usage.md](docs/development/run_all_tests_usage.md)
+
 ### Code Quality
 ```bash
 # Format code

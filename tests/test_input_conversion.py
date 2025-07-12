@@ -1,13 +1,11 @@
-import unittest
-import tempfile
-import os
 import sys
-import pytest
-from model.input_field_processor import InputFieldProcessor
-
-# Add src directory to Python path
+import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+import unittest
+import tempfile
+import pytest
+from model.input_field_processor import InputFieldProcessor
 from model.struct_model import StructModel
 from tests.test_config_parser import TestConfigParser
 

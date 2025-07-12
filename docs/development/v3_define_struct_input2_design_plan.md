@@ -346,3 +346,60 @@
 - 測試可用 unittest + tkinter widget 測試，或 mock Presenter
 - 建議每個互動/功能都先寫測試再實作，確保 UI 可維護性
 - 若需進行更完整的整合測試，可考慮在 tests/ 新增 integration 測試，模擬完整流程（不含 UI） 
+
+---
+
+## 10. View層測試失敗排查紀錄
+
+### 問題現象
+- 執行 `tests/test_struct_view.py` 時，出現 ImportError：No module named 'config'。
+- Traceback 指向 `src/view/struct_view.py` 的 `from config import get_string`。
+
+### 成因分析
+- View 層原本設計需支援國際化，部分 UI 文字透過 `get_string` 取得。
+- 但在新版骨架與測試 stub 中，Tab 與手動 struct 設定等功能已直接寫死中文字串，未用到 `get_string`。
+- 測試時仍會 import `struct_view.py`，而該檔案頂部仍有 `from config import get_string`，導致找不到 config 模組。
+- 測試 stub 並不需要國際化功能，僅需 UI 行為。
+
+### 解法建議
+1. **暫時移除或註解 `from config import get_string`**：若目前 View 層不需國際化，可直接移除 import。
+2. **將 UI 文字直接寫死於骨架**：如現有骨架所示，Tab、標籤等直接用中文字串。
+3. **若需保留國際化，則於測試環境 mock get_string**：可用 unittest.mock patch。
+
+### 修正步驟
+- 先將 `src/view/struct_view.py` 的 `from config import get_string` 註解或移除。
+- 確認所有 UI 文字皆已直接寫死於程式碼。
+- 重新執行測試，應可通過。 
+
+### 10.1 GUI測試與其他測試分開執行建議
+- 由於 Tkinter GUI 測試在 headless（無螢幕）或 macOS/Linux 環境下，與其他測試一起執行時容易出現 segmentation fault。
+- 建議將 `tests/test_struct_view.py` 這類 GUI 測試與其他純邏輯/非GUI測試分開執行。
+- 操作方式：
+  1. 執行所有非GUI測試：
+     ```bash
+     pytest --ignore=tests/test_struct_view.py
+     ```
+  2. 有桌面環境時，單獨執行GUI測試：
+     ```bash
+     pytest tests/test_struct_view.py
+     ```
+- 也可在 GUI 測試檔案開頭加上 skip 判斷，無 DISPLAY 時自動跳過。
+- 這樣可避免 pytest 在整批測試時因 GUI 測試 crash 而中斷。 
+
+---
+
+### 10.2 跨平台自動化測試批次腳本（run_all_tests.py）
+
+- 為避免 GUI 測試與其他測試同時執行造成失敗，專案新增 `run_all_tests.py` 跨平台 Python 批次腳本。
+- 此腳本會自動分開執行所有非 GUI 測試（排除 tests/test_struct_view.py）與 GUI 測試（僅執行 tests/test_struct_view.py），並彙總結果。
+- 適用於 Windows、macOS、Linux，無需 shell 指令相容性考量。
+- 只需執行：
+  ```bash
+  python run_all_tests.py
+  ```
+  即可自動完成所有測試，任何一個失敗則整體 exit code 為 1。
+- 優點：
+  - 減少人為操作錯誤，確保所有測試都能安全執行
+  - 一致的測試流程，方便 CI/CD 或團隊協作
+  - 可依未來需求擴充自動尋找多個 GUI 測試檔案
+- 腳本內容可參考專案根目錄 `run_all_tests.py`，如需調整可直接修改。 
