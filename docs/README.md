@@ -8,10 +8,14 @@ This directory contains all documentation for the C++ Struct Memory Parser proje
 
 ### 📋 Core Documentation
 - **[README.md](../README.md)** - Main project documentation and user guide
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed architecture documentation and design patterns
+- **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Project structure and organization guide
+
+### 🏗️ Architecture Documents
+- **[MVP_ARCHITECTURE_COMPLETE.md](architecture/MVP_ARCHITECTURE_COMPLETE.md)** - Complete MVP architecture guide with component comparisons
+- **[STRUCT_PARSING.md](architecture/STRUCT_PARSING.md)** - Detailed struct parsing mechanism documentation
 
 ### 📊 Analysis Documents
-- **[input_conversion_analysis.md](analysis/input_conversion_analysis.md)** - Comprehensive analysis of the hex input conversion mechanism
+- **[INPUT_CONVERSION_COMPLETE.md](analysis/INPUT_CONVERSION_COMPLETE.md)** - Comprehensive input conversion mechanism guide
 
 ### 🛠️ Development Documents
 - **[string_refactor_plan.md](development/string_refactor_plan.md)** - Plan for UI string refactoring and internationalization
@@ -26,9 +30,10 @@ This directory contains all documentation for the C++ Struct Memory Parser proje
 2. Check **[examples/example.h](../examples/example.h)** for sample struct definitions
 
 ### For Developers
-1. Read **[ARCHITECTURE.md](ARCHITECTURE.md)** to understand the MVP architecture
-2. Review **[input_conversion_analysis.md](analysis/input_conversion_analysis.md)** for input processing details
-3. Check **[tests/README.md](../tests/README.md)** for testing guidelines
+1. Read **[MVP_ARCHITECTURE_COMPLETE.md](architecture/MVP_ARCHITECTURE_COMPLETE.md)** to understand the complete MVP architecture
+2. Review **[STRUCT_PARSING.md](architecture/STRUCT_PARSING.md)** for struct parsing details
+3. Check **[INPUT_CONVERSION_COMPLETE.md](analysis/INPUT_CONVERSION_COMPLETE.md)** for input processing details
+4. Follow **[tests/README.md](../tests/README.md)** for testing guidelines
 
 ### For Contributors
 1. Review **[string_refactor_plan.md](development/string_refactor_plan.md)** for UI improvements
@@ -46,6 +51,7 @@ This directory contains all documentation for the C++ Struct Memory Parser proje
 │   ├── data/               # Test configuration files
 │   └── README.md           # Testing documentation
 ├── docs/                    # Documentation (this directory)
+│   ├── architecture/       # Architecture and design documents
 │   ├── analysis/           # Technical analysis
 │   ├── development/        # Development plans
 │   └── README.md           # This file
@@ -53,10 +59,23 @@ This directory contains all documentation for the C++ Struct Memory Parser proje
 └── README.md               # Main project documentation
 ```
 
+## Document Categories
+
+### 🏗️ Architecture Documents (`architecture/`)
+- **MVP_ARCHITECTURE_COMPLETE.md**: Complete guide to MVP architecture, component responsibilities, and design patterns
+- **STRUCT_PARSING.md**: Detailed explanation of C++ struct parsing mechanism
+
+### 📊 Analysis Documents (`analysis/`)
+- **INPUT_CONVERSION_COMPLETE.md**: Comprehensive guide to hex input conversion process and requirements
+
+### 🛠️ Development Documents (`development/`)
+- **string_refactor_plan.md**: Plan for UI string refactoring and internationalization
+
 ## Contributing
 
 When adding new documentation:
-1. Place analysis documents in `analysis/`
-2. Place development plans in `development/`
-3. Update this README.md with new entries
-4. Ensure all links are working correctly 
+1. Place architecture documents in `architecture/`
+2. Place analysis documents in `analysis/`
+3. Place development plans in `development/`
+4. Update this README.md with new entries
+5. Ensure all links are working correctly 
