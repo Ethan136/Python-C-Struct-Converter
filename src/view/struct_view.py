@@ -256,15 +256,51 @@ class StructView(tk.Tk):
             entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
             # Store the entry widget along with its expected character length
             self.hex_entries.append((entry, chars_per_box))
-            entry.bind("<KeyRelease>", lambda e, length=chars_per_box: self._auto_focus(e, length))
+            
+            # Bind input validation (不再自動 focus)
+            entry.bind("<KeyPress>", lambda e, length=chars_per_box: self._validate_input(e, length))
+            entry.bind("<Key>", lambda e, length=chars_per_box: self._limit_input_length(e, length))
 
-    def _auto_focus(self, event, length):
+    def _validate_input(self, event, max_length):
+        """
+        Validate input to ensure only hexadecimal characters are entered.
+        """
+        # Allow control keys (backspace, delete, etc.)
+        if event.keysym in ['BackSpace', 'Delete', 'Left', 'Right', 'Home', 'End', 'Tab']:
+            return
+        
+        # Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+        if event.state & 0x4:  # Ctrl key
+            if event.keysym in ['a', 'c', 'v', 'x']:
+                return
+        
+        # Check if the character is a valid hex character
+        char = event.char.lower()
+        if char not in '0123456789abcdef':
+            # Prevent the character from being entered
+            return "break"
+    
+    def _limit_input_length(self, event, max_length):
+        """
+        Limit input length to prevent exceeding the field's byte limit.
+        """
         widget = event.widget
-        if len(widget.get()) >= length:
-            next_widget = widget.tk_focusNext()
-            if next_widget:
-                next_widget.focus()
-
+        current_text = widget.get()
+        
+        # Allow control keys
+        if event.keysym in ['BackSpace', 'Delete', 'Left', 'Right', 'Home', 'End', 'Tab']:
+            return
+        
+        # Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+        if event.state & 0x4:  # Ctrl key
+            if event.keysym in ['a', 'c', 'v', 'x']:
+                return
+        
+        # Check if adding this character would exceed the limit
+        if len(current_text) >= max_length:
+            # Prevent the character from being entered
+            return "break"
+    
     def show_debug_bytes(self, debug_lines):
         """
         Show the debug byte content for each input box.
