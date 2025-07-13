@@ -386,11 +386,11 @@ class TestStructView(unittest.TestCase):
         self.assertTrue(member_idx and hex_idx and member_idx[0] < hex_idx[0])
 
     def test_tab_has_scrollbar(self):
-        # 檢查 MyStruct tab 右側沒有 scroll bar（已移除）
+        # 檢查 MyStruct tab 右側有 scroll bar（新需求）
         self.view.tab_control.select(self.view.tab_manual)
-        # 應沒有 Scrollbar widget
+        # 應有 Scrollbar widget
         scrollbars = [w for w in self.view.tab_manual.winfo_children() if isinstance(w, tk.Scrollbar)]
-        self.assertFalse(scrollbars, "MyStruct tab 應該沒有 scrollbar")
+        self.assertTrue(scrollbars, "MyStruct tab 應該有 scrollbar")
 
     def test_manual_struct_hex_parse_real_model(self):
         # 使用真實 presenter/model 串接
@@ -515,41 +515,35 @@ class TestStructView(unittest.TestCase):
         """測試 show_manual_parsed_values 方法正確顯示欄位值"""
         # 切換到 manual struct tab
         self.view.tab_control.select(self.view.tab_manual)
-        
         # 準備測試資料
         parsed_values = [
             {"name": "field1", "value": "123", "hex_value": "0x7b", "hex_raw": "7b000000"},
             {"name": "field2", "value": "65", "hex_value": "0x41", "hex_raw": "41"},
             {"name": "field3", "value": "258", "hex_value": "0x102", "hex_raw": "0201"}
         ]
-        
         # 呼叫顯示方法
         self.view.show_manual_parsed_values(parsed_values, "Little Endian")
-        
         # 驗證 manual_member_tree 有正確的資料
         items = self.view.manual_member_tree.get_children()
         self.assertEqual(len(items), 3, "應該有 3 個欄位")
-        
         # 驗證第一個欄位
         values1 = self.view.manual_member_tree.item(items[0], "values")
         self.assertEqual(values1[0], "field1", "欄位名稱應該正確")
         self.assertEqual(values1[1], "123", "欄位值應該正確")
         self.assertEqual(values1[2], "0x7b", "hex value 應該正確")
-        self.assertEqual(values1[3], "7b000000", "hex raw 應該正確")
-        
+        self.assertEqual(values1[3], "7b｜00｜00｜00", "hex raw 應該正確")
         # 驗證第二個欄位
         values2 = self.view.manual_member_tree.item(items[1], "values")
         self.assertEqual(values2[0], "field2", "欄位名稱應該正確")
         self.assertEqual(values2[1], "65", "欄位值應該正確")
         self.assertEqual(values2[2], "0x41", "hex value 應該正確")
         self.assertEqual(values2[3], "41", "hex raw 應該正確")
-        
         # 驗證第三個欄位
         values3 = self.view.manual_member_tree.item(items[2], "values")
         self.assertEqual(values3[0], "field3", "欄位名稱應該正確")
         self.assertEqual(values3[1], "258", "欄位值應該正確")
         self.assertEqual(values3[2], "0x102", "hex value 應該正確")
-        self.assertEqual(values3[3], "0201", "hex raw 應該正確")
+        self.assertEqual(values3[3], "02｜01", "hex raw 應該正確")
 
     def test_manual_struct_real_presenter_integration(self):
         """測試真實 presenter 與 MyStruct tab 的整合"""
@@ -917,6 +911,17 @@ class TestStructView(unittest.TestCase):
         # 欄位寬度
         for col in member_tree['columns']:
             self.assertEqual(member_tree.column(col)['width'], manual_member_tree.column(col)['width'], f"欄位 {col} 寬度不一致")
+
+    def test_tab_main_scrollbar(self):
+        """驗證 MyStruct 與 Import .H tab 主框架有右側 scrollbar"""
+        # 檢查 file tab
+        self.view.tab_control.select(self.view.tab_file)
+        file_scrollbars = [w for w in self.view.tab_file.winfo_children() if isinstance(w, tk.Scrollbar)]
+        self.assertTrue(file_scrollbars, "Import .H tab 應有主 scrollbar")
+        # 檢查 manual tab
+        self.view.tab_control.select(self.view.tab_manual)
+        manual_scrollbars = [w for w in self.view.tab_manual.winfo_children() if isinstance(w, tk.Scrollbar)]
+        self.assertTrue(manual_scrollbars, "MyStruct tab 應有主 scrollbar")
 
 if __name__ == "__main__":
     unittest.main()

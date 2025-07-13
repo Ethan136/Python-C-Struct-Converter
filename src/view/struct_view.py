@@ -22,6 +22,23 @@ def create_member_treeview(parent):
     tree.pack(fill="x")
     return tree
 
+def create_scrollable_tab_frame(parent):
+    canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
+    vscroll = tk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+    scrollable_frame = tk.Frame(canvas)
+    scrollable_frame_id = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=vscroll.set)
+    canvas.pack(side="left", fill="both", expand=True)
+    vscroll.pack(side="right", fill="y")
+    def _on_frame_configure(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+    scrollable_frame.bind("<Configure>", _on_frame_configure)
+    # 允許滑鼠滾輪
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+    return canvas, scrollable_frame
+
 class StructView(tk.Tk):
     def __init__(self, presenter=None):
         super().__init__()
@@ -45,8 +62,9 @@ class StructView(tk.Tk):
         self._create_manual_struct_frame(self.tab_manual)
 
     def _create_file_tab_frame(self, parent):
+        _, main_frame = create_scrollable_tab_frame(parent)
         # 單位選擇與 endianness
-        control_frame = tk.Frame(parent)
+        control_frame = tk.Frame(main_frame)
         control_frame.pack(fill="x", pady=(5, 2))
         tk.Label(control_frame, text="單位大小：").pack(side=tk.LEFT)
         self.unit_size_var = tk.StringVar(value="1 Byte")
@@ -60,33 +78,33 @@ class StructView(tk.Tk):
         self.endian_menu.pack(side=tk.LEFT)
 
         # 檔案選擇按鈕
-        tk.Button(parent, text="選擇 .h 檔", command=self._on_browse_file).pack(anchor="w", pady=2)
+        tk.Button(main_frame, text="選擇 .h 檔", command=self._on_browse_file).pack(anchor="w", pady=2)
         # 檔案路徑顯示
-        self.file_path_label = tk.Label(parent, text="尚未選擇檔案")
+        self.file_path_label = tk.Label(main_frame, text="尚未選擇檔案")
         self.file_path_label.pack(anchor="w", pady=2)
 
         # hex grid 輸入區
         self.hex_entries = []
-        self.hex_grid_frame = tk.Frame(parent)
+        self.hex_grid_frame = tk.Frame(main_frame)
         self.hex_grid_frame.pack(fill="x", pady=2)
 
         # 解析按鈕
-        self.parse_button = tk.Button(parent, text="解析", command=self._on_parse_file, state="disabled")
+        self.parse_button = tk.Button(main_frame, text="解析", command=self._on_parse_file, state="disabled")
         self.parse_button.pack(anchor="w", pady=5)
 
         # struct member value 顯示區
-        member_frame = tk.LabelFrame(parent, text="Struct Member Value")
+        member_frame = tk.LabelFrame(main_frame, text="Struct Member Value")
         member_frame.pack(fill="x", padx=2, pady=2)
         self.member_tree = create_member_treeview(member_frame)
 
         # debug bytes 顯示區
-        debug_frame = tk.LabelFrame(parent, text="Debug Bytes")
+        debug_frame = tk.LabelFrame(main_frame, text="Debug Bytes")
         debug_frame.pack(fill="x", padx=2, pady=2)
         self.debug_text = tk.Text(debug_frame, height=4, width=100)
         self.debug_text.pack(fill="x")
 
         # struct layout 顯示區
-        layout_frame = tk.LabelFrame(parent, text="Struct Layout")
+        layout_frame = tk.LabelFrame(main_frame, text="Struct Layout")
         layout_frame.pack(fill="both", expand=True, padx=2, pady=2)
         # 新增 scroll bar
         layout_scrollbar = ttk.Scrollbar(layout_frame, orient="vertical")
@@ -103,9 +121,7 @@ class StructView(tk.Tk):
         layout_scrollbar.pack(side="right", fill="y")
 
     def _create_manual_struct_frame(self, parent):
-        # 直接使用普通的 Frame，移除滾動機制
-        scrollable_frame = tk.Frame(parent)
-        scrollable_frame.pack(fill="both", expand=True)
+        _, scrollable_frame = create_scrollable_tab_frame(parent)
 
         # struct 名稱
         name_frame = tk.Frame(scrollable_frame)
@@ -544,7 +560,11 @@ class StructView(tk.Tk):
                     hex_value = "-"
             except Exception:
                 hex_value = "-"
-            self.member_tree.insert("", "end", values=(item.get("name", ""), value, hex_value, item.get("hex_raw", "")))
+            # 處理 hex_raw 分隔
+            hex_raw = item.get("hex_raw", "")
+            if hex_raw and len(hex_raw) > 2:
+                hex_raw = '｜'.join([hex_raw[i:i+2] for i in range(0, len(hex_raw), 2)])
+            self.member_tree.insert("", "end", values=(item.get("name", ""), value, hex_value, hex_raw))
 
     def show_manual_parsed_values(self, parsed_values, byte_order_str=None):
         """顯示 MyStruct tab 的解析結果，與 file tab 的 show_parsed_values 一致"""
@@ -563,7 +583,11 @@ class StructView(tk.Tk):
                     hex_value = "-"
             except Exception:
                 hex_value = "-"
-            self.manual_member_tree.insert("", "end", values=(item.get("name", ""), value, hex_value, item.get("hex_raw", "")))
+            # 處理 hex_raw 分隔
+            hex_raw = item.get("hex_raw", "")
+            if hex_raw and len(hex_raw) > 2:
+                hex_raw = '｜'.join([hex_raw[i:i+2] for i in range(0, len(hex_raw), 2)])
+            self.manual_member_tree.insert("", "end", values=(item.get("name", ""), value, hex_value, hex_raw))
 
     def show_debug_bytes(self, debug_lines):
         self.debug_text.config(state="normal")
