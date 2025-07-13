@@ -55,11 +55,18 @@ This project provides a graphical user interface (GUI) tool built with Python an
 │   │   └── test_config.xml   # Test configuration
 │   ├── test_string_parser.py
 │   └── test_input_conversion.py
+├── .github/workflows/        # GitHub Actions workflows
+│   ├── build-windows-exe.yml # Windows executable build
+│   └── release.yml           # Release automation
 ├── run.py                    # Application launcher
 ├── run_tests.py              # Test runner
 ├── run_all_tests.py          # Cross-platform test runner (separates GUI/non-GUI tests)
+├── build_exe.py              # Local build script
+├── test_build.py             # Build configuration test
+├── CppStructParser.spec      # PyInstaller specification
 ├── setup.py                  # Package configuration
 ├── requirements.txt          # Dependencies
+├── DEPLOYMENT.md             # Deployment guide
 └── README.md                 # This file
 ```
 
@@ -215,4 +222,29 @@ For detailed technical information about recent improvements, see [docs/developm
 
 ## Example File
 
-An `examples/example.h`
+An `examples/example.h` file is included with the project that contains sample struct definitions for testing.
+
+## Automatic Deployment
+
+This project includes GitHub Actions for automatic Windows .exe file generation:
+
+### Quick Start
+1. **Push to GitHub**: Any push to `main` or `master` branch triggers automatic build
+2. **Download Artifact**: Find the built .exe file in the Actions tab
+3. **Create Release**: Push a tag (e.g., `v1.0.0`) to automatically create a release with downloadable .exe
+
+### Local Testing
+```bash
+# Test build configuration
+python test_build.py
+
+# Build locally
+python build_exe.py
+```
+
+### Deployment Options
+- **Continuous Build**: Every push creates a new build artifact
+- **Release Build**: Tag-based releases with automatic GitHub Release creation
+- **Local Build**: Use `build_exe.py` for local testing
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
