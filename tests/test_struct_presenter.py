@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
-from presenter.struct_presenter import StructPresenter
+from presenter.struct_presenter import StructPresenter, HexProcessingError
 
 class TestStructPresenter(unittest.TestCase):
     def setUp(self):
@@ -30,6 +30,18 @@ class TestStructPresenter(unittest.TestCase):
         self.presenter.on_export_manual_struct()
         self.model.export_manual_struct_to_h.assert_called_once()
         self.view.show_exported_struct.assert_called_once_with("struct ManualStruct { ... }")
+
+    def test_process_hex_parts(self):
+        hex_parts = [("1", 2), ("2", 2)]
+        hex_data, debug_lines = self.presenter._process_hex_parts(hex_parts, "big")
+        self.assertEqual(hex_data, "0102")
+        self.assertEqual(debug_lines[0], "Box 1 (1 bytes): 01")
+        self.assertEqual(debug_lines[1], "Box 2 (1 bytes): 02")
+
+    def test_process_hex_parts_invalid_input(self):
+        with self.assertRaises(HexProcessingError) as cm:
+            self.presenter._process_hex_parts([("zz", 2)], "big")
+        self.assertEqual(cm.exception.kind, "invalid_input")
 
 if __name__ == "__main__":
     unittest.main() 
