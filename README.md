@@ -70,6 +70,16 @@ This project provides a graphical user interface (GUI) tool built with Python an
 └── README.md                 # This file
 ```
 
+## Developer Guides
+
+- [src/view/GUI_DEVELOPER_GUIDE.md](src/view/GUI_DEVELOPER_GUIDE.md): GUI 元件結構、事件流程與擴充指引
+- [src/presenter/PRESENTER_DEVELOPER_GUIDE.md](src/presenter/PRESENTER_DEVELOPER_GUIDE.md): Presenter 事件流、狀態管理、錯誤處理設計
+- [src/model/input_field_processor.py](src/model/input_field_processor.py): Input 處理 API 與用法（見檔案開頭 docstring）
+
+## Example Files
+
+- [examples/README.md](examples/README.md): 範例檔案格式、用途與擴充方式
+
 ## Features
 
 - **Graphical User Interface**: Easy-to-use window for all operations.
