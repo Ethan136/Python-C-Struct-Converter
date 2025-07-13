@@ -6,9 +6,9 @@ import os
 # 添加專案根目錄到 Python 路徑
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.view.struct_view import StructView
-from src.presenter.struct_presenter import StructPresenter
-from src.model.struct_model import StructModel
+from view.struct_view import StructView
+from presenter.struct_presenter import StructPresenter
+from model.struct_model import StructModel
 
 class TestStructViewPadding(unittest.TestCase):
     """測試 GUI 的 struct layout 標準顯示（只顯示下方 Treeview）"""

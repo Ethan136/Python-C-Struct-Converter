@@ -7,8 +7,8 @@ pytestmark = pytest.mark.skipif(
     not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests"
 )
 
-from src.view.struct_view import StructView
-from src.presenter.struct_presenter import StructPresenter
+from view.struct_view import StructView
+from presenter.struct_presenter import StructPresenter
 
 class PresenterStub:
     def __init__(self):
@@ -231,7 +231,7 @@ class TestStructView(unittest.TestCase):
         if model:
             layout = model.calculate_manual_layout(self.view.members, 8)
         else:
-            from src.model.struct_model import StructModel
+            from model.struct_model import StructModel
             layout = StructModel().calculate_manual_layout(self.view.members, 8)
         # 驗證 C++ align/padding 行為
         self.assertEqual(layout[0]['name'], 'a')
@@ -394,7 +394,7 @@ class TestStructView(unittest.TestCase):
 
     def test_manual_struct_hex_parse_real_model(self):
         # 使用真實 presenter/model 串接
-        from src.model.struct_model import StructModel
+        from model.struct_model import StructModel
         class RealPresenter:
             def __init__(self, view):
                 self.view = view
@@ -547,7 +547,7 @@ class TestStructView(unittest.TestCase):
 
     def test_manual_struct_real_presenter_integration(self):
         """測試真實 presenter 與 MyStruct tab 的整合"""
-        from src.model.struct_model import StructModel
+        from model.struct_model import StructModel
         
         # 建立真實 presenter
         model = StructModel()
@@ -643,8 +643,8 @@ class TestStructView(unittest.TestCase):
 
     def test_manual_struct_gui_bitfield_parsing(self):
         """測試 MyStruct GUI 介面的完整 bitfield 解析流程"""
-        from src.model.struct_model import StructModel
-        from src.presenter.struct_presenter import StructPresenter
+        from model.struct_model import StructModel
+        from presenter.struct_presenter import StructPresenter
         
         # 建立真實的 presenter 和 model
         model = StructModel()
@@ -727,8 +727,8 @@ class TestStructView(unittest.TestCase):
 
     def test_manual_struct_equivalent_to_example_h(self):
         """測試 MyStruct 可以正確處理與 example.h 中 CombinedExample struct 等效的定義"""
-        from src.model.struct_model import StructModel
-        from src.presenter.struct_presenter import StructPresenter
+        from model.struct_model import StructModel
+        from presenter.struct_presenter import StructPresenter
         
         # 建立真實的 presenter 和 model
         model = StructModel()

@@ -1,7 +1,7 @@
 import unittest
 import tempfile
 import os
-from src.config import ui_strings
+from config import ui_strings
 import pytest
 from config.ui_strings import get_string, load_ui_strings
 

@@ -1,8 +1,8 @@
 import re
 import tkinter as tk
 from tkinter import filedialog
-from src.config import get_string
-from src.model.input_field_processor import InputFieldProcessor
+from config import get_string
+from model.input_field_processor import InputFieldProcessor
 
 class StructPresenter:
     def __init__(self, model, view=None):

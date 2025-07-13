@@ -5,7 +5,7 @@ import os
 # 添加專案根目錄到 Python 路徑
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.model.struct_model import StructModel
+from model.struct_model import StructModel
 
 class TestStructModelV3(unittest.TestCase):
     """測試 V3 版本的 StructModel 新功能"""

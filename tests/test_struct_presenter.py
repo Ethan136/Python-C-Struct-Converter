@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
-from src.presenter.struct_presenter import StructPresenter
+from presenter.struct_presenter import StructPresenter
 
 class TestStructPresenter(unittest.TestCase):
     def setUp(self):

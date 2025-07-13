@@ -1,13 +1,16 @@
-import sys
 import os
+import sys
+# 修正 PyInstaller 執行環境下的 sys.path
+if getattr(sys, 'frozen', False):
+    sys.path.append(os.path.dirname(sys.executable))
+else:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '')))
 
-# Add the src directory to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '')))
+from model import StructModel
+from view import StructView
+from presenter import StructPresenter
+from config import load_ui_strings
 
-from .model import StructModel
-from .view import StructView
-from .presenter import StructPresenter
-from .config import load_ui_strings
 
 def main():
     """Main application entry point"""

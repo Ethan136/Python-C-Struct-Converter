@@ -1,5 +1,5 @@
 import unittest
-from src.model.struct_model import StructModel
+from model.struct_model import StructModel
 
 class TestManualStructIntegration(unittest.TestCase):
     def setUp(self):

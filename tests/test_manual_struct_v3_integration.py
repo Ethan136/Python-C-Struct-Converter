@@ -6,8 +6,8 @@ import tkinter as tk
 # 添加專案根目錄到 Python 路徑
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.view.struct_view import StructView
-from src.model.struct_model import StructModel
+from view.struct_view import StructView
+from model.struct_model import StructModel
 
 class TestManualStructV3Integration(unittest.TestCase):
     """測試 V3 版本的完整 MyStruct 工作流程"""

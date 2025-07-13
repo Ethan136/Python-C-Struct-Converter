@@ -21,7 +21,7 @@ layout 內每個欄位 dict 格式：
 }
 """
 import re
-from .input_field_processor import InputFieldProcessor
+from model.input_field_processor import InputFieldProcessor
 
 # Based on a common 64-bit system (like GCC on x86-64)
 TYPE_INFO = {

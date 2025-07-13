@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, messagebox, scrolledtext
 # from config import get_string
-from ..model.struct_model import StructModel
+from model.struct_model import StructModel
 
 def create_member_treeview(parent):
     tree = ttk.Treeview(

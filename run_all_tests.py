@@ -1,6 +1,11 @@
 import subprocess
 import sys
 import os
+# 自動設置 PYTHONPATH=src 並重啟腳本
+if "PYTHONPATH" not in os.environ or "src" not in os.environ["PYTHONPATH"]:
+    os.environ["PYTHONPATH"] = "src"
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 import unittest
 import shutil
 
