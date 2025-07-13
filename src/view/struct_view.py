@@ -666,28 +666,33 @@ class StructView(tk.Tk):
         """取得 MyStruct tab 選擇的單位大小"""
         return int(self.manual_unit_size_var.get().split()[0])
 
-    def rebuild_hex_grid(self, total_size, unit_size):
-        for widget in self.hex_grid_frame.winfo_children():
+    def _build_hex_grid(self, frame, entry_list, total_size, unit_size):
+        """建立十六進位輸入格的共用函式"""
+        for widget in frame.winfo_children():
             widget.destroy()
-        self.hex_entries.clear()
+        entry_list.clear()
         if total_size == 0:
             return
+
         chars_per_box = unit_size * 2
         num_boxes = (total_size + unit_size - 1) // unit_size
         cols = max(1, 16 // unit_size)
+
         for i in range(num_boxes):
-            # 動態調整最後一格的輸入長度
             if i == num_boxes - 1:
-                # 剩餘 byte
                 remain_bytes = total_size - (unit_size * (num_boxes - 1))
                 box_chars = remain_bytes * 2 if remain_bytes > 0 else chars_per_box
             else:
                 box_chars = chars_per_box
-            entry = tk.Entry(self.hex_grid_frame, width=box_chars + 2, font=("Courier", 10))
+
+            entry = tk.Entry(frame, width=box_chars + 2, font=("Courier", 10))
             entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
-            self.hex_entries.append((entry, box_chars))
+            entry_list.append((entry, box_chars))
             entry.bind("<KeyPress>", lambda e, length=box_chars: self._validate_input(e, length))
             entry.bind("<Key>", lambda e, length=box_chars: self._limit_input_length(e, length))
+
+    def rebuild_hex_grid(self, total_size, unit_size):
+        self._build_hex_grid(self.hex_grid_frame, self.hex_entries, total_size, unit_size)
 
     def get_hex_input_parts(self):
         return [(entry.get().strip(), expected_len) for entry, expected_len in self.hex_entries]
@@ -714,9 +719,6 @@ class StructView(tk.Tk):
             return "break"
 
     def _rebuild_manual_hex_grid(self):
-        for widget in self.manual_hex_grid_frame.winfo_children():
-            widget.destroy()
-        self.manual_hex_entries.clear()
         try:
             total_size = int(self.size_var.get())
         except Exception:
@@ -725,22 +727,7 @@ class StructView(tk.Tk):
             unit_size = int(self.manual_unit_size_var.get().split()[0])
         except Exception:
             unit_size = 1
-        if total_size == 0:
-            return
-        chars_per_box = unit_size * 2
-        num_boxes = (total_size + unit_size - 1) // unit_size
-        cols = max(1, 16 // unit_size)
-        for i in range(num_boxes):
-            if i == num_boxes - 1:
-                remain_bytes = total_size - (unit_size * (num_boxes - 1))
-                box_chars = remain_bytes * 2 if remain_bytes > 0 else chars_per_box
-            else:
-                box_chars = chars_per_box
-            entry = tk.Entry(self.manual_hex_grid_frame, width=box_chars + 2, font=("Courier", 10))
-            entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
-            self.manual_hex_entries.append((entry, box_chars))
-            entry.bind("<KeyPress>", lambda e, length=box_chars: self._validate_input(e, length))
-            entry.bind("<Key>", lambda e, length=box_chars: self._limit_input_length(e, length))
+        self._build_hex_grid(self.manual_hex_grid_frame, self.manual_hex_entries, total_size, unit_size)
 
     def _on_manual_unit_size_change(self):
         self._rebuild_manual_hex_grid()
