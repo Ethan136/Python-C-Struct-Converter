@@ -87,4 +87,4 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    main() raise Exception("Force test fail for PR check")
