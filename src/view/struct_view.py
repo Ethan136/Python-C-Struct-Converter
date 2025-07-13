@@ -544,69 +544,44 @@ class StructView(tk.Tk):
     def show_error(self, title, message):
         messagebox.showerror(title, message)
 
-    def show_parsed_values(self, parsed_values, byte_order_str=None):
-        # 清空舊資料
-        for i in self.member_tree.get_children():
-            self.member_tree.delete(i)
-        # 插入新資料
+    def _populate_tree(self, tree, parsed_values):
+        """Helper to display parsed values in a Treeview."""
+        for item_id in tree.get_children():
+            tree.delete(item_id)
+
         for item in parsed_values:
             value = item.get("value", "")
-            hex_value = ""
             try:
-                if value != "-":
-                    int_value = int(value)
-                    hex_value = hex(int_value)
-                else:
-                    hex_value = "-"
+                hex_value = hex(int(value)) if value != "-" else "-"
             except Exception:
                 hex_value = "-"
-            # 處理 hex_raw 分隔
+
             hex_raw = item.get("hex_raw", "")
             if hex_raw and len(hex_raw) > 2:
-                hex_raw = '｜'.join([hex_raw[i:i+2] for i in range(0, len(hex_raw), 2)])
-            self.member_tree.insert("", "end", values=(item.get("name", ""), value, hex_value, hex_raw))
+                hex_raw = "｜".join(hex_raw[i:i+2] for i in range(0, len(hex_raw), 2))
+
+            tree.insert("", "end", values=(item.get("name", ""), value, hex_value, hex_raw))
+
+    def _show_debug_text(self, text_widget, debug_lines):
+        """Helper to display debug lines in a Text widget."""
+        text_widget.config(state="normal")
+        text_widget.delete("1.0", tk.END)
+        text_widget.insert("1.0", "\n".join(debug_lines) if debug_lines else "無 debug 資訊")
+        text_widget.config(state="disabled")
+
+    def show_parsed_values(self, parsed_values, byte_order_str=None):
+        self._populate_tree(self.member_tree, parsed_values)
 
     def show_manual_parsed_values(self, parsed_values, byte_order_str=None):
         """顯示 MyStruct tab 的解析結果，與 file tab 的 show_parsed_values 一致"""
-        # 清空舊資料
-        for i in self.manual_member_tree.get_children():
-            self.manual_member_tree.delete(i)
-        # 插入新資料
-        for item in parsed_values:
-            value = item.get("value", "")
-            hex_value = ""
-            try:
-                if value != "-":
-                    int_value = int(value)
-                    hex_value = hex(int_value)
-                else:
-                    hex_value = "-"
-            except Exception:
-                hex_value = "-"
-            # 處理 hex_raw 分隔
-            hex_raw = item.get("hex_raw", "")
-            if hex_raw and len(hex_raw) > 2:
-                hex_raw = '｜'.join([hex_raw[i:i+2] for i in range(0, len(hex_raw), 2)])
-            self.manual_member_tree.insert("", "end", values=(item.get("name", ""), value, hex_value, hex_raw))
+        self._populate_tree(self.manual_member_tree, parsed_values)
 
     def show_debug_bytes(self, debug_lines):
-        self.debug_text.config(state="normal")
-        self.debug_text.delete("1.0", tk.END)
-        if debug_lines:
-            self.debug_text.insert("1.0", "\n".join(debug_lines))
-        else:
-            self.debug_text.insert("1.0", "無 debug 資訊")
-        self.debug_text.config(state="disabled")
+        self._show_debug_text(self.debug_text, debug_lines)
 
     def show_manual_debug_bytes(self, debug_lines):
         """顯示 MyStruct tab 的 debug bytes，與 file tab 的 show_debug_bytes 一致"""
-        self.manual_debug_text.config(state="normal")
-        self.manual_debug_text.delete("1.0", tk.END)
-        if debug_lines:
-            self.manual_debug_text.insert("1.0", "\n".join(debug_lines))
-        else:
-            self.manual_debug_text.insert("1.0", "無 debug 資訊")
-        self.manual_debug_text.config(state="disabled")
+        self._show_debug_text(self.manual_debug_text, debug_lines)
 
     def show_struct_member_debug(self, parsed_values, layout):
         # 顯示 struct layout 與欄位對應
