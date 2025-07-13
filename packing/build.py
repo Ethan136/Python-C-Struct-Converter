@@ -88,8 +88,13 @@ def main():
     success = True
     
     if args.target == "all":
-        # Build for current platform
-        spec_file = get_platform_spec()
+        try:
+            spec_file = get_platform_spec()
+        except ValueError as e:
+            print(e)
+            print("Skipping build on unsupported platform.")
+            return
+
         platform_name = "macOS" if current_platform == "darwin" else "Windows"
         success = build_executable(spec_file, platform_name)
         
