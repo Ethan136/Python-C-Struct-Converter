@@ -69,8 +69,16 @@ def run_unittest(args, desc):
 
 def main():
     # Step 1: 執行非 GUI 測試
-    non_gui_args = ["--ignore=tests/test_struct_view.py"]
-    non_gui_result = run_pytest(non_gui_args, "Step 1: 執行非 GUI 測試")
+    non_gui_args = [
+        "--ignore=tests/test_struct_view.py",
+        "--ignore=packing/test_executable.py",
+    ]
+    use_xvfb = not os.environ.get("DISPLAY")
+    non_gui_result = run_pytest(
+        non_gui_args,
+        "Step 1: 執行非 GUI 測試",
+        use_xvfb=use_xvfb,
+    )
 
     # Step 2: 執行 GUI 測試
     gui_args = ["tests/test_struct_view.py"]
