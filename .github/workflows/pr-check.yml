@@ -1,0 +1,31 @@
+name: PR Test & Distribute
+
+on:
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-and-distribute:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run all tests
+      run: |
+        python run_all_tests.py
+
+    - name: Distribute (build executables)
+      run: |
+        python packing/build.py --target all 
