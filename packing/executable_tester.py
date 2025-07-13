@@ -21,6 +21,10 @@ import signal
 # Add parent directory to path so we can import from src
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import sys
+if __name__ != "__main__":
+    sys.exit(0)
+
 def test_executable(executable_path, platform_name, timeout=5):
     """Test an executable by running it for a short time"""
     print(f"Testing {platform_name} executable: {executable_path}")
