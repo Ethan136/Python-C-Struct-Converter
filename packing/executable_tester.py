@@ -39,7 +39,8 @@ def test_executable(executable_path, platform_name, timeout=5):
             process = subprocess.Popen([executable_path], 
                                      stdout=subprocess.PIPE, 
                                      stderr=subprocess.PIPE,
-                                     text=True)
+                                     text=True,
+                                     creationflags=getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0))
         else:
             process = subprocess.Popen([executable_path], 
                                      stdout=subprocess.PIPE, 
@@ -49,11 +50,20 @@ def test_executable(executable_path, platform_name, timeout=5):
         # Wait for a few seconds
         time.sleep(timeout)
         
-        # Try to terminate gracefully
-        try:
-            process.terminate()
-            process.wait(timeout=2)
-        except subprocess.TimeoutExpired:
+        # Try to terminate gracefully with retry
+        terminate_retries = 3
+        terminated = False
+        for i in range(terminate_retries):
+            try:
+                process.terminate()
+                process.wait(timeout=2)
+                terminated = True
+                break
+            except subprocess.TimeoutExpired:
+                print(f"[Retry] Terminate attempt {i+1} failed, retrying...")
+                time.sleep(1)
+        if not terminated:
+            print("[Force Kill] Process did not terminate after retries, killing...")
             process.kill()
             process.wait()
         
