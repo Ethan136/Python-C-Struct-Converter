@@ -143,3 +143,55 @@
 ## 8. pytest 執行常見問題
 
 pytest 執行常見問題與解法，請見 tests/README.md。 
+
+## 9. XML 驅動測試 endianness 預設值 bug 與修正經驗
+
+### 問題現象
+- XML 驅動的 struct 解析測試（如 bitfield_basic）出現欄位值不符（如 '0' != '1'），但原本 hardcode 測試皆通過。
+
+### 排查過程
+- 發現 hardcode 測試（如 test_parse_hex_data_bitfields）預設用 little endian 解析 hex input。
+- XML 驅動測試程式碼卻用 big endian，導致 bitfield 解析結果錯誤。
+- 將 XML 驅動測試的 endianness 改為 little，理論上應該一致。
+- 但測試仍失敗，推測與 struct 解析流程或測試資料細節有關，需進一步比對。
+
+### 修正建議
+- XML 驅動測試必須明確指定 endianness，且預設值應與 hardcode 測試一致。
+- 建議 XML schema 增加 <endianness> 欄位，或 loader 支援 per-case 指定。
+- 若仍有不一致，應比對 hardcode 測試與 XML 測試的 struct 定義、input、expected 是否完全一致。
+
+### 經驗教訓
+- 資料驅動測試 refactor 時，需特別注意隱含的預設值（如 endianness），否則易出現「同一組資料 hardcode 能過、XML 驅動卻失敗」的情形。 
+
+## 10. 目前 test_struct_model.py 與 test_input_field_processor.py 測試分類與 refactor 判斷
+
+### test_input_field_processor.py
+- **已 XML 化**：
+  - `TestInputFieldProcessorXMLDriven` 內的 `test_pad_hex_input`、`test_pad_hex_input_case_insensitive`、`test_convert_to_raw_bytes` 已經完全由 XML 驅動，對應 `input_field_processor_test_config.xml`。
+- **hardcode 測試**：
+  - `TestInputFieldProcessor` 內大多數測試（如 `test_pad_hex_input_4byte_fields`、`test_pad_hex_input_8byte_fields`、`test_convert_to_raw_bytes_big_endian`、`test_process_input_field_complete_pipeline` 等）
+- **適合 XML 化**：
+  - 所有純 input/output 驗證、padding、大小端轉換、pipeline 測試等（如 `test_pad_hex_input_*`、`test_convert_to_raw_bytes_*`、`test_process_input_field_complete_pipeline`、`test_process_input_field_edge_cases`、`test_case_insensitive_hex_input`、`test_data_integrity_through_pipeline`）
+  - 這些測試已經部分 XML 化，剩餘 hardcode 測試可逐步搬移到 XML，並以 XML 驅動為主。
+- **建議維持 hardcode**：
+  - 例外處理、API 支援性檢查（如 `test_pad_hex_input_invalid_byte_size`、`test_convert_to_raw_bytes_invalid_endianness`、`test_convert_to_raw_bytes_invalid_hex`、`test_process_input_field_error_handling`、`test_is_supported_field_size`）
+  - 這些屬於行為/例外/邊界條件驗證，維持 hardcode 可讀性較佳。
+
+### test_struct_model.py
+- **已 XML 化**：
+  - `TestStructModelXMLDriven` 內的 `test_struct_model_cases` 已經由 XML 驅動，對應 `model_test_config.xml`。
+- **hardcode 測試**：
+  - `TestParseStructDefinition`、`TestCalculateLayout`、`TestStructModel`、`TestCombinedExampleStruct`、`TestTypeInfo` 內大多數測試
+- **適合 XML 化**：
+  - 純 struct parsing、layout、bitfield、padding、pointer、input/output 驗證等（如 `test_parse_hex_data_bitfields`、`test_parse_hex_data_padding`、`test_parse_hex_data_pointer`、`test_parse_hex_data_short_input`、`test_parse_hex_data_big_endian`、`test_struct_a_with_8byte_hex_units`、`test_struct_a_endian_comparison`、`test_struct_a_8byte_field_short_hex`、`test_integration_with_real_file`、`test_hex_raw_formatting_and_padding`）
+  - 這些測試已經部分 XML 化，剩餘 hardcode 測試可逐步搬移到 XML，並以 XML 驅動為主。
+- **建議維持 hardcode**：
+  - struct 定義語法解析（如 `test_valid_struct_definition`、`test_struct_with_pointer`、`test_struct_with_unsigned_types`、`test_struct_with_bitfields`、`test_invalid_struct_no_match`、`test_struct_with_unknown_type`）
+  - 例外處理、API 支援性、物件狀態驗證（如 `test_load_struct_from_file_invalid`、`test_parse_hex_data_no_layout`、`test_set_manual_struct_sets_members_and_size`、`test_validate_manual_struct_errors_and_success`、`test_export_manual_struct_to_h`、`test_export_manual_struct_to_h_with_custom_name`、`test_manual_struct_byte_bit_size_layout`、`test_parse_manual_hex_data_uses_file_parsing_logic`、`test_parse_manual_hex_data_preserves_original_layout`、`test_type_info_completeness`、`test_type_info_sizes`、`test_type_info_alignment`）
+  - 這些屬於語法/行為/例外/API 驗證，維持 hardcode 可讀性較佳。
+
+### 綜合說明
+- 兩個檔案皆已經有 XML 驅動測試雛型，且純資料驗證型測試已部分搬移。
+- 剩餘 hardcode 的純 input/output 驗證型測試，建議持續搬移到 XML。
+- 行為、例外、API、狀態驗證型測試則維持 hardcode。
+- 這樣可兼顧測試維護性、可讀性與擴充性。 

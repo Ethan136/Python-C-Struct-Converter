@@ -175,6 +175,39 @@ Offset:  0   1   2   3   4   5   6   7   8   9  10  11
 - Padding ensures correct alignment but does not store member values.
 - The value of each member is stored as raw bytes at its offset, and can be read/written by slicing the memory block accordingly.
 
+## Hex String 補零方向與記憶體對應說明
+
+### 為什麼 struct input 是「左補零」？
+
+- 使用者輸入的 hex string（如 "121"）是「高位在左、低位在右」的**人類可讀十六進位字串**。
+- 當 hex string 長度不足 struct 大小時，**系統會自動左補零**（高位補零），確保 bytes 長度正確。
+- 這樣 "121" → "0000000000000121"（8 bytes），對應 bytes [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x21]。
+
+### 與 C/C++ 記憶體的對應
+
+- 在 C/C++ 中，struct 記憶體是「固定長度」的 bytes array，不足時高位補零。
+- 例如：
+  ```c
+  struct A { long long val; };
+  struct A a = { .val = 0x121 };
+  // 記憶體內容（big endian）：00 00 00 00 00 00 01 21
+  // 記憶體內容（little endian）：21 01 00 00 00 00 00 00
+  ```
+- Python 解析 bytes → 數值時，會根據 endianness（big/little）正確解讀高低位。
+
+### 圖解
+
+| hex string                | bytes array (index)         | int.from_bytes(..., "big") | int.from_bytes(..., "little") |
+|---------------------------|-----------------------------|----------------------------|-------------------------------|
+| "0000000000000121"        | [0x00, ..., 0x01, 0x21]     | 289                        | 2378182078228332544           |
+| "2101000000000000"        | [0x21, 0x01, 0x00, ...]     | 2378182078228332544        | 289                           |
+
+### 結論
+
+- **左補零**是為了讓 hex string 的「高位」對應到 bytes array 的高 index（big endian）或低 index（little endian）。
+- Python 會根據 endianness 正確解讀 bytes array，不會搞錯高低位。
+- 這種設計與 C/C++ 記憶體 dump、hexdump 工具完全一致。
+
 ## Testing and TDD Approach
 
 ### Test-Driven Development

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<input_field_processor_tests>
+    <!-- 4-byte field padding -->
+    <pad_hex_input byte_size="4">
+        <case input="12" expected="00000012"/>
+        <case input="123" expected="00000123"/>
+        <case input="1234" expected="00001234"/>
+        <case input="12345" expected="00012345"/>
+        <case input="123456" expected="00123456"/>
+        <case input="1234567" expected="01234567"/>
+        <case input="12345678" expected="12345678"/>
+        <case input="" expected="00000000"/>
+    </pad_hex_input>
+    <!-- 8-byte field padding -->
+    <pad_hex_input byte_size="8">
+        <case input="123" expected="0000000000000123"/>
+        <case input="1234" expected="0000000000001234"/>
+        <case input="12345" expected="0000000000012345"/>
+        <case input="123456" expected="0000000000123456"/>
+        <case input="1234567" expected="0000000001234567"/>
+        <case input="12345678" expected="0000000012345678"/>
+        <case input="123456789" expected="0000000123456789"/>
+        <case input="123456789A" expected="000000123456789a"/>
+        <case input="123456789AB" expected="00000123456789ab"/>
+        <case input="123456789ABC" expected="0000123456789abc"/>
+        <case input="123456789ABCD" expected="000123456789abcd"/>
+        <case input="123456789ABCDE" expected="00123456789abcde"/>
+        <case input="123456789ABCDEF" expected="0123456789abcdef"/>
+        <case input="123456789ABCDEF0" expected="123456789abcdef0"/>
+        <case input="" expected="0000000000000000"/>
+    </pad_hex_input>
+    <!-- 1-byte field padding -->
+    <pad_hex_input byte_size="1">
+        <case input="1" expected="01"/>
+        <case input="A" expected="0a"/>
+        <case input="F" expected="0f"/>
+        <case input="FF" expected="ff"/>
+        <case input="" expected="00"/>
+    </pad_hex_input>
+    <!-- other byte sizes -->
+    <pad_hex_input byte_size="2">
+        <case input="12" expected="0012"/>
+        <case input="" expected="0000"/>
+    </pad_hex_input>
+    <pad_hex_input byte_size="3">
+        <case input="123" expected="000123"/>
+        <case input="" expected="000000"/>
+    </pad_hex_input>
+    <pad_hex_input byte_size="5">
+        <case input="1234" expected="0000001234"/>
+    </pad_hex_input>
+    <pad_hex_input byte_size="6">
+        <case input="123456" expected="000000123456"/>
+    </pad_hex_input>
+    <!-- convert_to_raw_bytes big endian -->
+    <convert_to_raw_bytes endianness="big">
+        <case padded_hex="00000012" byte_size="4" expected="00000012"/>
+        <case padded_hex="12345678" byte_size="4" expected="12345678"/>
+        <case padded_hex="0000000000000123" byte_size="8" expected="0000000000000123"/>
+        <case padded_hex="123456789ABCDEF0" byte_size="8" expected="123456789abcdef0"/>
+        <case padded_hex="01" byte_size="1" expected="01"/>
+        <case padded_hex="FF" byte_size="1" expected="ff"/>
+    </convert_to_raw_bytes>
+    <!-- convert_to_raw_bytes little endian -->
+    <convert_to_raw_bytes endianness="little">
+        <case padded_hex="00000012" byte_size="4" expected="12000000"/>
+        <case padded_hex="12345678" byte_size="4" expected="78563412"/>
+        <case padded_hex="0000000000000123" byte_size="8" expected="2301000000000000"/>
+        <case padded_hex="123456789ABCDEF0" byte_size="8" expected="f0debc9a78563412"/>
+        <case padded_hex="01" byte_size="1" expected="01"/>
+        <case padded_hex="FF" byte_size="1" expected="ff"/>
+    </convert_to_raw_bytes>
+    <!-- 1-byte field padding (case insensitive) -->
+    <pad_hex_input_case_insensitive byte_size="4">
+        <case input="ABCDEF" expected="00abcdef"/>
+        <case input="abcdef" expected="00abcdef"/>
+        <case input="AbCdEf" expected="00abcdef"/>
+        <case input="123456789ABCDEF" expected="89abcdef"/>
+    </pad_hex_input_case_insensitive>
+    <!-- process_input_field complete pipeline -->
+    <process_input_field>
+        <case input="12" byte_size="4" endianness="big" expected="00000012"/>
+        <case input="12" byte_size="4" endianness="little" expected="12000000"/>
+        <case input="123" byte_size="8" endianness="big" expected="0000000000000123"/>
+        <case input="123" byte_size="8" endianness="little" expected="2301000000000000"/>
+        <case input="1" byte_size="1" endianness="big" expected="01"/>
+        <case input="1" byte_size="1" endianness="little" expected="01"/>
+        <case input="" byte_size="4" endianness="big" expected="00000000"/>
+        <case input="" byte_size="8" endianness="little" expected="0000000000000000"/>
+    </process_input_field>
+    <!-- process_input_field edge cases -->
+    <process_input_field_edge_cases>
+        <!-- Maximum values -->
+        <case input="FFFFFFFF" byte_size="4" endianness="big" expected="ffffffff"/>
+        <case input="FFFFFFFFFFFFFFFF" byte_size="8" endianness="big" expected="ffffffffffffffff"/>
+        <case input="FF" byte_size="1" endianness="big" expected="ff"/>
+        <!-- Zero values -->
+        <case input="0" byte_size="4" endianness="big" expected="00000000"/>
+        <case input="0" byte_size="8" endianness="big" expected="0000000000000000"/>
+        <case input="0" byte_size="1" endianness="big" expected="00"/>
+        <!-- Single digits -->
+        <case input="A" byte_size="4" endianness="big" expected="0000000a"/>
+        <case input="B" byte_size="8" endianness="big" expected="000000000000000b"/>
+    </process_input_field_edge_cases>
+</input_field_processor_tests> 

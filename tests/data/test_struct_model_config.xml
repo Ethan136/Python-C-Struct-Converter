@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<struct_model_tests>
+    <test_case name="bitfield_basic" description="Test struct with bitfields">
+        <struct_definition><![CDATA[
+            struct A {
+                int a : 1;
+                int b : 2;
+                int c : 5;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>8d000000</hex>
+        </input_data>
+        <expected_results>
+            <member name="a" value="1"/>
+            <member name="b" value="2"/>
+            <member name="c" value="17"/>
+        </expected_results>
+    </test_case>
+    <test_case name="padding_and_pointer" description="Test struct with padding and pointer">
+        <struct_definition><![CDATA[
+            struct B {
+                char a;
+                int* ptr;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>0100000000000000</hex>
+        </input_data>
+        <expected_results>
+            <member name="a" value="0"/>
+            <member name="ptr" value="1"/>
+        </expected_results>
+    </test_case>
+    <test_case name="simple_struct" description="Test parsing simple struct" endianness="little">
+        <struct_definition><![CDATA[
+            struct SimpleStruct {
+                int value1;
+                char value2;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>0100000041000000</hex>
+        </input_data>
+        <expected_results>
+            <member name="value1" value="1"/>
+            <member name="value2" value="65"/>
+        </expected_results>
+    </test_case>
+    <test_case name="bool_struct" description="Test parsing boolean values" endianness="little">
+        <struct_definition><![CDATA[
+            struct BoolStruct {
+                bool flag1;
+                bool flag2;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>0100</hex>
+        </input_data>
+        <expected_results>
+            <member name="flag1" value="True"/>
+            <member name="flag2" value="False"/>
+        </expected_results>
+    </test_case>
+    <test_case name="padding_struct" description="Test parsing with padding" endianness="little">
+        <struct_definition><![CDATA[
+            struct PaddingStruct {
+                char a;
+                int b;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>4100000002000000</hex>
+        </input_data>
+        <expected_results>
+            <member name="a" value="65"/>
+            <member name="b" value="2"/>
+        </expected_results>
+    </test_case>
+    <test_case name="short_input" description="Test parsing short hex input with zero padding" endianness="little">
+        <struct_definition><![CDATA[
+            struct ShortStruct {
+                int value1;
+                int value2;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>01000000</hex>
+        </input_data>
+        <expected_results>
+            <member name="value1" value="0"/>
+            <member name="value2" value="1"/>
+        </expected_results>
+    </test_case>
+    <test_case name="big_endian" description="Test parsing with big endian byte order" endianness="big">
+        <struct_definition><![CDATA[
+            struct EndianStruct {
+                int value1;
+                short value2;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>0000000100020000</hex>
+        </input_data>
+        <expected_results>
+            <member name="value1" value="1"/>
+            <member name="value2" value="2"/>
+        </expected_results>
+    </test_case>
+    <test_case name="struct_a_8byte_units" description="Test struct A { char s; long long val; } with 8-byte hex units" endianness="little">
+        <struct_definition><![CDATA[
+            struct A {
+                char s;
+                long long val;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>12330000000000001210000000000000</hex>
+        </input_data>
+        <expected_results>
+            <member name="s" value="18"/>
+            <member name="val" value="4114"/>
+        </expected_results>
+    </test_case>
+    <test_case name="pointer_struct" description="Test parsing pointer values" endianness="little">
+        <struct_definition><![CDATA[
+            struct PointerStruct {
+                char a;
+                int* ptr;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>00000000410000001234567890abcdef</hex>
+        </input_data>
+        <expected_results>
+            <member name="a" value="0"/>
+            <member name="ptr" value="17279655982273016850"/>
+        </expected_results>
+    </test_case>
+    <test_case name="bitfield_struct" description="Test parsing hex data for struct with bit fields" endianness="little">
+        <struct_definition><![CDATA[
+            struct BitFieldStruct {
+                int a : 1;
+                int b : 2;
+                int c : 5;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>8d000000</hex>
+        </input_data>
+        <expected_results>
+            <member name="a" value="1"/>
+            <member name="b" value="2"/>
+            <member name="c" value="17"/>
+        </expected_results>
+    </test_case>
+    <test_case name="struct_a_endian_comparison" description="Test struct A with both little endian and big endian to show the difference" endianness="both">
+        <struct_definition><![CDATA[
+            struct A {
+                char s;
+                long long val;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>12330000000000001210000000000000</hex>
+        </input_data>
+        <expected_results>
+            <member name="s" value_little="18" value_big="18"/>
+            <member name="val" value_little="4114" value_big="1301540292310073344"/>
+        </expected_results>
+    </test_case>
+    <test_case name="struct_a_8byte_field_short_hex" description="Test 8-byte field with short hex input '121' should be padded to '0000000000000121'" endianness="both">
+        <struct_definition><![CDATA[
+            struct A {
+                long long val;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>121</hex>
+        </input_data>
+        <expected_results>
+            <member name="val" value_little="2378182078228332544" value_big="289" hex_raw="0000000000000121"/>
+        </expected_results>
+    </test_case>
+</struct_model_tests> 

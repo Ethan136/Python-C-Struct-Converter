@@ -73,4 +73,66 @@
             <result index="2" big_endian="00000001" little_endian="01000000">1</result>
         </expected_results>
     </test_config>
+
+    <!-- Test configuration for 1-byte field expansion (from test_1byte_field_expansion) -->
+    <test_config name="1byte_field_expansion" unit_size="1" description="Test 1-byte field expansion (from hardcode)">
+        <input_values>
+            <value index="0">1</value>
+            <value index="1">A</value>
+            <value index="2">FF</value>
+            <value index="3"></value>
+        </input_values>
+        <expected_results>
+            <result index="0" big_endian="01" little_endian="01">1</result>
+            <result index="1" big_endian="0a" little_endian="0a">A</result>
+            <result index="2" big_endian="ff" little_endian="ff">FF</result>
+            <result index="3" big_endian="00" little_endian="00">empty</result>
+        </expected_results>
+    </test_config>
+
+    <!-- Test configuration for empty field handling (from test_empty_field_handling) -->
+    <test_config name="empty_field_handling" unit_size="4" description="Test empty field handling (from hardcode)">
+        <input_values>
+            <value index="0"></value>
+            <value index="1"></value>
+            <value index="2"></value>
+        </input_values>
+        <expected_results>
+            <result index="0" big_endian="00000000" little_endian="00000000">empty4</result>
+            <result index="1" big_endian="00000000" little_endian="00000000">empty4</result>
+            <result index="2" big_endian="00000000" little_endian="00000000">empty4</result>
+        </expected_results>
+    </test_config>
+
+    <!-- Test configuration for various input scenarios (from test_various_input_scenarios) -->
+    <test_config name="various_input_scenarios" unit_size="4" description="Test various input scenarios (from hardcode)">
+        <input_values>
+            <value index="0">ABCDEF01</value>
+            <value index="1">A</value>
+            <value index="2">ABC</value>
+            <value index="3">123456</value>
+        </input_values>
+        <expected_results>
+            <result index="0" big_endian="abcdef01" little_endian="01efcdab">ABCDEF01</result>
+            <result index="1" big_endian="0000000a" little_endian="0a000000">A</result>
+            <result index="2" big_endian="00000abc" little_endian="bc0a0000">ABC</result>
+            <result index="3" big_endian="00123456" little_endian="56341200">123456</result>
+        </expected_results>
+    </test_config>
+
+    <!-- Test configuration for all requirements compliance (from test_all_requirements_compliance) -->
+    <test_config name="all_requirements_compliance" unit_size="4" description="Test all requirements compliance (from hardcode)">
+        <input_values>
+            <value index="0">12</value>
+            <value index="1">123</value>
+            <value index="2">1</value>
+            <value index="3"></value>
+        </input_values>
+        <expected_results>
+            <result index="0" big_endian="00000012" little_endian="12000000">12</result>
+            <result index="1" big_endian="00000123" little_endian="23010000">123</result>
+            <result index="2" big_endian="00000001" little_endian="01000000">1</result>
+            <result index="3" big_endian="00000000" little_endian="00000000">empty</result>
+        </expected_results>
+    </test_config>
 </test_configs> 

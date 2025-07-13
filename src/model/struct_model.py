@@ -292,9 +292,8 @@ class StructModel:
         if not self.layout:
             raise ValueError("No struct layout loaded. Please load a struct definition first.")
 
-        # Use the input field processor to handle the complete hex data
-        # For the entire struct, we need to pad to the total size
-        padded_hex = self.input_processor.pad_hex_input(hex_data, self.total_size)
+        # struct 整體 hex_data 視為 raw bytes，左補零到 total_size
+        padded_hex = hex_data.zfill(self.total_size * 2)
         data_bytes = bytes.fromhex(padded_hex)
         
         parsed_values = []

@@ -33,37 +33,22 @@ class StructPresenter:
             chunk_byte_size = expected_chars // 2
 
             try:
-                padded_hex = self.input_processor.pad_hex_input(raw_part, chunk_byte_size)
-                int_value = int(padded_hex, 16) if padded_hex else 0
+                # 新版：直接用 process_input_field 產生 bytes
+                bytes_for_chunk = self.input_processor.process_input_field(raw_part, chunk_byte_size, byte_order)
+                int_value = int.from_bytes(bytes_for_chunk, byte_order)
             except ValueError:
                 raise HexProcessingError(
                     "invalid_input",
                     f"Could not convert '{raw_part}' to a number."
                 )
-
-            try:
-                max_val = (2 ** (chunk_byte_size * 8)) - 1
-                if int_value > max_val:
-                    raise HexProcessingError(
-                        "value_too_large",
-                        f"Value 0x{raw_part} is too large for a {chunk_byte_size}-byte field."
-                    )
-
-                bytes_for_chunk = int_value.to_bytes(chunk_byte_size, byteorder=byte_order)
-                final_hex_parts.append(bytes_for_chunk.hex())
-                debug_bytes.append(bytes_for_chunk)
             except OverflowError:
                 raise HexProcessingError(
-                    "overflow_error",
+                    "value_too_large",
                     f"Value 0x{raw_part} is too large for a {chunk_byte_size}-byte field."
                 )
-            except HexProcessingError:
-                raise
-            except Exception as e:  # pragma: no cover - unexpected conversion error
-                raise HexProcessingError(
-                    "conversion_error",
-                    f"Error converting value 0x{raw_part} to bytes: {e}"
-                )
+
+            final_hex_parts.append(bytes_for_chunk.hex())
+            debug_bytes.append(bytes_for_chunk)
 
         debug_lines = []
         for i, chunk in enumerate(debug_bytes):

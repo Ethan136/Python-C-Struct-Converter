@@ -20,6 +20,7 @@ from model.struct_model import (
     StructModel, 
     TYPE_INFO
 )
+from tests.xml_struct_model_loader import load_struct_model_tests
 
 
 class TestParseStructDefinition(unittest.TestCase):
@@ -358,62 +359,6 @@ class TestStructModel(unittest.TestCase):
         
         self.assertIn("No struct layout loaded", str(context.exception))
     
-    def test_parse_hex_data_simple(self):
-        """Test parsing simple hex data."""
-        # Load a simple struct first
-        struct_content = """
-        struct SimpleStruct {
-            int value1;
-            char value2;
-        };
-        """
-        
-        with patch("builtins.open", mock_open(read_data=struct_content)):
-            self.model.load_struct_from_file("test_file.h")
-        
-        # Parse hex data
-        hex_data = "01000000" + "41" + "000000"  # int(1) + char('A') + padding
-        result = self.model.parse_hex_data(hex_data, "little")
-        
-        self.assertEqual(len(result), 3)  # int, char, padding
-        
-        # Check int value
-        self.assertEqual(result[0]["name"], "value1")
-        self.assertEqual(result[0]["value"], "1")
-        self.assertEqual(result[0]["hex_raw"], "01000000")  # little endian: 數值在 little endian 下的 hex 表示
-        
-        # Check char value
-        self.assertEqual(result[1]["name"], "value2")
-        self.assertEqual(result[1]["value"], "65")  # ASCII 'A' = 65
-        self.assertEqual(result[1]["hex_raw"], "41")
-        
-        # Check padding
-        self.assertEqual(result[2]["name"], "(final padding)")
-        self.assertEqual(result[2]["value"], "-")
-        self.assertEqual(result[2]["hex_raw"], "000000")
-    
-    def test_parse_hex_data_bool(self):
-        """Test parsing boolean values."""
-        struct_content = """
-        struct BoolStruct {
-            bool flag1;
-            bool flag2;
-        };
-        """
-        
-        with patch("builtins.open", mock_open(read_data=struct_content)):
-            self.model.load_struct_from_file("test_file.h")
-        
-        # Parse hex data with boolean values
-        hex_data = "01" + "00"  # true, false
-        result = self.model.parse_hex_data(hex_data, "little")
-        
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]["name"], "flag1")
-        self.assertEqual(result[0]["value"], "True")
-        self.assertEqual(result[1]["name"], "flag2")
-        self.assertEqual(result[1]["value"], "False")
-    
     def test_parse_hex_data_padding(self):
         """Test parsing hex data with padding."""
         struct_content = """
@@ -490,32 +435,6 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(result[1]["name"], "value2")
         self.assertEqual(result[1]["value"], "2")
     
-    def test_parse_hex_data_pointer(self):
-        """Test parsing pointer values."""
-        struct_content = """
-        struct PointerStruct {
-            char a;
-            int* ptr;
-        };
-        """
-        
-        with patch("builtins.open", mock_open(read_data=struct_content)):
-            self.model.load_struct_from_file("test_file.h")
-        
-        # Parse hex data with pointer
-        # 輸入: "41" + "000000" + "1234567890abcdef" (15 bytes)
-        # 左補零後: "0" + "41" + "000000" + "1234567890abcdef" (16 bytes)
-        hex_data = "41" + "000000" + "1234567890abcdef"
-        result = self.model.parse_hex_data(hex_data, "little")
-        
-        self.assertEqual(len(result), 3)
-        self.assertEqual(result[0]["name"], "a")
-        # 左補零後，char 'a' 變成 0x00 = 0
-        self.assertEqual(result[0]["value"], "0")
-        self.assertEqual(result[2]["name"], "ptr")
-        # Pointer value should be parsed as integer
-        self.assertIsInstance(int(result[2]["value"]), int)
-
     def test_struct_a_with_8byte_hex_units(self):
         """Test struct A { char s; long long val; } with 8-byte hex units."""
         struct_content = """
@@ -615,6 +534,8 @@ class TestStructModel(unittest.TestCase):
         expected_hex_little = "0000000000000121"  # little endian: 數值在 little endian 下的 hex 表示
         expected_hex_big = "0000000000000121"  # big endian: 直接顯示原始 bytes 的 hex
         expected_bytes = bytes.fromhex(expected_hex_big)
+        print(f"[DEBUG][hardcode] value_little={result_little[0]['value']} hex_raw={result_little[0]['hex_raw']}")
+        print(f"[DEBUG][hardcode] value_big={result_big[0]['value']} hex_raw={result_big[0]['hex_raw']}")
         self.assertEqual(result_little[0]["hex_raw"], expected_hex_little)
         self.assertEqual(result_big[0]["hex_raw"], expected_hex_big)
         # little endian: int.from_bytes(..., 'little')
@@ -673,30 +594,6 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(result[1]["hex_raw"], "000000")  # 3 bytes padding
         self.assertEqual(result[2]["hex_raw"], "00000123")  # 4 bytes
         self.assertEqual(result[3]["hex_raw"], "0000000004567890")  # 8 bytes
-
-    def test_parse_hex_data_bitfields(self):
-        """Test parsing hex data for struct with bit fields."""
-        # struct BitFieldStruct { int a:1; int b:2; int c:5; };
-        # Layout: all packed in 1 int (4 bytes), a=bit0, b=bit1-2, c=bit3-7
-        struct_content = """
-        struct BitFieldStruct {
-            int a : 1;
-            int b : 2;
-            int c : 5;
-        };
-        """
-        with patch("builtins.open", mock_open(read_data=struct_content)):
-            self.model.load_struct_from_file("test_file.h")
-        # a=1, b=2, c=17 -> bits: 1 (a), 10 (b), 10001 (c) => 1 10 10001 = 0b10001101 = 0x8D
-        # Little endian: 0x8D 00 00 00
-        hex_data = "8d000000"
-        result = self.model.parse_hex_data(hex_data, "little")
-        self.assertEqual(result[0]["name"], "a")
-        self.assertEqual(result[0]["value"], "1")
-        self.assertEqual(result[1]["name"], "b")
-        self.assertEqual(result[1]["value"], "2")
-        self.assertEqual(result[2]["name"], "c")
-        self.assertEqual(result[2]["value"], "17")
 
     def test_set_manual_struct_sets_members_and_size(self):
         """Test that set_manual_struct correctly sets members and total_size."""
@@ -983,6 +880,41 @@ class TestTypeInfo(unittest.TestCase):
         # Alignment should match size for most types
         for type_name, info in TYPE_INFO.items():
             self.assertEqual(info["size"], info["align"])
+
+
+class TestStructModelXMLDriven(unittest.TestCase):
+    """XML 驅動的 StructModel 測試"""
+    @classmethod
+    def setUpClass(cls):
+        cls.test_data = load_struct_model_tests(
+            os.path.join(os.path.dirname(__file__), 'data', 'test_struct_model_config.xml')
+        )
+
+    def test_struct_model_cases(self):
+        for case in self.test_data:
+            with self.subTest(name=case['name']):
+                model = StructModel()
+                struct_name, members = parse_struct_definition(case['struct_definition'])
+                model.struct_name = struct_name
+                model.members = members
+                model.layout, model.total_size, model.struct_align = calculate_layout(members)
+                if case.get('endianness') == 'both':
+                    for endian in ['little', 'big']:
+                        result = model.parse_hex_data(case['input_hex'], endian)
+                        for expect in case['expected']:
+                            found = next((item for item in result if item['name'] == expect['name']), None)
+                            self.assertIsNotNone(found, f"欄位 {expect['name']} 未找到")
+                            key = f"value_{endian}"
+                            if key in expect:
+                                self.assertEqual(str(found['value']), str(expect[key]))
+                            if 'hex_raw' in expect:
+                                self.assertEqual(found.get('hex_raw'), expect['hex_raw'])
+                else:
+                    result = model.parse_hex_data(case['input_hex'], case.get('endianness', 'little'))
+                    for expect in case['expected']:
+                        found = next((item for item in result if item['name'] == expect['name']), None)
+                        self.assertIsNotNone(found, f"欄位 {expect['name']} 未找到")
+                        self.assertEqual(str(found['value']), str(expect['value']))
 
 
 if __name__ == "__main__":

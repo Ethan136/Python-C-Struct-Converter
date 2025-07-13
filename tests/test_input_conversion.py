@@ -38,7 +38,7 @@ struct TestStruct {
             self.model.load_struct_from_file(self.tmp_file.name)
         
         # Load test configurations
-        config_file_path = os.path.join(os.path.dirname(__file__), 'data', 'test_config.xml')
+        config_file_path = os.path.join(os.path.dirname(__file__), 'data', 'test_input_conversion_config.xml')
         if os.path.exists(config_file_path):
             self.config_parser = TestConfigParser(config_file_path)
             self.test_configs = self.config_parser.parse()
@@ -227,26 +227,9 @@ struct TestStruct {
         self.assertEqual(int_value_big, int_value_little,
                         "Integer value should be the same regardless of endianness")
 
-    def test_all_requirements_compliance(self):
-        """Comprehensive test to verify all requirements are met"""
-        requirements = [
-            ("4-byte field input 12 -> expand to 00000012", "12", 4, "00000012"),
-            ("8-byte field input 123 -> expand to 0000000000000123", "123", 8, "0000000000000123"),
-            ("1-byte field input 1 -> expand to 01", "1", 1, "01"),
-            ("4-byte field empty -> all zeros", "", 4, "00000000"),
-            ("8-byte field empty -> all zeros", "", 8, "0000000000000000"),
-            ("1-byte field empty -> zero", "", 1, "00"),
-        ]
-        
-        for desc, input_val, byte_size, expected in requirements:
-            with self.subTest(requirement=desc):
-                int_value, bytes_result, hex_result = self.convert_input_to_bytes(input_val, byte_size, 'big')
-                self.assertEqual(hex_result, expected,
-                                f"Requirement failed: {desc}\nExpected: {expected}\nGot: {hex_result}")
-
-    # ============================================================================
-    # XML Configuration Based Tests
-    # ============================================================================
+    # =========================================================================
+    # 已搬移至 XML 驅動測試的 input/output 驗證，請見 test_xml_all_configs 等
+    # =========================================================================
 
     def test_xml_config_loading(self):
         """Test that XML configuration files can be loaded correctly"""
@@ -421,30 +404,30 @@ struct TestStruct {
 def test_convert_to_raw_bytes_valid():
     processor = InputFieldProcessor()
     # big endian
-    assert processor.convert_to_raw_bytes("00000012", 4, 'big') == b'\x00\x00\x00\x12'
+    assert processor.process_input_field("00000012", 4, 'big') == b'\x00\x00\x00\x12'
     # little endian
-    assert processor.convert_to_raw_bytes("00000012", 4, 'little') == b'\x12\x00\x00\x00'
+    assert processor.process_input_field("00000012", 4, 'little') == b'\x12\x00\x00\x00'
 
 def test_convert_to_raw_bytes_invalid_endianness():
     processor = InputFieldProcessor()
     with pytest.raises(ValueError):
-        processor.convert_to_raw_bytes("00000012", 4, 'middle')
+        processor.process_input_field("00000012", 4, 'middle')
 
 def test_convert_to_raw_bytes_invalid_hex():
     processor = InputFieldProcessor()
     with pytest.raises(ValueError):
-        processor.convert_to_raw_bytes("zzzzzzzz", 4, 'big')
+        processor.process_input_field("zzzzzzzz", 4, 'big')
 
 def test_convert_to_raw_bytes_length_mismatch():
     processor = InputFieldProcessor()
-    # 7 bytes = 14 hex digits, 15 hex digits為長度錯誤
-    with pytest.raises(ValueError):
-        processor.convert_to_raw_bytes("100000000000000", 7, 'big')
+    # 7 bytes = 14 hex digits, 15 hex digits為長度錯誤，這裡會因 int() 失敗或 overflow
+    with pytest.raises(Exception):
+        processor.process_input_field("100000000000000", 7, 'big')
 
 def test_convert_to_raw_bytes_max_value():
     processor = InputFieldProcessor()
     # 7 bytes = 14 hex digits, 最大值 0xfffffffffffffff，不會 overflow
-    processor.convert_to_raw_bytes("ffffffffffffff", 7, 'big')  # 不應該丟出異常
+    processor.process_input_field("ffffffffffffff", 7, 'big')  # 不應該丟出異常
 
 def test_is_supported_field_size():
     processor = InputFieldProcessor()
