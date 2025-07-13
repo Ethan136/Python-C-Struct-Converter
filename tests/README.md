@@ -452,3 +452,31 @@ python3 -m unittest test_struct_manual_integration -v
 - 測試資料生成工具
 - 測試結果分析工具
 - 測試覆蓋率報告工具 
+
+## pytest 執行常見問題與解法
+
+### 問題：zsh: command not found: pytest
+- **原因**：未啟用正確的 Python 虛擬環境，或 PATH 未指向 .venv/bin。
+- **解法**：
+  1. 先啟用虛擬環境：
+     ```sh
+     source .venv/bin/activate
+     ```
+  2. 再執行 pytest：
+     ```sh
+     pytest tests/test_input_field_processor.py
+     ```
+
+### 問題：ModuleNotFoundError: No module named 'pytest'
+- **原因**：虛擬環境內未安裝 pytest。
+- **解法**：
+  1. 啟用虛擬環境後安裝 pytest：
+     ```sh
+     pip install pytest
+     ```
+
+### 問題：找不到測試模組或 loader
+- **原因**：PYTHONPATH 未正確設置，或 import 路徑錯誤。
+- **解法**：
+  - 確認 sys.path 有包含 src/ 及 tests/ 目錄。
+  - 使用相對 import 或調整 sys.path。 
