@@ -544,11 +544,10 @@ class StructView(tk.Tk):
     def show_error(self, title, message):
         messagebox.showerror(title, message)
 
-    def show_parsed_values(self, parsed_values, byte_order_str=None):
-        # 清空舊資料
-        for i in self.member_tree.get_children():
-            self.member_tree.delete(i)
-        # 插入新資料
+    def _populate_tree(self, tree, parsed_values):
+        """Insert parsed values into the provided Treeview widget."""
+        for i in tree.get_children():
+            tree.delete(i)
         for item in parsed_values:
             value = item.get("value", "")
             hex_value = ""
@@ -560,53 +559,36 @@ class StructView(tk.Tk):
                     hex_value = "-"
             except Exception:
                 hex_value = "-"
-            # 處理 hex_raw 分隔
             hex_raw = item.get("hex_raw", "")
             if hex_raw and len(hex_raw) > 2:
                 hex_raw = '｜'.join([hex_raw[i:i+2] for i in range(0, len(hex_raw), 2)])
-            self.member_tree.insert("", "end", values=(item.get("name", ""), value, hex_value, hex_raw))
+            tree.insert("", "end", values=(item.get("name", ""), value, hex_value, hex_raw))
+
+    def _update_debug_text(self, text_widget, debug_lines):
+        """Display debug lines in the given Text widget."""
+        text_widget.config(state="normal")
+        text_widget.delete("1.0", tk.END)
+        if debug_lines:
+            text_widget.insert("1.0", "\n".join(debug_lines))
+        else:
+            text_widget.insert("1.0", "無 debug 資訊")
+        text_widget.config(state="disabled")
+
+    def show_parsed_values(self, parsed_values, byte_order_str=None):
+        """Display parsed values in the file tab."""
+        self._populate_tree(self.member_tree, parsed_values)
 
     def show_manual_parsed_values(self, parsed_values, byte_order_str=None):
         """顯示 MyStruct tab 的解析結果，與 file tab 的 show_parsed_values 一致"""
-        # 清空舊資料
-        for i in self.manual_member_tree.get_children():
-            self.manual_member_tree.delete(i)
-        # 插入新資料
-        for item in parsed_values:
-            value = item.get("value", "")
-            hex_value = ""
-            try:
-                if value != "-":
-                    int_value = int(value)
-                    hex_value = hex(int_value)
-                else:
-                    hex_value = "-"
-            except Exception:
-                hex_value = "-"
-            # 處理 hex_raw 分隔
-            hex_raw = item.get("hex_raw", "")
-            if hex_raw and len(hex_raw) > 2:
-                hex_raw = '｜'.join([hex_raw[i:i+2] for i in range(0, len(hex_raw), 2)])
-            self.manual_member_tree.insert("", "end", values=(item.get("name", ""), value, hex_value, hex_raw))
+        self._populate_tree(self.manual_member_tree, parsed_values)
 
     def show_debug_bytes(self, debug_lines):
-        self.debug_text.config(state="normal")
-        self.debug_text.delete("1.0", tk.END)
-        if debug_lines:
-            self.debug_text.insert("1.0", "\n".join(debug_lines))
-        else:
-            self.debug_text.insert("1.0", "無 debug 資訊")
-        self.debug_text.config(state="disabled")
+        """Display debug bytes in the file tab."""
+        self._update_debug_text(self.debug_text, debug_lines)
 
     def show_manual_debug_bytes(self, debug_lines):
         """顯示 MyStruct tab 的 debug bytes，與 file tab 的 show_debug_bytes 一致"""
-        self.manual_debug_text.config(state="normal")
-        self.manual_debug_text.delete("1.0", tk.END)
-        if debug_lines:
-            self.manual_debug_text.insert("1.0", "\n".join(debug_lines))
-        else:
-            self.manual_debug_text.insert("1.0", "無 debug 資訊")
-        self.manual_debug_text.config(state="disabled")
+        self._update_debug_text(self.manual_debug_text, debug_lines)
 
     def show_struct_member_debug(self, parsed_values, layout):
         # 顯示 struct layout 與欄位對應
@@ -666,28 +648,30 @@ class StructView(tk.Tk):
         """取得 MyStruct tab 選擇的單位大小"""
         return int(self.manual_unit_size_var.get().split()[0])
 
-    def rebuild_hex_grid(self, total_size, unit_size):
-        for widget in self.hex_grid_frame.winfo_children():
+    def _build_hex_grid(self, frame, entries_list, total_size, unit_size):
+        """Generic helper to create hex input grid."""
+        for widget in frame.winfo_children():
             widget.destroy()
-        self.hex_entries.clear()
+        entries_list.clear()
         if total_size == 0:
             return
         chars_per_box = unit_size * 2
         num_boxes = (total_size + unit_size - 1) // unit_size
         cols = max(1, 16 // unit_size)
         for i in range(num_boxes):
-            # 動態調整最後一格的輸入長度
             if i == num_boxes - 1:
-                # 剩餘 byte
                 remain_bytes = total_size - (unit_size * (num_boxes - 1))
                 box_chars = remain_bytes * 2 if remain_bytes > 0 else chars_per_box
             else:
                 box_chars = chars_per_box
-            entry = tk.Entry(self.hex_grid_frame, width=box_chars + 2, font=("Courier", 10))
+            entry = tk.Entry(frame, width=box_chars + 2, font=("Courier", 10))
             entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
-            self.hex_entries.append((entry, box_chars))
+            entries_list.append((entry, box_chars))
             entry.bind("<KeyPress>", lambda e, length=box_chars: self._validate_input(e, length))
             entry.bind("<Key>", lambda e, length=box_chars: self._limit_input_length(e, length))
+
+    def rebuild_hex_grid(self, total_size, unit_size):
+        self._build_hex_grid(self.hex_grid_frame, self.hex_entries, total_size, unit_size)
 
     def get_hex_input_parts(self):
         return [(entry.get().strip(), expected_len) for entry, expected_len in self.hex_entries]
@@ -714,9 +698,6 @@ class StructView(tk.Tk):
             return "break"
 
     def _rebuild_manual_hex_grid(self):
-        for widget in self.manual_hex_grid_frame.winfo_children():
-            widget.destroy()
-        self.manual_hex_entries.clear()
         try:
             total_size = int(self.size_var.get())
         except Exception:
@@ -725,22 +706,7 @@ class StructView(tk.Tk):
             unit_size = int(self.manual_unit_size_var.get().split()[0])
         except Exception:
             unit_size = 1
-        if total_size == 0:
-            return
-        chars_per_box = unit_size * 2
-        num_boxes = (total_size + unit_size - 1) // unit_size
-        cols = max(1, 16 // unit_size)
-        for i in range(num_boxes):
-            if i == num_boxes - 1:
-                remain_bytes = total_size - (unit_size * (num_boxes - 1))
-                box_chars = remain_bytes * 2 if remain_bytes > 0 else chars_per_box
-            else:
-                box_chars = chars_per_box
-            entry = tk.Entry(self.manual_hex_grid_frame, width=box_chars + 2, font=("Courier", 10))
-            entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
-            self.manual_hex_entries.append((entry, box_chars))
-            entry.bind("<KeyPress>", lambda e, length=box_chars: self._validate_input(e, length))
-            entry.bind("<Key>", lambda e, length=box_chars: self._limit_input_length(e, length))
+        self._build_hex_grid(self.manual_hex_grid_frame, self.manual_hex_entries, total_size, unit_size)
 
     def _on_manual_unit_size_change(self):
         self._rebuild_manual_hex_grid()
