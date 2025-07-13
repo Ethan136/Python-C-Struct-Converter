@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-from tkinter import filedialog, messagebox, scrolledtext
+from tkinter import filedialog, messagebox
 # from config import get_string
 from model.struct_model import StructModel
 

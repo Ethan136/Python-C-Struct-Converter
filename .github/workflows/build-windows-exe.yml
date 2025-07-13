@@ -1,4 +1,4 @@
-name: Build Windows Executable
+name: Build Multi-Platform Executables
 
 on:
   push:
@@ -9,7 +9,41 @@ on:
     types: [ published ]
 
 jobs:
-  build-windows-exe:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Create macOS executable with PyInstaller
+      run: |
+        pyinstaller packing/CppStructParser-macos.spec
+        
+    - name: Smoke test the macOS executable
+      run: |
+        ./dist/CppStructParser &
+        sleep 5
+        pkill -f CppStructParser || echo "Process not found or already stopped"
+      shell: bash
+
+    - name: Upload macOS executable as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CppStructParser-macOS
+        path: dist/CppStructParser
+
+  build-windows:
     runs-on: windows-latest
     
     steps:
@@ -26,23 +60,19 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Create executable with PyInstaller
+    - name: Create Windows executable with PyInstaller
       run: |
-        pyinstaller CppStructParser.spec
+        pyinstaller packing/CppStructParser-windows.spec
         
-    - name: Upload executable as artifact
+    - name: Smoke test the Windows executable
+      run: |
+        Start-Process -FilePath dist/CppStructParser.exe
+        Start-Sleep -Seconds 5
+        Get-Process CppStructParser -ErrorAction SilentlyContinue | Stop-Process
+      shell: pwsh
+
+    - name: Upload Windows executable as artifact
       uses: actions/upload-artifact@v4
       with:
         name: CppStructParser-Windows
-        path: dist/CppStructParser.exe
-        
-    - name: Create release on tag
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/CppStructParser.exe
-        asset_name: CppStructParser-Windows.exe
-        asset_content_type: application/octet-stream 
+        path: dist/CppStructParser.exe 

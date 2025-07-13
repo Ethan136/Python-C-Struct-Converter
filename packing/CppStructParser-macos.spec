@@ -3,18 +3,28 @@
 block_cipher = None
 
 a = Analysis(
-    ['src/main.py'],
+    ['../src/main.py'],
     pathex=[],
     binaries=[],
     datas=[
-        ('src/config/ui_strings.xml', 'config'),
-        ('examples/example.h', 'examples'),
+        ('../src/config', 'config'),  # 整個 config 目錄
+        ('../src/model', 'model'),    # model 目錄
+        ('../src/view', 'view'),      # view 目錄
+        ('../src/presenter', 'presenter'),  # presenter 目錄
+        ('../examples/example.h', 'examples'),
     ],
     hiddenimports=[
         'tkinter',
         'tkinter.ttk',
         'tkinter.filedialog',
         'tkinter.messagebox',
+        'model',
+        'view',
+        'presenter',
+        'config',
+        'xml',
+        'xml.etree',
+        'xml.etree.ElementTree',
     ],
     hookspath=[],
     hooksconfig={},
