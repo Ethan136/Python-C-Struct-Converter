@@ -14,12 +14,13 @@ from .struct_parser import parse_struct_definition, parse_member_line
 # parse_struct_definition 與 parse_member_line 已移至 ``struct_parser`` 模組，
 # 於此重新匯入以維持相容性。
 
-def calculate_layout(members):
-    """Calculates the memory layout of a struct, including padding and bit fields."""
+def calculate_layout(members, calculator_cls=None):
+    """Calculate the memory layout using the specified calculator class."""
     if not members:
         return [], 0, 1
 
-    layout_calculator = LayoutCalculator()
+    calculator_cls = calculator_cls or LayoutCalculator
+    layout_calculator = calculator_cls()
     return layout_calculator.calculate(members)
 
 

@@ -86,13 +86,13 @@ def parse_member_line_v2(line: str) -> Optional[MemberDef]:
     )
 
 
-def _extract_struct_body(file_content):
-    """Return struct name and body substring.
+def _extract_struct_body(file_content, keyword="struct"):
+    """Return structure name and body substring.
 
-    This helper isolates struct body extraction logic so that nested
-    structures can be supported in the future.
+    The ``keyword`` argument allows reuse for future union support.
     """
-    match = re.search(r"struct\s+(\w+)\s*\{", file_content)
+    pattern = rf"{keyword}\s+(\w+)\s*\{{"
+    match = re.search(pattern, file_content)
     if not match:
         return None, None
     struct_name = match.group(1)
@@ -116,7 +116,7 @@ def _extract_struct_body(file_content):
 
 def parse_struct_definition(file_content):
     """Parse a C/C++ struct definition string."""
-    struct_name, struct_content = _extract_struct_body(file_content)
+    struct_name, struct_content = _extract_struct_body(file_content, "struct")
     if not struct_name:
         return None, None
     struct_content = re.sub(r"//.*", "", struct_content)
@@ -131,7 +131,7 @@ def parse_struct_definition(file_content):
 
 def parse_struct_definition_v2(file_content: str) -> Tuple[Optional[str], Optional[List[MemberDef]]]:
     """Parse a C/C++ struct definition string and return ``MemberDef`` objects."""
-    struct_name, struct_content = _extract_struct_body(file_content)
+    struct_name, struct_content = _extract_struct_body(file_content, "struct")
     if not struct_name:
         return None, None
     struct_content = re.sub(r"//.*", "", struct_content)
@@ -142,3 +142,15 @@ def parse_struct_definition_v2(file_content: str) -> Tuple[Optional[str], Option
         if parsed is not None:
             members.append(parsed)
     return struct_name, members
+
+
+def parse_c_definition(file_content: str) -> Tuple[Optional[str], Optional[str], Optional[List[dict]]]:
+    """Parse a C structure or union definition.
+
+    Union parsing is not yet implemented, so this function currently
+    only recognizes ``struct`` definitions.
+    """
+    name, members = parse_struct_definition(file_content)
+    if name is None:
+        return None, None, None
+    return "struct", name, members
