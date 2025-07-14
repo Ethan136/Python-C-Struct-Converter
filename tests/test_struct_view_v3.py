@@ -2,6 +2,11 @@ import unittest
 import sys
 import os
 import tkinter as tk
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("DISPLAY"), reason="No display found, skipping GUI tests"
+)
 
 # 添加專案根目錄到 Python 路徑
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -267,6 +272,17 @@ class TestStructViewV3(unittest.TestCase):
         # 應該沒有變化
         self.assertEqual(self.view.members[0]["name"], "a")
         self.assertEqual(self.view.members[1]["name"], "b")
+
+    def test_compute_member_layout_v3(self):
+        """確保 _compute_member_layout 回傳正確 size 對應表"""
+        self.view.members = [
+            {"name": "a", "type": "int", "bit_size": 0},
+            {"name": "b", "type": "char", "bit_size": 0}
+        ]
+        self.view.size_var.set(8)
+        result = self.view._compute_member_layout(True)
+        self.assertEqual(result["a"], "4")
+        self.assertEqual(result["b"], "1")
 
 if __name__ == "__main__":
     unittest.main() 

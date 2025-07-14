@@ -227,104 +227,105 @@ class StructView(tk.Tk):
                 "float", "double", "bool"
             ]
 
+    def _compute_member_layout(self, is_v3_format):
+        """回傳 {name: size} 對應表供表格使用"""
+        model = StructModel()
+        try:
+            if is_v3_format:
+                member_data = [
+                    {
+                        "name": m.get("name", ""),
+                        "type": m.get("type", ""),
+                        "bit_size": m.get("bit_size", 0),
+                    }
+                    for m in self.members
+                ]
+            else:
+                member_data = [
+                    {
+                        "name": m.get("name", ""),
+                        "byte_size": m.get("byte_size", 0),
+                        "bit_size": m.get("bit_size", 0),
+                    }
+                    for m in self.members
+                ]
+            layout = model.calculate_manual_layout(member_data, self.size_var.get())
+        except Exception:
+            layout = []
+
+        mapping = {}
+        for item in layout:
+            if item.get("type") != "padding":
+                mapping[item["name"]] = str(item["size"])
+        return mapping
+
+    def _build_member_header(self, is_v3_format):
+        tk.Label(self.member_frame, text="#", font=("Arial", 9, "bold")).grid(row=0, column=0, padx=2, pady=2)
+        tk.Label(self.member_frame, text="成員名稱", font=("Arial", 9, "bold")).grid(row=0, column=1, padx=2, pady=2)
+        if is_v3_format:
+            tk.Label(self.member_frame, text="型別", font=("Arial", 9, "bold")).grid(row=0, column=2, padx=2, pady=2)
+        else:
+            tk.Label(self.member_frame, text="byte size", font=("Arial", 9, "bold")).grid(row=0, column=2, padx=2, pady=2)
+        tk.Label(self.member_frame, text="bit size", font=("Arial", 9, "bold")).grid(row=0, column=3, padx=2, pady=2)
+        tk.Label(self.member_frame, text="size", font=("Arial", 9, "bold")).grid(row=0, column=4, padx=2, pady=2)
+        tk.Label(self.member_frame, text="操作", font=("Arial", 9, "bold")).grid(row=0, column=5, padx=2, pady=2)
+
+    def _render_member_row(self, idx, member, is_v3_format, name2size):
+        row = idx + 1
+        tk.Label(self.member_frame, text=str(idx + 1)).grid(row=row, column=0, padx=2, pady=1)
+
+        name_var = tk.StringVar(value=member.get("name", ""))
+        tk.Entry(self.member_frame, textvariable=name_var, width=10).grid(row=row, column=1, padx=2, pady=1)
+
+        if is_v3_format:
+            type_var = tk.StringVar(value=member.get("type", ""))
+            type_options = self._get_type_options(member.get("bit_size", 0) > 0)
+            tk.OptionMenu(self.member_frame, type_var, *type_options).grid(row=row, column=2, padx=2, pady=1)
+        else:
+            byte_var = tk.IntVar(value=member.get("byte_size", 0))
+            tk.Entry(self.member_frame, textvariable=byte_var, width=6).grid(row=row, column=2, padx=2, pady=1)
+
+        bit_var = tk.IntVar(value=member.get("bit_size", 0))
+        tk.Entry(self.member_frame, textvariable=bit_var, width=6).grid(row=row, column=3, padx=2, pady=1)
+
+        size_val = name2size.get(member.get("name", ""), "-")
+        size_label = tk.Label(self.member_frame, text=size_val)
+        size_label.grid(row=row, column=4, padx=2, pady=1)
+        size_label.is_size_label = True
+
+        op_frame = tk.Frame(self.member_frame)
+        op_frame.grid(row=row, column=5, padx=2, pady=1)
+        tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i), width=4).pack(side=tk.LEFT, padx=1)
+        tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i), width=4).pack(side=tk.LEFT, padx=1)
+        tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i), width=4).pack(side=tk.LEFT, padx=1)
+        tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4).pack(side=tk.LEFT, padx=1)
+
+        name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
+        if is_v3_format:
+            type_var.trace_add("write", lambda *_, i=idx, v=type_var: self._update_member_type(i, v))
+        else:
+            byte_var.trace_add("write", lambda *_, i=idx, v=byte_var: self._update_member_byte(i, v))
+        bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
+
+        member["name_var"] = name_var
+        if is_v3_format:
+            member["type_var"] = type_var
+        else:
+            member["byte_var"] = byte_var
+        member["bit_var"] = bit_var
+
     def _render_member_table(self):
         # 清空現有表格
         for widget in self.member_frame.winfo_children():
             widget.destroy()
         # Member 編輯表格
         if self.members:
-            # 檢查是否為 V3 格式
             is_v3_format = self.members and "type" in self.members[0]
-
-            tk.Label(self.member_frame, text="#", font=("Arial", 9, "bold")).grid(row=0, column=0, padx=2, pady=2)
-            tk.Label(self.member_frame, text="成員名稱", font=("Arial", 9, "bold")).grid(row=0, column=1, padx=2, pady=2)
-
-            if is_v3_format:
-                tk.Label(self.member_frame, text="型別", font=("Arial", 9, "bold")).grid(row=0, column=2, padx=2, pady=2)
-            else:
-                tk.Label(self.member_frame, text="byte size", font=("Arial", 9, "bold")).grid(row=0, column=2, padx=2, pady=2)
-
-            tk.Label(self.member_frame, text="bit size", font=("Arial", 9, "bold")).grid(row=0, column=3, padx=2, pady=2)
-            # 新增 size 欄位
-            tk.Label(self.member_frame, text="size", font=("Arial", 9, "bold")).grid(row=0, column=4, padx=2, pady=2)
-            tk.Label(self.member_frame, text="操作", font=("Arial", 9, "bold")).grid(row=0, column=5, padx=2, pady=2)
-
-            # 計算 layout 以取得 size
-            model = StructModel()
-            try:
-                if is_v3_format:
-                    member_data = [
-                        {"name": m.get("name", ""), "type": m.get("type", ""), "bit_size": m.get("bit_size", 0)}
-                        for m in self.members
-                    ]
-                else:
-                    member_data = [
-                        {"name": m.get("name", ""), "byte_size": m.get("byte_size", 0), "bit_size": m.get("bit_size", 0)}
-                        for m in self.members
-                    ]
-                layout = model.calculate_manual_layout(member_data, self.size_var.get())
-            except Exception:
-                layout = []
-            # 建立 name->size 對應表
-            name2size = {}
-            for item in layout:
-                if item.get("type") != "padding":
-                    name2size[item["name"]] = str(item["size"])
+            self._build_member_header(is_v3_format)
+            name2size = self._compute_member_layout(is_v3_format)
 
             for idx, m in enumerate(self.members):
-                row = idx + 1
-                tk.Label(self.member_frame, text=str(idx+1)).grid(row=row, column=0, padx=2, pady=1)
-
-                # 成員名稱輸入
-                name_var = tk.StringVar(value=m.get("name", ""))
-                tk.Entry(self.member_frame, textvariable=name_var, width=10).grid(row=row, column=1, padx=2, pady=1)
-
-                if is_v3_format:
-                    # 型別下拉選單
-                    type_var = tk.StringVar(value=m.get("type", ""))
-                    type_options = self._get_type_options(m.get("bit_size", 0) > 0)
-                    type_menu = tk.OptionMenu(self.member_frame, type_var, *type_options)
-                    type_menu.grid(row=row, column=2, padx=2, pady=1)
-                else:
-                    # byte size 輸入
-                    byte_var = tk.IntVar(value=m.get("byte_size", 0))
-                    tk.Entry(self.member_frame, textvariable=byte_var, width=6).grid(row=row, column=2, padx=2, pady=1)
-
-                # bit size 輸入
-                bit_var = tk.IntVar(value=m.get("bit_size", 0))
-                tk.Entry(self.member_frame, textvariable=bit_var, width=6).grid(row=row, column=3, padx=2, pady=1)
-
-                # size 只讀欄位
-                size_val = name2size.get(m.get("name", ""), "-")
-                size_label = tk.Label(self.member_frame, text=size_val)
-                size_label.grid(row=row, column=4, padx=2, pady=1)
-                size_label.is_size_label = True  # 供測試辨識
-
-                # 操作按鈕
-                op_frame = tk.Frame(self.member_frame)
-                op_frame.grid(row=row, column=5, padx=2, pady=1)
-                tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i), width=4).pack(side=tk.LEFT, padx=1)
-                tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i), width=4).pack(side=tk.LEFT, padx=1)
-                tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i), width=4).pack(side=tk.LEFT, padx=1)
-                tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4).pack(side=tk.LEFT, padx=1)
-
-                # 綁定變更事件
-                name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
-
-                if is_v3_format:
-                    type_var.trace_add("write", lambda *_, i=idx, v=type_var: self._update_member_type(i, v))
-                else:
-                    byte_var.trace_add("write", lambda *_, i=idx, v=byte_var: self._update_member_byte(i, v))
-
-                bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
-
-                # 儲存變數參考
-                m["name_var"] = name_var
-                if is_v3_format:
-                    m["type_var"] = type_var
-                else:
-                    m["byte_var"] = byte_var
-                m["bit_var"] = bit_var
+                self._render_member_row(idx, m, is_v3_format, name2size)
         else:
             tk.Label(self.member_frame, text="無成員資料", fg="gray").grid(row=0, column=0, columnspan=6, pady=10)
         # 更新下方標準 struct layout treeview

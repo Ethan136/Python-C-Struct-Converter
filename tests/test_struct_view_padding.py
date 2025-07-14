@@ -2,6 +2,11 @@ import unittest
 import tkinter as tk
 import sys
 import os
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("DISPLAY"), reason="No display found, skipping GUI tests"
+)
 
 # 添加專案根目錄到 Python 路徑
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
