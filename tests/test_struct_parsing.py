@@ -211,6 +211,21 @@ class TestLayoutItemDataclass(unittest.TestCase):
         self.assertEqual(b_entry.type, "int")
 
 
+class TestArrayMemberStubBehavior(unittest.TestCase):
+    """Ensure array members are currently treated as single elements."""
+
+    def test_array_member_single_element_layout(self):
+        calc = LayoutCalculator()
+        members = [{"type": "int", "name": "arr", "array_dims": [3, 2]}]
+        layout, total_size, alignment = calc.calculate(members)
+
+        self.assertEqual(total_size, 4)
+        self.assertEqual(alignment, 4)
+        self.assertEqual(len(layout), 1)
+        self.assertEqual(layout[0].name, "arr")
+        self.assertEqual(layout[0].size, 4)
+
+
 
 if __name__ == '__main__':
     unittest.main() 
