@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<error_tests>
+    <error_case name="invalid_byte_size_0" input="12" byte_size="0" endianness="big" error_type="ValueError"/>
+    <error_case name="invalid_endianness" input="12" byte_size="4" endianness="invalid" error_type="ValueError"/>
+    <error_case name="invalid_hex_input" input="GG" byte_size="4" endianness="big" error_type="ValueError"/>
+</error_tests> 

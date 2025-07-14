@@ -124,6 +124,9 @@ Tests for GUI view functionality with TDD approach.
   - Tests edge cases (empty struct, full struct, partial fill)
 
 ### `test_config_parser.py`
+
+**DEPRECATED**: 此檔案已被 XML loader 標準化方案取代，未來可安全移除。
+請改用 BaseXMLTestLoader 及其子類進行 XML 驅動測試。
 Tests for XML configuration parsing.
 - Tests XML configuration file loading
 - Tests configuration validation
@@ -486,3 +489,63 @@ python3 -m unittest test_struct_manual_integration -v
 - 測試 tab 切換時，Treeview、hex grid、欄位驗證等 GUI 行為即時同步。
 - 測試 debug bytes 格式於兩個 tab 完全一致，便於比對與除錯。
 - 以上皆有自動化測試驗證。 
+
+## 如何撰寫與擴充 XML 驅動測試
+
+本專案所有核心測試（struct model、input conversion、input field processor 等）皆已標準化為 XML 驅動架構。以下說明如何撰寫、擴充與除錯：
+
+### 1. Loader 擴充方式
+- 所有 XML loader 皆繼承 `BaseXMLTestLoader`，可依需求 override `parse_common_fields` 與 `parse_extra`。
+- 新增模組時，建議建立 `xml_xxx_loader.py`，並實作 `parse_common_fields` 解析共用欄位，`parse_extra` 處理自訂欄位。
+- 例如：
+```python
+class MyModuleXMLTestLoader(BaseXMLTestLoader):
+    def parse_common_fields(self, case):
+        # 解析共用欄位
+        ...
+    def parse_extra(self, case):
+        # 解析自訂欄位
+        ...
+```
+
+### 2. XML schema 範例
+- 以 input conversion 為例：
+```xml
+<test_config name="4byte_test" unit_size="4" description="Test 4-byte field expansion">
+    <input_values>
+        <array>123,234,456,567,11</array>
+    </input_values>
+    <expected_results>
+        <result index="0" big_endian="00000123" little_endian="23010000">123</result>
+        ...
+    </expected_results>
+</test_config>
+```
+- struct model 例：
+```xml
+<test_case name="bitfield_basic">
+    <struct_definition><![CDATA[
+        struct A { int a : 1; int b : 2; int c : 5; };
+    ]]></struct_definition>
+    <input_data>
+        <hex>8d000000</hex>
+    </input_data>
+    <expected_results>
+        <member name="a" value="1"/>
+        ...
+    </expected_results>
+</test_case>
+```
+
+### 3. 新增測資步驟
+1. 在 `tests/data/` 新增對應 XML 檔案或擴充現有檔案。
+2. 依照 loader 支援的 schema 新增 `<test_case>` 或 `<test_config>` 區塊。
+3. 不需改動 Python 測試程式，會自動讀取所有 config 並驗證。
+
+### 4. 常見錯誤排查
+- **KeyError**: loader 未正確解析 XML 欄位，請檢查 loader 是否有對應欄位解析邏輯。
+- **測資未被載入**: 檢查 XML 檔案路徑、格式、root tag 是否正確。
+- **測試失敗但資料正確**: 檢查 loader 是否有正確 strip/轉型欄位內容。
+- **GUI 測試跳過**: 無 DISPLAY 環境下會自動 skip GUI 測試，屬正常現象。
+
+如有進階需求，可參考現有 loader 實作或提出 issue。 

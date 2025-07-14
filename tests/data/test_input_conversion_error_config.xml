@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<error_tests>
+    <error_case name="overflow_4byte" input="100000000" byte_size="4" error_type="OverflowError"/>
+    <error_case name="overflow_8byte" input="10000000000000000" byte_size="8" error_type="OverflowError"/>
+    <error_case name="invalid_hex_1" input="GG" byte_size="4" error_type="ValueError"/>
+    <error_case name="invalid_hex_2" input="12G" byte_size="4" error_type="ValueError"/>
+    <error_case name="invalid_hex_3" input="XYZ" byte_size="4" error_type="ValueError"/>
+    <error_case name="invalid_hex_4" input="12.34" byte_size="4" error_type="ValueError"/>
+</error_tests> 

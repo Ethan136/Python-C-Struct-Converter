@@ -21,6 +21,7 @@ from model.struct_model import (
     TYPE_INFO
 )
 from tests.xml_struct_model_loader import load_struct_model_tests
+from tests.xml_struct_parse_definition_loader import load_struct_parse_definition_tests
 
 
 class TestParseStructDefinition(unittest.TestCase):
@@ -135,6 +136,34 @@ class TestParseStructDefinition(unittest.TestCase):
         self.assertEqual(struct_name, "UnknownTypeStruct")
         self.assertEqual(len(members), 1)  # Only valid type should be included
         self.assertEqual(members[0], ("int", "valid_type"))
+
+    @classmethod
+    def setUpClass(cls):
+        config_file = os.path.join(os.path.dirname(__file__), 'data', 'test_struct_parse_definition_config.xml')
+        cls.xml_cases = load_struct_parse_definition_tests(config_file)
+
+    def test_xml_struct_parse_definition(self):
+        for case in self.xml_cases:
+            with self.subTest(name=case['name']):
+                struct_name, members = parse_struct_definition(case['struct_definition'])
+                if case['expect_none']:
+                    self.assertIsNone(struct_name)
+                    self.assertIsNone(members)
+                else:
+                    self.assertEqual(struct_name, case['expected_struct_name'])
+                    self.assertEqual(len(members), len(case['expected_members']))
+                    for i, expect in enumerate(case['expected_members']):
+                        m = members[i]
+                        # 支援 bitfield dict/tuple
+                        if isinstance(m, tuple):
+                            self.assertEqual(m[0], expect['type'])
+                            self.assertEqual(m[1], expect['name'])
+                        else:
+                            self.assertEqual(m['type'], expect['type'])
+                            self.assertEqual(m['name'], expect['name'])
+                            if 'is_bitfield' in expect:
+                                self.assertTrue(m.get('is_bitfield', False))
+                                self.assertEqual(m['bit_size'], expect['bit_size'])
 
 
 class TestCalculateLayout(unittest.TestCase):

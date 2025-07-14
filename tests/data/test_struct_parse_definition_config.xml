@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<struct_parse_tests>
+    <test_case name="valid_struct">
+        <struct_definition><![CDATA[
+            struct TestStruct {
+                int value1;
+                char value2;
+                double value3;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>TestStruct</expected_struct_name>
+        <expected_members>
+            <member type="int" name="value1"/>
+            <member type="char" name="value2"/>
+            <member type="double" name="value3"/>
+        </expected_members>
+    </test_case>
+    <test_case name="struct_with_pointer">
+        <struct_definition><![CDATA[
+            struct PointerStruct {
+                int* ptr1;
+                char* ptr2;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>PointerStruct</expected_struct_name>
+        <expected_members>
+            <member type="pointer" name="ptr1"/>
+            <member type="pointer" name="ptr2"/>
+        </expected_members>
+    </test_case>
+    <test_case name="struct_with_unsigned_types">
+        <struct_definition><![CDATA[
+            struct UnsignedStruct {
+                unsigned int value1;
+                unsigned long value2;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>UnsignedStruct</expected_struct_name>
+        <expected_members>
+            <member type="unsigned int" name="value1"/>
+            <member type="unsigned long" name="value2"/>
+        </expected_members>
+    </test_case>
+    <test_case name="struct_with_bitfields">
+        <struct_definition><![CDATA[
+            struct BitFieldStruct {
+                int a : 1;
+                int b : 2;
+                int c : 5;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>BitFieldStruct</expected_struct_name>
+        <expected_members>
+            <member type="int" name="a" is_bitfield="true" bit_size="1"/>
+            <member type="int" name="b" is_bitfield="true" bit_size="2"/>
+            <member type="int" name="c" is_bitfield="true" bit_size="5"/>
+        </expected_members>
+    </test_case>
+    <test_case name="invalid_struct_no_match">
+        <struct_definition>This is not a struct definition</struct_definition>
+        <expect_none/>
+    </test_case>
+    <test_case name="struct_with_unknown_type">
+        <struct_definition><![CDATA[
+            struct UnknownTypeStruct {
+                int valid_type;
+                unknown_type invalid_type;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>UnknownTypeStruct</expected_struct_name>
+        <expected_members>
+            <member type="int" name="valid_type"/>
+        </expected_members>
+    </test_case>
+</struct_parse_tests> 

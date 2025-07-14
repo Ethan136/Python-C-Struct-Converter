@@ -241,7 +241,7 @@ This project includes GitHub Actions for automatic Windows .exe file generation:
 ### Quick Start
 1. **Push to GitHub**: Any push to `main` or `master` branch triggers automatic build
 2. **Download Artifact**: Find the built .exe file in the Actions tab
-3. **Create Release**: Push a tag (e.g., `v1.0.0`) to automatically create a release with downloadable .exe
+3. **Create Release**: Push a tag (e.g., `v1.0.g`) to automatically create a release with downloadable .exe
 
 ### Local Testing
 ```bash
@@ -258,3 +258,20 @@ python build_exe.py
 - **Local Build**: Use `build_exe.py` for local testing
 
 For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+## XML 驅動測試架構
+
+本專案所有核心測試（struct model、input conversion、input field processor 等）皆已標準化為 XML 驅動架構，具備以下優點：
+
+- **高維護性**：測試資料集中於 `tests/data/`，易於擴充與管理
+- **自動化**：所有測試自動讀取 XML 配置，無需修改 Python 測試程式
+- **一致性**：各模組 loader 皆繼承 `BaseXMLTestLoader`，可彈性擴充 schema
+- **易於擴充**：只需新增/編輯 XML 檔案，即可快速擴充測試案例
+
+### 如何撰寫/擴充 XML 測試
+
+1. 於 `tests/data/` 新增或擴充 XML 檔案（如 `test_struct_model_config.xml`）
+2. 依照 loader 支援的 schema 新增 `<test_case>` 或 `<test_config>` 區塊
+3. 測試程式會自動讀取所有 config 並驗證，無需改動 Python 程式
+
+詳細教學與 schema 範例，請見 [`tests/README.md`](tests/README.md) 的「如何撰寫與擴充 XML 驅動測試」章節。

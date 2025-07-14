@@ -30,7 +30,7 @@ Python C Struct Converter/
 │   ├── README.md                    # Comprehensive testing documentation
 │   ├── test_input_conversion.py     # Input conversion mechanism tests
 │   ├── test_string_parser.py        # String parser tests
-│   ├── test_config_parser.py        # Configuration parser tests
+│   ├── test_config_parser.py        # DEPRECATED: 已被 XML loader 標準化方案取代
 │   └── 📁 data/                     # Test data and configuration
 │       └── test_config.xml          # XML test configurations
 ├── 📁 docs/                         # Documentation hub

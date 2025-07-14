@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manual_struct_tests>
+    <test_case name="basic_v3_struct" description="基本 V3 手動 struct 驗證">
+        <struct_name>UserInfo</struct_name>
+        <total_size>16</total_size>
+        <members>
+            <member name="user_id" type="unsigned long long" bit_size="0"/>
+            <member name="status" type="unsigned int" bit_size="4"/>
+            <member name="name" type="char" bit_size="0"/>
+        </members>
+        <expected_errors></expected_errors>
+        <expected_bits>104</expected_bits>
+        <expected_export_contains>
+            <line>struct UserInfo</line>
+            <line>unsigned long long user_id;</line>
+            <line>unsigned int status : 4;</line>
+            <line>char name;</line>
+            <line>// total size: 16 bytes</line>
+        </expected_export_contains>
+    </test_case>
+    <test_case name="bitfield_type_invalid" description="bitfield 型別限制">
+        <struct_name>TestStruct</struct_name>
+        <total_size>8</total_size>
+        <members>
+            <member name="flags" type="float" bit_size="8"/>
+        </members>
+        <expected_errors>
+            <error>bitfield 只支援</error>
+        </expected_errors>
+    </test_case>
+    <test_case name="legacy_format" description="舊格式支援">
+        <struct_name>LegacyStruct</struct_name>
+        <total_size>8</total_size>
+        <members>
+            <member name="a" byte_size="4" bit_size="0"/>
+            <member name="b" byte_size="0" bit_size="4"/>
+        </members>
+        <expected_errors></expected_errors>
+        <expected_types>
+            <type>int</type>
+            <type>unsigned int</type>
+        </expected_types>
+    </test_case>
+    <test_case name="mixed_format" description="新舊格式混合支援">
+        <struct_name>MixedStruct</struct_name>
+        <total_size>12</total_size>
+        <members>
+            <member name="legacy" byte_size="4" bit_size="0"/>
+            <member name="new" type="char" bit_size="0"/>
+            <member name="bitfield" type="unsigned int" bit_size="8"/>
+        </members>
+        <expected_errors></expected_errors>
+        <expected_types>
+            <type>int</type>
+            <type>char</type>
+            <type>unsigned int</type>
+        </expected_types>
+    </test_case>
+    <test_case name="bitfield_manual_struct_full_flow" description="bitfield 手動 struct full flow">
+        <struct_name>MyStruct</struct_name>
+        <total_size>4</total_size>
+        <members>
+            <member name="a" byte_size="0" bit_size="3"/>
+            <member name="b" byte_size="0" bit_size="5"/>
+            <member name="c" byte_size="0" bit_size="8"/>
+        </members>
+        <expected_errors></expected_errors>
+        <expected_export_contains>
+            <line>struct MyStruct</line>
+            <line>unsigned int a : 3;</line>
+            <line>unsigned int b : 5;</line>
+            <line>unsigned int c : 8;</line>
+            <line>// total size: 4 bytes</line>
+        </expected_export_contains>
+    </test_case>
+</manual_struct_tests> 

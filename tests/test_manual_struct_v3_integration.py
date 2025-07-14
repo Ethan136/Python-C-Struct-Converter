@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from view.struct_view import StructView
 from model.struct_model import StructModel
+from tests.xml_manual_struct_loader import load_manual_struct_tests
 
 class TestManualStructV3Integration(unittest.TestCase):
     """測試 V3 版本的完整 MyStruct 工作流程"""
@@ -291,6 +292,43 @@ class TestManualStructV3Integration(unittest.TestCase):
         values = first_item['values']
         self.assertEqual(values[0], "a")  # name
         self.assertEqual(values[1], "int")  # type
+
+class TestManualStructV3XMLDriven(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        config_file = os.path.join(os.path.dirname(__file__), 'data', 'manual_struct_test_config.xml')
+        cls.cases = load_manual_struct_tests(config_file)
+        cls.model = StructModel()
+
+    def test_manual_struct_cases(self):
+        for case in self.cases:
+            with self.subTest(name=case['name']):
+                members = case['members']
+                total_size = case['total_size']
+                struct_name = case['struct_name']
+                # 驗證 Model 層處理
+                errors = self.model.validate_manual_struct(members, total_size)
+                if case['expected_errors']:
+                    for expect in case['expected_errors']:
+                        self.assertTrue(any(expect in err for err in errors), f"Should contain error: {expect}")
+                else:
+                    self.assertEqual(len(errors), 0)
+                # 驗證使用空間計算
+                if case['expected_bits'] is not None:
+                    used_bits = self.model.calculate_used_bits(members)
+                    self.assertEqual(used_bits, case['expected_bits'])
+                # 驗證匯出內容
+                if case['expected_export_contains']:
+                    self.model.set_manual_struct(members, total_size)
+                    h_content = self.model.export_manual_struct_to_h(struct_name)
+                    for line in case['expected_export_contains']:
+                        self.assertIn(line, h_content)
+                # 驗證型別轉換
+                if case['expected_types']:
+                    result = self.model._convert_to_cpp_members(members)
+                    types = [item['type'] for item in result]
+                    for expect_type in case['expected_types']:
+                        self.assertIn(expect_type, types)
 
 if __name__ == "__main__":
     unittest.main() 
