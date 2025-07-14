@@ -4,53 +4,15 @@
 佈局結果以 :class:`model.layout.LayoutItem` dataclass 表示，可同時以屬性或
 字典介面存取欄位資訊。
 """
-import re
 from model.input_field_processor import InputFieldProcessor
 from .layout import LayoutCalculator, LayoutItem, TYPE_INFO
+from .struct_parser import parse_struct_definition, parse_member_line
 
 
 
-def parse_struct_definition(file_content):
-    """Parses C++ struct definition from a string, including bit fields, preserving field order."""
-    struct_match = re.search(r"struct\s+(\w+)\s*\{([^}]+)\};", file_content, re.DOTALL)
-    if not struct_match:
-        return None, None
-    struct_name = struct_match.group(1)
-    struct_content = struct_match.group(2)
-    # 移除 // 註解
-    struct_content = re.sub(r'//.*', '', struct_content)
-    # 逐行解析，保留順序
-    lines = struct_content.split(';')
-    members = []
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        # bitfield: type name : bits
-        bitfield_match = re.match(r"(.+?)\s+([\w\[\]]+)\s*:\s*(\d+)$", line)
-        if bitfield_match:
-            type_str, name, bits = bitfield_match.groups()
-            clean_type = " ".join(type_str.strip().split())
-            if "*" in clean_type:
-                continue  # 不支援 pointer bit field
-            if clean_type in TYPE_INFO:
-                members.append({
-                    "type": clean_type,
-                    "name": name,
-                    "is_bitfield": True,
-                    "bit_size": int(bits)
-                })
-            continue
-        # 普通欄位: type name
-        member_match = re.match(r"(.+?)\s+([\w\[\]]+)$", line)
-        if member_match:
-            type_str, name = member_match.groups()
-            clean_type = " ".join(type_str.strip().split())
-            if "*" in clean_type:
-                members.append(("pointer", name))
-            elif clean_type in TYPE_INFO:
-                members.append((clean_type, name))
-    return struct_name, members
+
+# parse_struct_definition 與 parse_member_line 已移至 ``struct_parser`` 模組，
+# 於此重新匯入以維持相容性。
 
 def calculate_layout(members):
     """Calculates the memory layout of a struct, including padding and bit fields."""
