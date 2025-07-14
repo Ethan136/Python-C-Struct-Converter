@@ -1,7 +1,7 @@
 """Data structures and helpers for struct layout calculations."""
 
 from dataclasses import dataclass
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 from abc import ABC, abstractmethod
 
 
@@ -27,9 +27,13 @@ TYPE_INFO = {
 
 @dataclass
 class LayoutItem:
-    """Represents a single entry in a struct layout."""
+    """Represents a single entry in a struct layout.
 
-    name: str
+    ``name`` is optional so that future versions can represent anonymous
+    bit fields as padding entries.
+    """
+
+    name: Optional[str]
     type: str
     size: int
     offset: int
@@ -181,6 +185,11 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         self.current_offset += size
 
     def _add_bitfield_to_layout(self, name: str, mtype: str, bit_size: int):
+        """Add a bit field entry to ``self.layout``.
+
+        ``name`` may be ``None`` in future versions when supporting anonymous
+        bit fields. For now all callers still pass a string.
+        """
         self.layout.append(
             LayoutItem(
                 name=name,
