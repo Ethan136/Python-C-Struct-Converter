@@ -1,4 +1,5 @@
 import unittest
+import pytest
 from model.struct_parser import parse_member_line, _extract_struct_body
 
 class TestParseMemberLine(unittest.TestCase):
@@ -13,6 +14,15 @@ class TestParseMemberLine(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertEqual(result['type'], 'int')
         self.assertEqual(result['name'], 'flag')
+        self.assertTrue(result['is_bitfield'])
+        self.assertEqual(result['bit_size'], 3)
+
+    @pytest.mark.xfail(reason="anonymous bitfields not yet supported")
+    def test_anonymous_bitfield_member(self):
+        result = parse_member_line('int : 3')
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result['type'], 'int')
+        self.assertIsNone(result['name'])
         self.assertTrue(result['is_bitfield'])
         self.assertEqual(result['bit_size'], 3)
 

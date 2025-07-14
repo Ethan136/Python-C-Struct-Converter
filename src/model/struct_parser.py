@@ -7,10 +7,14 @@ from .layout import TYPE_INFO
 
 @dataclass
 class MemberDef:
-    """Unified representation of a struct or union member."""
+    """Unified representation of a struct or union member.
+
+    The ``name`` attribute is kept optional so future extensions can support
+    anonymous bit fields that act as padding.
+    """
 
     type: str
-    name: str
+    name: Optional[str]
     is_bitfield: bool = False
     bit_size: int = 0
     array_dims: List[int] = field(default_factory=list)
@@ -43,6 +47,29 @@ def _extract_array_dims(name_token):
     return base, dims
 
 
+def _parse_bitfield_declaration(line: str):
+    """Parse a bit field declaration and return a member dict or ``None``."""
+    match = re.match(r"(.+?)\s+([\w\[\]]+)\s*:\s*(\d+)$", line)
+    if not match:
+        return None
+    type_str, name_token, bits = match.groups()
+    clean_type = " ".join(type_str.strip().split())
+    if "*" in clean_type:
+        return None  # pointer bitfields not supported
+    if clean_type not in TYPE_INFO:
+        return None
+    name, dims = _extract_array_dims(name_token)
+    member = {
+        "type": clean_type,
+        "name": name,
+        "is_bitfield": True,
+        "bit_size": int(bits),
+    }
+    if dims:
+        member["array_dims"] = dims
+    return member
+
+
 def parse_member_line(line):
     """Parse a single struct member line.
 
@@ -53,24 +80,9 @@ def parse_member_line(line):
     if not line:
         return None
 
-    bitfield_match = re.match(r"(.+?)\s+([\w\[\]]+)\s*:\s*(\d+)$", line)
-    if bitfield_match:
-        type_str, name_token, bits = bitfield_match.groups()
-        clean_type = " ".join(type_str.strip().split())
-        if "*" in clean_type:
-            return None  # pointer bitfields not supported
-        if clean_type in TYPE_INFO:
-            name, dims = _extract_array_dims(name_token)
-            member = {
-                "type": clean_type,
-                "name": name,
-                "is_bitfield": True,
-                "bit_size": int(bits),
-            }
-            if dims:
-                member["array_dims"] = dims
-            return member
-        return None
+    bitfield = _parse_bitfield_declaration(line)
+    if bitfield is not None:
+        return bitfield
 
     member_match = re.match(r"(.+?)\s+([\w\[\]]+)$", line)
     if member_match:
