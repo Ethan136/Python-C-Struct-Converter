@@ -1,46 +1,14 @@
-"""
-struct_model.py
+"""C/C++ struct 解析與記憶體佈局計算核心模組。
 
-C/C++ struct 解析與記憶體佈局計算核心模組。
-支援 struct 欄位型別：char, int, long long, unsigned, pointer, 以及 bit field (type name : bits)。
-支援自動計算 padding、alignment、bitfield packing（同 storage unit 內連續 bitfield）。
-主要 API:
-- parse_struct_definition: 解析 struct 定義，回傳 struct 名稱與欄位 members（含 bitfield 資訊）。
-- calculate_layout: 根據 members 計算記憶體佈局，回傳 layout list（含 offset, size, is_bitfield, bit_offset, bit_size）。
-- StructModel: struct 解析與 hex 資料解析高階介面。
-
-layout 內每個欄位 dict 格式：
-{
-  "name": 欄位名稱,
-  "type": 型別,
-  "size": 占用 bytes 數,
-  "offset": 在 struct 內的 byte offset,
-  "is_bitfield": 是否為 bitfield 欄位 (bool, optional),
-  "bit_offset": 若為 bitfield，於 storage unit 內的 bit offset (int, optional),
-  "bit_size": 若為 bitfield，bitfield 欄位寬度 (int, optional)
-}
+提供 `parse_struct_definition`、`calculate_layout` 與 `StructModel` 等 API。
+佈局結果以 :class:`model.layout.LayoutItem` dataclass 表示，可同時以屬性或
+字典介面存取欄位資訊。
 """
 import re
 from model.input_field_processor import InputFieldProcessor
+from .layout import LayoutCalculator, LayoutItem, TYPE_INFO
 
-# Based on a common 64-bit system (like GCC on x86-64)
-TYPE_INFO = {
-    "char":               {"size": 1, "align": 1},
-    "signed char":        {"size": 1, "align": 1},
-    "unsigned char":      {"size": 1, "align": 1},
-    "bool":               {"size": 1, "align": 1},
-    "short":              {"size": 2, "align": 2},
-    "unsigned short":     {"size": 2, "align": 2},
-    "int":                {"size": 4, "align": 4},
-    "unsigned int":       {"size": 4, "align": 4},
-    "long":               {"size": 8, "align": 8}, # Common on 64-bit Linux/macOS
-    "unsigned long":      {"size": 8, "align": 8},
-    "long long":          {"size": 8, "align": 8},
-    "unsigned long long": {"size": 8, "align": 8},
-    "float":              {"size": 4, "align": 4},
-    "double":             {"size": 8, "align": 8},
-    "pointer":            {"size": 8, "align": 8} # Generic for all pointer types
-}
+
 
 def parse_struct_definition(file_content):
     """Parses C++ struct definition from a string, including bit fields, preserving field order."""
@@ -88,143 +56,11 @@ def calculate_layout(members):
     """Calculates the memory layout of a struct, including padding and bit fields."""
     if not members:
         return [], 0, 1
-    
+
     layout_calculator = LayoutCalculator()
     return layout_calculator.calculate(members)
 
 
-class LayoutCalculator:
-    """Helper class for calculating struct memory layout."""
-    
-    def __init__(self):
-        self.layout = []
-        self.current_offset = 0
-        self.max_alignment = 1
-        self.bitfield_unit_type = None
-        self.bitfield_unit_size = 0
-        self.bitfield_unit_align = 0
-        self.bitfield_bit_offset = 0
-        self.bitfield_unit_offset = 0
-    
-    def calculate(self, members):
-        """Calculate the complete memory layout for the struct."""
-        for member in members:
-            if isinstance(member, dict) and member.get("is_bitfield", False):
-                self._process_bitfield_member(member)
-            else:
-                self._process_regular_member(member)
-        
-        self._add_final_padding()
-        return self.layout, self.current_offset, self.max_alignment
-    
-    def _process_bitfield_member(self, member):
-        """Process a bitfield member."""
-        mtype = member["type"]
-        mname = member["name"]
-        mbit_size = member["bit_size"]
-        info = TYPE_INFO[mtype]
-        size, alignment = info["size"], info["align"]
-        
-        if self._needs_new_bitfield_unit(mtype, mbit_size):
-            self._start_new_bitfield_unit(mtype, size, alignment)
-        
-        self._add_bitfield_to_layout(mname, mtype, mbit_size)
-        self.bitfield_bit_offset += mbit_size
-    
-    def _process_regular_member(self, member):
-        """Process a regular (non-bitfield) member."""
-        # End any open bitfield unit
-        self.bitfield_unit_type = None
-        self.bitfield_bit_offset = 0
-        
-        # Handle both tuple and dict formats for backward compatibility
-        if isinstance(member, tuple):
-            member_type, member_name = member
-        elif isinstance(member, dict):
-            member_type = member["type"]
-            member_name = member["name"]
-        else:
-            raise ValueError(f"Invalid member format: {member}")
-        
-        info = TYPE_INFO[member_type]
-        size, alignment = info["size"], info["align"]
-        
-        if alignment > self.max_alignment:
-            self.max_alignment = alignment
-        
-        self._add_padding_if_needed(alignment)
-        self._add_member_to_layout(member_name, member_type, size)
-        self.current_offset += size
-    
-    def _needs_new_bitfield_unit(self, mtype, mbit_size):
-        """Check if a new bitfield storage unit is needed."""
-        return (self.bitfield_unit_type != mtype or 
-                self.bitfield_bit_offset + mbit_size > self.bitfield_unit_size * 8)
-    
-    def _start_new_bitfield_unit(self, mtype, size, alignment):
-        """Start a new bitfield storage unit."""
-        self._add_padding_if_needed(alignment)
-        self.bitfield_unit_type = mtype
-        self.bitfield_unit_size = size
-        self.bitfield_unit_align = alignment
-        self.bitfield_bit_offset = 0
-        self.bitfield_unit_offset = self.current_offset
-        
-        if alignment > self.max_alignment:
-            self.max_alignment = alignment
-        
-        self.current_offset += size
-    
-    def _add_bitfield_to_layout(self, name, mtype, bit_size):
-        """Add a bitfield member to the layout."""
-        self.layout.append({
-            "name": name,
-            "type": mtype,
-            "size": self.bitfield_unit_size,
-            "offset": self.bitfield_unit_offset,
-            "is_bitfield": True,
-            "bit_offset": self.bitfield_bit_offset,
-            "bit_size": bit_size
-        })
-    
-    def _add_member_to_layout(self, name, member_type, size):
-        """Add a regular member to the layout."""
-        self.layout.append({
-            "name": name,
-            "type": member_type,
-            "size": size,
-            "offset": self.current_offset,
-            "is_bitfield": False,
-            "bit_offset": 0,
-            "bit_size": size * 8
-        })
-    
-    def _add_padding_if_needed(self, alignment):
-        """Add padding if needed to meet alignment requirements."""
-        padding = (alignment - (self.current_offset % alignment)) % alignment
-        if padding > 0:
-            self._add_padding_entry("(padding)", padding)
-
-    def _add_final_padding(self):
-        """Add final padding to align the whole struct."""
-        final_padding = (
-            self.max_alignment - (self.current_offset % self.max_alignment)
-        ) % self.max_alignment
-        if final_padding > 0:
-            self._add_padding_entry("(final padding)", final_padding)
-
-    def _add_padding_entry(self, name, size):
-        """Append a padding entry to the layout and advance the offset."""
-        self.layout.append({
-            "name": name,
-            "type": "padding",
-            "size": size,
-            "offset": self.current_offset,
-            "is_bitfield": False,
-            "bit_offset": 0,
-            "bit_size": size * 8,
-        })
-        self.current_offset += size
 
 class StructModel:
     def __init__(self):
