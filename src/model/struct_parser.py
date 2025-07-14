@@ -1,6 +1,19 @@
 """Utilities for parsing C/C++ struct definitions."""
 import re
+from dataclasses import dataclass, field
+from typing import List, Optional, Tuple
 from .layout import TYPE_INFO
+
+
+@dataclass
+class MemberDef:
+    """Unified representation of a struct member."""
+
+    type: str
+    name: str
+    is_bitfield: bool = False
+    bit_size: int = 0
+    array_dims: List[int] = field(default_factory=list)
 
 
 def _extract_array_dims(name_token):
@@ -56,6 +69,23 @@ def parse_member_line(line):
     return None
 
 
+def parse_member_line_v2(line: str) -> Optional[MemberDef]:
+    """Parse a struct member line and return a :class:`MemberDef`."""
+    parsed = parse_member_line(line)
+    if parsed is None:
+        return None
+    if isinstance(parsed, tuple):
+        mtype, name = parsed
+        return MemberDef(type=mtype, name=name)
+    return MemberDef(
+        type=parsed["type"],
+        name=parsed["name"],
+        is_bitfield=parsed.get("is_bitfield", False),
+        bit_size=parsed.get("bit_size", 0),
+        array_dims=parsed.get("array_dims", []),
+    )
+
+
 def _extract_struct_body(file_content):
     """Return struct name and body substring.
 
@@ -94,6 +124,21 @@ def parse_struct_definition(file_content):
     members = []
     for line in lines:
         parsed = parse_member_line(line)
+        if parsed is not None:
+            members.append(parsed)
+    return struct_name, members
+
+
+def parse_struct_definition_v2(file_content: str) -> Tuple[Optional[str], Optional[List[MemberDef]]]:
+    """Parse a C/C++ struct definition string and return ``MemberDef`` objects."""
+    struct_name, struct_content = _extract_struct_body(file_content)
+    if not struct_name:
+        return None, None
+    struct_content = re.sub(r"//.*", "", struct_content)
+    lines = struct_content.split(';')
+    members: List[MemberDef] = []
+    for line in lines:
+        parsed = parse_member_line_v2(line)
         if parsed is not None:
             members.append(parsed)
     return struct_name, members
