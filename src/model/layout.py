@@ -83,7 +83,12 @@ class LayoutCalculator:
     def calculate(self, members: List[Union[Tuple[str, str], dict]]):
         """Calculate the complete memory layout for the struct."""
         for member in members:
-            if isinstance(member, dict) and member.get("is_bitfield", False):
+            if hasattr(member, "is_bitfield") and hasattr(member, "type"):
+                if member.is_bitfield:
+                    self._process_bitfield_member(member)
+                else:
+                    self._process_regular_member(member)
+            elif isinstance(member, dict) and member.get("is_bitfield", False):
                 self._process_bitfield_member(member)
             else:
                 self._process_regular_member(member)
@@ -92,10 +97,15 @@ class LayoutCalculator:
         return self.layout, self.current_offset, self.max_alignment
 
     # Internal helpers -------------------------------------------------
-    def _process_bitfield_member(self, member: dict):
-        mtype = member["type"]
-        mname = member["name"]
-        mbit_size = member["bit_size"]
+    def _process_bitfield_member(self, member):
+        if hasattr(member, "type"):
+            mtype = member.type
+            mname = member.name
+            mbit_size = member.bit_size
+        else:
+            mtype = member["type"]
+            mname = member["name"]
+            mbit_size = member["bit_size"]
         info = TYPE_INFO[mtype]
         size, alignment = info["size"], info["align"]
 
@@ -117,6 +127,10 @@ class LayoutCalculator:
             member_type = member["type"]
             member_name = member["name"]
             array_dims = member.get("array_dims", [])
+        elif hasattr(member, "type"):
+            member_type = member.type
+            member_name = member.name
+            array_dims = getattr(member, "array_dims", [])
         else:
             raise ValueError(f"Invalid member format: {member}")
 
