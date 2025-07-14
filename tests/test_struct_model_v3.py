@@ -72,7 +72,7 @@ class TestStructModelV3(unittest.TestCase):
             {"name": "c", "type": "int", "bit_size": 0}            # 4 bytes = 32 bits
         ]
         used_bits = self.model.calculate_used_bits(members)
-        self.assertEqual(used_bits, 4 + 8 + 32)  # 44 bits
+        self.assertEqual(used_bits, 32 + 32)  # bitfield group + int
     
     def test_calculate_used_bits_mixed_types(self):
         """測試使用空間計算 - 混合型別"""
@@ -82,7 +82,7 @@ class TestStructModelV3(unittest.TestCase):
             {"name": "c", "type": "double", "bit_size": 0}          # 64 bits
         ]
         used_bits = self.model.calculate_used_bits(members)
-        self.assertEqual(used_bits, 8 + 12 + 64)  # 84 bits
+        self.assertEqual(used_bits, 8 + 32 + 64)  # char + bitfield storage unit + double
     
     def test_calculate_used_bits_skip_invalid_type(self):
         """測試計算時跳過無效型別"""

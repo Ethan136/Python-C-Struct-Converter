@@ -9,15 +9,31 @@ pytestmark = pytest.mark.skipif(
 
 from view.struct_view import StructView
 from presenter.struct_presenter import StructPresenter
+from model.struct_model import StructModel
 
 class PresenterStub:
     def __init__(self):
         self.last_struct_data = None
         self.export_called = False
+        self.model = StructModel()
     def on_manual_struct_change(self, struct_data):
         self.last_struct_data = struct_data
     def on_export_manual_struct(self):
         self.export_called = True
+    def calculate_remaining_space(self, members, total_size):
+        # 真實計算剩餘 bits/bytes
+        if members and "type" in members[0]:
+            used_bits = self.model.calculate_used_bits(members)
+        else:
+            used_bits = sum(m.get("byte_size", 0) * 8 + m.get("bit_size", 0) for m in members)
+        total_bits = total_size * 8
+        remaining_bits = max(0, total_bits - used_bits)
+        remaining_bytes = remaining_bits // 8
+        return remaining_bits, remaining_bytes
+    def compute_member_layout(self, members, total_size):
+        # 回傳真實 layout，過濾掉 padding
+        layout = self.model.calculate_manual_layout(members, total_size)
+        return [item for item in layout if item.get("type") != "padding"]
 
 class TestStructView(unittest.TestCase):
     def setUp(self):

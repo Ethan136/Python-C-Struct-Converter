@@ -68,94 +68,69 @@ class StructModel:
         return merged
 
     def set_manual_struct(self, members, total_size):
-        # V3 版本：直接使用傳入的 members，支援 type 欄位
-        self.manual_struct = {"members": members, "total_size": total_size}
+        # 統一格式：轉換為 C++ 標準型別格式
+        self.struct_name = "MyStruct"
+        self.members = self._convert_to_cpp_members(members)
+        self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
+        self.manual_struct = {"members": self.members, "total_size": total_size}
 
     def load_struct_from_file(self, file_path):
         with open(file_path, 'r') as f:
             content = f.read()
-        
         struct_name, members = parse_struct_definition(content)
         if not struct_name or not members:
             raise ValueError("Could not find a valid struct definition in the file.")
-        
         self.struct_name = struct_name
-        self.members = members
-        self.layout, self.total_size, self.struct_align = calculate_layout(members)
+        self.members = self._convert_to_cpp_members(members)
+        self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
         return self.struct_name, self.layout, self.total_size, self.struct_align
 
-    def parse_hex_data(self, hex_data, byte_order):
-        if not self.layout:
-            raise ValueError("No struct layout loaded. Please load a struct definition first.")
-
-        # struct 整體 hex_data 視為 raw bytes，左補零到 total_size
-        padded_hex = hex_data.zfill(self.total_size * 2)
-        data_bytes = bytes.fromhex(padded_hex)
-        
-        parsed_values = []
-        for item in self.layout:
-            # Only parse actual members, skip padding entries
-            if item['type'] == "padding":
-                # For padding, hex_raw should reflect the actual memory layout without endianness
-                padding_bytes = data_bytes[item['offset'] : item['offset'] + item['size']]
-                hex_value = padding_bytes.hex()
+    def parse_hex_data(self, hex_data, byte_order, layout=None, total_size=None):
+        # 支援外部傳入 layout/total_size（如手動 struct）
+        orig_layout = self.layout
+        orig_total_size = self.total_size
+        if layout is not None:
+            self.layout = layout
+        if total_size is not None:
+            self.total_size = total_size
+        try:
+            if not self.layout:
+                raise ValueError("No struct layout loaded. Please load a struct definition first.")
+            padded_hex = hex_data.zfill(self.total_size * 2)
+            data_bytes = bytes.fromhex(padded_hex)
+            parsed_values = []
+            for item in self.layout:
+                if item['type'] == "padding":
+                    padding_bytes = data_bytes[item['offset'] : item['offset'] + item['size']]
+                    hex_value = padding_bytes.hex()
+                    parsed_values.append({
+                        "name": item['name'],
+                        "value": "-",
+                        "hex_raw": hex_value
+                    })
+                    continue
+                offset, size, name = item['offset'], item['size'], item['name']
+                member_bytes = data_bytes[offset : offset + size]
+                if item.get("is_bitfield", False):
+                    storage_int = int.from_bytes(member_bytes, byte_order)
+                    bit_offset = item["bit_offset"]
+                    bit_size = item["bit_size"]
+                    mask = (1 << bit_size) - 1
+                    value = (storage_int >> bit_offset) & mask
+                    display_value = str(value)
+                else:
+                    value = int.from_bytes(member_bytes, byte_order)
+                    display_value = str(bool(value)) if item['type'] == 'bool' else str(value)
+                hex_value = int.from_bytes(member_bytes, 'big').to_bytes(size, 'big').hex()
                 parsed_values.append({
-                    "name": item['name'],
-                    "value": "-", # No value for padding
+                    "name": name,
+                    "value": display_value,
                     "hex_raw": hex_value
                 })
-                continue
-
-            offset, size, name = item['offset'], item['size'], item['name']
-            member_bytes = data_bytes[offset : offset + size]
-            if item.get("is_bitfield", False):
-                # Extract the storage unit as int
-                storage_int = int.from_bytes(member_bytes, byte_order)
-                bit_offset = item["bit_offset"]
-                bit_size = item["bit_size"]
-                mask = (1 << bit_size) - 1
-                value = (storage_int >> bit_offset) & mask
-                display_value = str(value)
-            else:
-                value = int.from_bytes(member_bytes, byte_order)
-                display_value = str(bool(value)) if item['type'] == 'bool' else str(value)
-            # hex_raw 一律用 big endian 顯示
-            hex_value = int.from_bytes(member_bytes, 'big').to_bytes(size, 'big').hex()
-            parsed_values.append({
-                "name": name,
-                "value": display_value,
-                "hex_raw": hex_value
-            })
-        return parsed_values
-
-    def parse_manual_hex_data(self, hex_data, byte_order, layout):
-        """解析 MyStruct tab 的 hex 資料 - 橋接版本，直接使用載入.h檔的解析機制"""
-        if not layout:
-            raise ValueError("No manual struct layout provided.")
-
-        # 橋接：暫時設定 model 的 layout 和 total_size，讓 parse_hex_data 可以工作
-        original_layout = self.layout
-        original_total_size = self.total_size
-        
-        try:
-            # 設定 MyStruct 的 layout
-            self.layout = layout
-            
-            # 修正：計算實際的 total_size，考慮 bitfield 共用 storage unit
-            if layout:
-                # 找出最大的 offset + size，這代表實際需要的記憶體大小
-                max_offset_plus_size = max(item['offset'] + item['size'] for item in layout)
-                self.total_size = max_offset_plus_size
-            else:
-                self.total_size = 0
-            
-            # 直接使用載入.h檔的解析機制
-            return self.parse_hex_data(hex_data, byte_order)
-            
+            return parsed_values
         finally:
-            # 恢復原始的 layout 和 total_size
-            self.layout = original_layout
-            self.total_size = original_total_size
+            self.layout = orig_layout
+            self.total_size = orig_total_size
 
     def _convert_legacy_member(self, member):
         """支援舊格式的 member（包含 byte_size）"""
@@ -180,20 +155,21 @@ class StructModel:
         return member.get("type", "")
 
     def _convert_to_cpp_members(self, members):
-        """將 type/bit 欄位轉換為 C++ 標準型別（V3 版本）"""
+        """將 type/bit 欄位轉換為 C++ 標準型別（V3 版本），支援 tuple 格式。"""
         new_members = []
         for m in members:
+            # 支援 tuple 格式 ('type', 'name')
+            if isinstance(m, tuple) and len(m) == 2 and isinstance(m[0], str) and isinstance(m[1], str):
+                type_name, name = m
+                m = {"type": type_name, "name": name, "bit_size": 0}
             name = m.get("name", "")
             type_name = m.get("type", "")
             bit_size = m.get("bit_size", 0)
-            
             # 支援舊格式（向後相容）
             if not type_name:
                 type_name = self._convert_legacy_member(m)
-            
             if not type_name or type_name not in TYPE_INFO:
                 continue
-                
             if bit_size > 0:
                 # bitfield
                 new_members.append({
@@ -209,80 +185,95 @@ class StructModel:
                     "name": name,
                     "is_bitfield": False
                 })
-
         return new_members
 
     def calculate_used_bits(self, members):
-        """根據 type 計算已使用的 bits（V3 版本）"""
+        """根據 C++ 標準，bitfield 佔滿 storage unit（如 int/unsigned int 4 bytes）。"""
         used_bits = 0
-        for m in members:
+        i = 0
+        n = len(members)
+        while i < n:
+            m = members[i]
             type_name = m.get("type", "")
             bit_size = m.get("bit_size", 0)
-            
             # 支援舊格式（向後相容）
             if not type_name:
                 type_name = self._convert_legacy_member(m)
-            
             if type_name in TYPE_INFO:
                 if bit_size > 0:
-                    # bitfield：使用實際 bit 數
-                    used_bits += bit_size
+                    # 連續 bitfield group
+                    storage_unit_bits = TYPE_INFO[type_name]["size"] * 8
+                    group_bits = 0
+                    # 收集連續同型別 bitfield
+                    while i < n:
+                        m2 = members[i]
+                        t2 = m2.get("type", "") or self._convert_legacy_member(m2)
+                        b2 = m2.get("bit_size", 0)
+                        if b2 > 0 and t2 == type_name:
+                            group_bits += b2
+                            i += 1
+                        else:
+                            break
+                    # 這一組 bitfield 佔滿一個 storage unit
+                    used_bits += storage_unit_bits
+                    continue
                 else:
                     # 普通欄位：使用 type 的 byte size * 8
                     used_bits += TYPE_INFO[type_name]["size"] * 8
-        
+            i += 1
         return used_bits
 
-    def validate_manual_struct(self, members, total_size):
-        """驗證手動 struct 定義（V3 版本）"""
+    def _validate_member_types(self, members):
         errors = []
-        
-        # 檢查型別有效性
         for m in members:
             type_name = m.get("type", "")
             bit_size = m.get("bit_size", 0)
             byte_size = m.get("byte_size", 0)
-            
-            # 支援舊格式（向後相容）
             if not type_name and "byte_size" in m:
                 type_name = self._convert_legacy_member(m)
-            
-            # 檢查 byte_size（舊格式）
             if "byte_size" in m:
                 if not isinstance(byte_size, int) or byte_size < 0:
                     errors.append(f"member '{m.get('name', '?')}' byte_size 需為 0 或正整數")
-            
             if not type_name:
                 errors.append(f"member '{m.get('name', '?')}' 必須指定型別")
             elif type_name not in TYPE_INFO:
                 errors.append(f"member '{m.get('name', '?')}' 不支援的型別: {type_name}")
-            
-            # 檢查 bit_size
             if not isinstance(bit_size, int) or bit_size < 0:
                 errors.append(f"member '{m.get('name', '?')}' bit_size 需為 0 或正整數")
-            
-            # 檢查 bitfield 型別限制
             if bit_size > 0:
                 if type_name not in ["int", "unsigned int", "char", "unsigned char"]:
                     errors.append(f"member '{m.get('name', '?')}' bitfield 只支援 int/unsigned int/char/unsigned char")
-        
-        # 檢查名稱重複
+        return errors
+
+    def _validate_member_names(self, members):
+        errors = []
         names = [m["name"] for m in members if m.get("name")]
         if len(set(names)) != len(names):
             for n in set([x for x in names if names.count(x) > 1]):
                 errors.append(f"成員名稱 '{n}' 重複")
-        
-        # 檢查總大小
+        return errors
+
+    def _validate_total_size(self, total_size):
+        errors = []
         if not isinstance(total_size, int) or total_size <= 0:
             errors.append("結構體大小需為正整數")
-        
-        # 檢查 layout 大小
+        return errors
+
+    def _validate_layout_size(self, members, total_size):
+        errors = []
+        expanded_members = self._convert_to_cpp_members(members)
+        _, layout_size, _ = calculate_layout(expanded_members)
+        if layout_size > total_size:
+            errors.append(f"Layout 總長度 ({layout_size} bytes) 超過指定 struct 大小 ({total_size} bytes)")
+        return errors
+
+    def validate_manual_struct(self, members, total_size):
+        errors = []
+        errors += self._validate_member_types(members)
+        errors += self._validate_member_names(members)
+        errors += self._validate_total_size(total_size)
         if not errors:
-            expanded_members = self._convert_to_cpp_members(members)
-            _, layout_size, _ = calculate_layout(expanded_members)
-            if layout_size > total_size:
-                errors.append(f"Layout 總長度 ({layout_size} bytes) 超過指定 struct 大小 ({total_size} bytes)")
-        
+            errors += self._validate_layout_size(members, total_size)
         return errors
 
     def calculate_manual_layout(self, members, total_size):

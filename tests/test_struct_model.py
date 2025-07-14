@@ -603,7 +603,12 @@ class TestStructModel(unittest.TestCase):
         ]
         total_size = 3
         self.model.set_manual_struct(members, total_size)
-        self.assertEqual(self.model.manual_struct["members"], members)
+        # 期望 members 轉換為 C++ 格式
+        expected = [
+            {"type": "char", "name": "a", "is_bitfield": False},
+            {"type": "short", "name": "b", "is_bitfield": False}
+        ]
+        self.assertEqual(self.model.manual_struct["members"], expected)
         self.assertEqual(self.model.manual_struct["total_size"], total_size)
 
     def test_validate_manual_struct_errors_and_success(self):
@@ -770,7 +775,8 @@ class TestStructModel(unittest.TestCase):
             {"name": "b", "type": "char", "offset": 4, "size": 1, "is_bitfield": False}
         ]
         hex_data = "04030201" + "41"  # little endian
-        result = self.model.parse_manual_hex_data(hex_data, "little", manual_layout)
+        # 直接用 parse_hex_data
+        result = self.model.parse_hex_data(hex_data, "little", layout=manual_layout, total_size=5)
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0]["name"], "a")
         self.assertEqual(result[0]["value"], "16909060")
@@ -795,7 +801,7 @@ class TestStructModel(unittest.TestCase):
             {"name": "a", "type": "int", "offset": 0, "size": 4, "is_bitfield": False}
         ]
         hex_data = "01000000"
-        self.model.parse_manual_hex_data(hex_data, "little", manual_layout)
+        self.model.parse_hex_data(hex_data, "little", layout=manual_layout, total_size=4)
         self.assertEqual(self.model.layout, original_layout)
         self.assertEqual(self.model.total_size, original_total_size)
 

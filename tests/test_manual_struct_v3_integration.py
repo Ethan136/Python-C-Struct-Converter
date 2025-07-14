@@ -78,7 +78,7 @@ class TestManualStructV3Integration(unittest.TestCase):
         
         # 8. 驗證使用空間計算
         used_bits = self.model.calculate_used_bits(struct_data["members"])
-        expected_bits = 64 + 4 + 8  # unsigned long long + 4 bits + char
+        expected_bits = 64 + 32 + 8  # unsigned long long + bitfield storage unit + char
         self.assertEqual(used_bits, expected_bits)
         
         # 9. 驗證匯出功能
@@ -201,11 +201,11 @@ class TestManualStructV3Integration(unittest.TestCase):
         # 驗證剩餘空間計算
         struct_data = self.view.get_manual_struct_definition()
         used_bits = self.model.calculate_used_bits(struct_data["members"])
-        expected_used = 32 + 4  # int + 4 bits
+        expected_used = 32 + 32  # int + bitfield storage unit
         self.assertEqual(used_bits, expected_used)
         
         remaining_bits = 64 - used_bits
-        self.assertEqual(remaining_bits, 28)
+        self.assertEqual(remaining_bits, 0)
     
     def test_member_operations(self):
         """測試成員操作（新增、刪除、移動、複製）"""

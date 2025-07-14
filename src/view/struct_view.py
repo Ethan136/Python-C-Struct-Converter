@@ -228,35 +228,40 @@ class StructView(tk.Tk):
             ]
 
     def _compute_member_layout(self, is_v3_format):
-        """回傳 {name: size} 對應表供表格使用"""
-        model = StructModel()
+        """回傳 {name: size} 對應表供表格使用，改為呼叫 presenter，並過濾 padding。"""
+        if not self.presenter:
+            print("[DEBUG] presenter is None")
+            return {}
+        if is_v3_format:
+            member_data = [
+                {
+                    "name": m.get("name", ""),
+                    "type": m.get("type", ""),
+                    "bit_size": m.get("bit_size", 0),
+                }
+                for m in self.members
+            ]
+        else:
+            member_data = [
+                {
+                    "name": m.get("name", ""),
+                    "byte_size": m.get("byte_size", 0),
+                    "bit_size": m.get("bit_size", 0),
+                }
+                for m in self.members
+            ]
+        print(f"[DEBUG] member_data: {member_data}")
         try:
-            if is_v3_format:
-                member_data = [
-                    {
-                        "name": m.get("name", ""),
-                        "type": m.get("type", ""),
-                        "bit_size": m.get("bit_size", 0),
-                    }
-                    for m in self.members
-                ]
-            else:
-                member_data = [
-                    {
-                        "name": m.get("name", ""),
-                        "byte_size": m.get("byte_size", 0),
-                        "bit_size": m.get("bit_size", 0),
-                    }
-                    for m in self.members
-                ]
-            layout = model.calculate_manual_layout(member_data, self.size_var.get())
-        except Exception:
+            layout = self.presenter.compute_member_layout(member_data, self.size_var.get())
+        except Exception as e:
+            print(f"[DEBUG] compute_member_layout error: {e}")
             layout = []
-
+        print(f"[DEBUG] layout: {layout}")
         mapping = {}
         for item in layout:
             if item.get("type") != "padding":
                 mapping[item["name"]] = str(item["size"])
+        print(f"[DEBUG] mapping: {mapping}")
         return mapping
 
     def _build_member_header(self, is_v3_format):
@@ -485,21 +490,14 @@ class StructView(tk.Tk):
         if errors:
             self.validation_label.config(text="; ".join(errors), fg="red")
         else:
-            # 根據 type 計算剩餘空間
+            # 改為呼叫 presenter 計算剩餘空間
             struct_data = self.get_manual_struct_definition()
-            total_bits = struct_data["total_size"] * 8
-            
-            # 支援向後相容性：根據資料格式決定計算方法
-            if struct_data["members"] and "type" in struct_data["members"][0]:
-                # V3 格式：使用 Model 的計算方法
-                model = StructModel()
-                used_bits = model.calculate_used_bits(struct_data["members"])
+            members = struct_data["members"]
+            total_size = struct_data["total_size"]
+            if self.presenter:
+                remaining_bits, remaining_bytes = self.presenter.calculate_remaining_space(members, total_size)
             else:
-                # 舊格式：使用舊的計算方法
-                used_bits = sum(m.get("byte_size", 0) * 8 + m.get("bit_size", 0) for m in struct_data["members"])
-            
-            remaining_bits = max(0, total_bits - used_bits)
-            remaining_bytes = remaining_bits // 8
+                remaining_bits, remaining_bytes = 0, 0
             msg = "設定正確"
             msg += f"（剩餘可用空間：{remaining_bits} bits（{remaining_bytes} bytes））"
             self.validation_label.config(text=msg, fg="green")
@@ -700,7 +698,7 @@ class StructView(tk.Tk):
         except Exception:
             total_size = 0
         try:
-            unit_size = int(self.manual_unit_size_var.get().split()[0])
+            unit_size = self.get_selected_manual_unit_size()
         except Exception:
             unit_size = 1
         self._build_hex_grid(self.manual_hex_grid_frame, self.manual_hex_entries, total_size, unit_size)

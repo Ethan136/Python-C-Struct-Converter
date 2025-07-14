@@ -170,8 +170,8 @@ class StructPresenter:
             self.model.set_manual_struct(struct_def['members'], struct_def['total_size'])
             layout = self.model.calculate_manual_layout(struct_def['members'], struct_def['total_size'])
 
-            # 解析 hex 資料
-            parsed_values = self.model.parse_manual_hex_data(hex_data, byte_order, layout)
+            # 解析 hex 資料，統一用 parse_hex_data
+            parsed_values = self.model.parse_hex_data(hex_data, byte_order, layout=layout, total_size=struct_def['total_size'])
 
             # 呼叫 view 的顯示方法
             self.view.show_manual_parsed_values(parsed_values, endian)
@@ -189,3 +189,19 @@ class StructPresenter:
             self.view.show_error("解析錯誤", f"解析 hex 資料時發生錯誤: {e}")
             # 清空顯示
             self.view.manual_member_tree.delete(*self.view.manual_member_tree.get_children())
+
+    def compute_member_layout(self, members, total_size):
+        """計算 struct member 的 layout，回傳 layout list。"""
+        return self.model.calculate_manual_layout(members, total_size)
+
+    def calculate_remaining_space(self, members, total_size):
+        """計算剩餘可用空間（bits, bytes）。"""
+        # 支援 V3 格式與舊格式
+        if members and "type" in members[0]:
+            used_bits = self.model.calculate_used_bits(members)
+        else:
+            used_bits = sum(m.get("byte_size", 0) * 8 + m.get("bit_size", 0) for m in members)
+        total_bits = total_size * 8
+        remaining_bits = max(0, total_bits - used_bits)
+        remaining_bytes = remaining_bits // 8
+        return remaining_bits, remaining_bytes

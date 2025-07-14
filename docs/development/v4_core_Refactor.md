@@ -1,21 +1,45 @@
-# v4 程式碼精簡計畫
+# v4 核心程式碼重構計畫
 
-## 目標
-- 合併 GUI 中建立十六進位輸入格的重複程式碼
-- 初步盤點其他相似邏輯供後續重構
+## 1. 目標
+- **提升程式碼品質**：簡化複雜函式、移除重複程式碼，並強化 MVP 架構的職責分離。
+- **提高可維護性**：讓程式碼結構更清晰，未來更容易擴充與修改。
 
-## 背景
-`src/view/struct_view.py` 內的 `rebuild_hex_grid` 與 `_rebuild_manual_hex_grid` 兩個方法功能幾乎相同，僅操作的容器與參數來源不同。維持兩份程式易造成維護負擔。
+## 2. `StructView` 程式碼整理 (`src/view/struct_view.py`)
 
-## 計畫
-1. 新增私有方法 `_build_hex_grid(frame, entry_list, total_size, unit_size)`，包裝目前建立格子的邏輯。
-2. `rebuild_hex_grid` 及 `_rebuild_manual_hex_grid` 分別呼叫此方法，僅負責取得參數。
-3. 確認所有現有測試（特別是 `tests/test_struct_view.py` 中有呼叫 `_rebuild_manual_hex_grid` 的部份）皆能通過。
-4. show_parsed_values 與 show_manual_parsed_values 兩個方法已共用 _populate_tree 來顯示 Treeview，減少重複邏輯。
-5. GUI 內「.H 檔載入」tab 與「手動 struct 定義」tab 的 hex grid、欄位驗證、Treeview 欄位顯示等行為已完全一致，並於 code 以共用方法與 callback 實作（如 _build_hex_grid、_rebuild_manual_hex_grid、_populate_tree）。
-6. 欄位驗證（如 hex 輸入長度、合法字元）與 tab 切換時的自動重建 hex grid、Treeview 欄位一致性等細節，皆已於 src/view/struct_view.py 內完善實作。
+### 2.1. 合併重複的 hex grid 建立邏輯
+- **問題**：`rebuild_hex_grid` 和 `_rebuild_manual_hex_grid` 方法的程式碼幾乎完全相同。
+- **計畫**：
+    1.  建立一個新的私有方法 `_build_hex_grid(frame, entry_list, total_size, unit_size)`，將共用邏輯封裝進去。
+    2.  修改 `rebuild_hex_grid` 和 `_rebuild_manual_hex_grid`，讓它們只負責準備參數並呼叫 `_build_hex_grid`。
 
-## TDD 步驟
-1. 執行既有測試確保基準狀態（可能因環境無顯示而失敗）。
-2. 依照上述計畫實作 `_build_hex_grid`，修改相關呼叫。
-3. 重新執行測試確認無新錯誤。
+### 2.2. 移除 View 中的業務邏輯
+- **問題**：View 層包含了一些應屬於 Presenter 的資料處理邏輯，違反了 MVP 職責分離原則。
+- **計畫**：
+    1.  將 `_compute_member_layout` 方法的邏輯移至 `StructPresenter`。Presenter 計算完後，再將結果傳給 View 顯示。
+    2.  將 `show_manual_struct_validation` 中計算剩餘空間的邏輯移至 `StructPresenter`。
+
+## 3. `StructModel` 簡化 (`src/model/struct_model.py`)
+
+### 3.1. 統一 Struct 的內部表示法
+- **問題**：從檔案載入的 struct 和手動定義的 struct 在 Model 中有不同的處理流程與資料結構，導致 `parse_manual_hex_data` 等方法變得複雜且多餘。
+- **計畫**：
+    1.  設計一個統一的內部資料結構來表示 struct 成員，無論其來源為何。
+    2.  重構 `set_manual_struct` 和 `load_struct_from_file`，讓它們都產生這個統一的資料結構。
+    3.  移除 `parse_manual_hex_data`，讓 `parse_hex_data` 可以處理所有情況。
+
+### 3.2. 拆分複雜的驗證邏輯
+- **問題**：`validate_manual_struct` 函式過於龐大，單一函式負責了多種驗證（型別、名稱、大小等），難以閱讀和測試。
+- **計畫**：
+    1.  將 `validate_manual_struct` 拆分為數個更小的函式，每個函式只負責一種類型的驗證，例如：
+        - `_validate_member_types`
+        - `_validate_member_names`
+        - `_validate_total_size`
+    2.  `validate_manual_struct` 負責依序呼叫這些小函式並彙總錯誤。
+
+## 4. `struct_parser.py` 清理
+
+### 4.1. 合併重複的解析函式
+- **問題**：檔案中存在多個版本的解析函式，如 `parse_member_line`、`parse_member_line_v2`，以及 `parse_struct_definition`、`parse_struct_definition_v2`，功能重疊且命名混亂。
+- **計畫**：
+    1.  分析各版本函式的功能，整併為一組核心 API。
+    2.  將舊函式標記為棄用 (deprecated)，並更新所有呼叫點，使其統一使用新的 API。
