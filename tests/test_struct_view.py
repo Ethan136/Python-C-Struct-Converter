@@ -110,6 +110,17 @@ class TestStructView(unittest.TestCase):
         names = [m["name"] for m in self.view.members]
         self.assertEqual(names, ["a", "b"])
 
+    def test_compute_member_layout_legacy(self):
+        """確保舊格式也能正確計算 size"""
+        self.view.members = [
+            {"name": "a", "byte_size": 4, "bit_size": 0},
+            {"name": "b", "byte_size": 1, "bit_size": 0},
+        ]
+        self.view.size_var.set(8)
+        result = self.view._compute_member_layout(False)
+        self.assertEqual(result["a"], "4")
+        self.assertEqual(result["b"], "1")
+
     def test_struct_name_input_and_export(self):
         # 設定 struct 名稱
         self.view.struct_name_var.set("MyStruct")
