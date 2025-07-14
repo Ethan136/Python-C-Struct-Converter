@@ -94,48 +94,9 @@ class TestStructModelV3(unittest.TestCase):
         used_bits = self.model.calculate_used_bits(members)
         self.assertEqual(used_bits, 32 + 8)  # 40 bits
     
-    def test_backward_compatibility_legacy_format(self):
-        """測試向後相容性 - 舊格式（包含 byte_size）"""
-        members = [
-            {"name": "a", "byte_size": 4, "bit_size": 0},  # 舊格式
-            {"name": "b", "type": "int", "bit_size": 0}    # 新格式
-        ]
-        result = self.model._convert_to_cpp_members(members)
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]["type"], "int")
-        self.assertEqual(result[1]["type"], "int")
-    
-    def test_backward_compatibility_legacy_bitfield(self):
-        """測試向後相容性 - 舊格式 bitfield"""
-        members = [
-            {"name": "a", "byte_size": 0, "bit_size": 4},  # 舊格式 bitfield
-            {"name": "b", "type": "unsigned int", "bit_size": 8}  # 新格式 bitfield
-        ]
-        result = self.model._convert_to_cpp_members(members)
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]["type"], "unsigned int")
-        self.assertTrue(result[0]["is_bitfield"])
-        self.assertEqual(result[0]["bit_size"], 4)
-        self.assertEqual(result[1]["type"], "unsigned int")
-        self.assertTrue(result[1]["is_bitfield"])
-        self.assertEqual(result[1]["bit_size"], 8)
-    
-    def test_backward_compatibility_legacy_byte_sizes(self):
-        """測試向後相容性 - 不同 byte_size 的推斷"""
-        test_cases = [
-            (1, "char"),
-            (2, "short"),
-            (4, "int"),
-            (8, "long long"),
-            (16, "unsigned char")  # 其他大小推斷為 unsigned char
-        ]
-        
-        for byte_size, expected_type in test_cases:
-            with self.subTest(byte_size=byte_size):
-                members = [{"name": "test", "byte_size": byte_size, "bit_size": 0}]
-                result = self.model._convert_to_cpp_members(members)
-                self.assertEqual(len(result), 1)
-                self.assertEqual(result[0]["type"], expected_type)
+    # 已移除 test_backward_compatibility_legacy_format
+    # 已移除 test_backward_compatibility_legacy_bitfield
+    # 已移除 test_backward_compatibility_legacy_byte_sizes
     
     def test_validate_manual_struct_v3_format(self):
         """測試 V3 格式的驗證"""

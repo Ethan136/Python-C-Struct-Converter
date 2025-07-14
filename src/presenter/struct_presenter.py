@@ -196,11 +196,7 @@ class StructPresenter:
 
     def calculate_remaining_space(self, members, total_size):
         """計算剩餘可用空間（bits, bytes）。"""
-        # 支援 V3 格式與舊格式
-        if members and "type" in members[0]:
-            used_bits = self.model.calculate_used_bits(members)
-        else:
-            used_bits = sum(m.get("byte_size", 0) * 8 + m.get("bit_size", 0) for m in members)
+        used_bits = self.model.calculate_used_bits(members)
         total_bits = total_size * 8
         remaining_bits = max(0, total_bits - used_bits)
         remaining_bytes = remaining_bits // 8

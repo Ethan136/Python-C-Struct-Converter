@@ -35,8 +35,8 @@ class TestStructViewPadding(unittest.TestCase):
         # 設定 struct
         self.view.size_var.set(8)
         self.view.members = [
-            {"name": "a", "byte_size": 1, "bit_size": 0},
-            {"name": "b", "byte_size": 4, "bit_size": 0},
+            {"name": "a", "type": "char", "bit_size": 0},
+            {"name": "b", "type": "int", "bit_size": 0},
         ]
         self.view._on_manual_struct_change()
         # 應該有 manual_layout_tree 屬性

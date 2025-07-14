@@ -232,24 +232,14 @@ class StructView(tk.Tk):
         if not self.presenter:
             print("[DEBUG] presenter is None")
             return {}
-        if is_v3_format:
-            member_data = [
-                {
-                    "name": m.get("name", ""),
-                    "type": m.get("type", ""),
-                    "bit_size": m.get("bit_size", 0),
-                }
-                for m in self.members
-            ]
-        else:
-            member_data = [
-                {
-                    "name": m.get("name", ""),
-                    "byte_size": m.get("byte_size", 0),
-                    "bit_size": m.get("bit_size", 0),
-                }
-                for m in self.members
-            ]
+        member_data = [
+            {
+                "name": m.get("name", ""),
+                "type": m.get("type", ""),
+                "bit_size": m.get("bit_size", 0),
+            }
+            for m in self.members
+        ]
         print(f"[DEBUG] member_data: {member_data}")
         try:
             layout = self.presenter.compute_member_layout(member_data, self.size_var.get())
@@ -267,10 +257,7 @@ class StructView(tk.Tk):
     def _build_member_header(self, is_v3_format):
         tk.Label(self.member_frame, text="#", font=("Arial", 9, "bold")).grid(row=0, column=0, padx=2, pady=2)
         tk.Label(self.member_frame, text="成員名稱", font=("Arial", 9, "bold")).grid(row=0, column=1, padx=2, pady=2)
-        if is_v3_format:
-            tk.Label(self.member_frame, text="型別", font=("Arial", 9, "bold")).grid(row=0, column=2, padx=2, pady=2)
-        else:
-            tk.Label(self.member_frame, text="byte size", font=("Arial", 9, "bold")).grid(row=0, column=2, padx=2, pady=2)
+        tk.Label(self.member_frame, text="型別", font=("Arial", 9, "bold")).grid(row=0, column=2, padx=2, pady=2)
         tk.Label(self.member_frame, text="bit size", font=("Arial", 9, "bold")).grid(row=0, column=3, padx=2, pady=2)
         tk.Label(self.member_frame, text="size", font=("Arial", 9, "bold")).grid(row=0, column=4, padx=2, pady=2)
         tk.Label(self.member_frame, text="操作", font=("Arial", 9, "bold")).grid(row=0, column=5, padx=2, pady=2)
@@ -282,13 +269,9 @@ class StructView(tk.Tk):
         name_var = tk.StringVar(value=member.get("name", ""))
         tk.Entry(self.member_frame, textvariable=name_var, width=10).grid(row=row, column=1, padx=2, pady=1)
 
-        if is_v3_format:
-            type_var = tk.StringVar(value=member.get("type", ""))
-            type_options = self._get_type_options(member.get("bit_size", 0) > 0)
-            tk.OptionMenu(self.member_frame, type_var, *type_options).grid(row=row, column=2, padx=2, pady=1)
-        else:
-            byte_var = tk.IntVar(value=member.get("byte_size", 0))
-            tk.Entry(self.member_frame, textvariable=byte_var, width=6).grid(row=row, column=2, padx=2, pady=1)
+        type_var = tk.StringVar(value=member.get("type", ""))
+        type_options = self._get_type_options(member.get("bit_size", 0) > 0)
+        tk.OptionMenu(self.member_frame, type_var, *type_options).grid(row=row, column=2, padx=2, pady=1)
 
         bit_var = tk.IntVar(value=member.get("bit_size", 0))
         tk.Entry(self.member_frame, textvariable=bit_var, width=6).grid(row=row, column=3, padx=2, pady=1)
@@ -306,17 +289,11 @@ class StructView(tk.Tk):
         tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4).pack(side=tk.LEFT, padx=1)
 
         name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
-        if is_v3_format:
-            type_var.trace_add("write", lambda *_, i=idx, v=type_var: self._update_member_type(i, v))
-        else:
-            byte_var.trace_add("write", lambda *_, i=idx, v=byte_var: self._update_member_byte(i, v))
+        type_var.trace_add("write", lambda *_, i=idx, v=type_var: self._update_member_type(i, v))
         bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
 
         member["name_var"] = name_var
-        if is_v3_format:
-            member["type_var"] = type_var
-        else:
-            member["byte_var"] = byte_var
+        member["type_var"] = type_var
         member["bit_var"] = bit_var
 
     def _render_member_table(self):
@@ -325,12 +302,10 @@ class StructView(tk.Tk):
             widget.destroy()
         # Member 編輯表格
         if self.members:
-            is_v3_format = self.members and "type" in self.members[0]
-            self._build_member_header(is_v3_format)
-            name2size = self._compute_member_layout(is_v3_format)
-
+            self._build_member_header(True)
+            name2size = self._compute_member_layout(True)
             for idx, m in enumerate(self.members):
-                self._render_member_row(idx, m, is_v3_format, name2size)
+                self._render_member_row(idx, m, True, name2size)
         else:
             tk.Label(self.member_frame, text="無成員資料", fg="gray").grid(row=0, column=0, columnspan=6, pady=10)
         # 更新下方標準 struct layout treeview
@@ -340,20 +315,10 @@ class StructView(tk.Tk):
         # 計算 layout
         model = StructModel()
         try:
-            # 支援向後相容性：根據成員格式決定資料格式
-            if self.members and "type" in self.members[0]:
-                # V3 格式
-                member_data = [
-                    {"name": m.get("name", ""), "type": m.get("type", ""), "bit_size": m.get("bit_size", 0)}
-                    for m in self.members
-                ]
-            else:
-                # 舊格式
-                member_data = [
-                    {"name": m.get("name", ""), "byte_size": m.get("byte_size", 0), "bit_size": m.get("bit_size", 0)}
-                    for m in self.members
-                ]
-            
+            member_data = [
+                {"name": m.get("name", ""), "type": m.get("type", ""), "bit_size": m.get("bit_size", 0)}
+                for m in self.members
+            ]
             layout = model.calculate_manual_layout(member_data, self.size_var.get())
         except Exception:
             layout = []
@@ -384,13 +349,7 @@ class StructView(tk.Tk):
         self._update_manual_layout_tree()
 
     def _add_member(self):
-        # 支援向後相容性：根據現有成員的格式決定新增成員的格式
-        if not self.members or (self.members and "type" in self.members[0]):
-            # V3 格式（預設）或現有成員是 V3 格式
-            self.members.append({"name": "", "type": "int", "bit_size": 0})
-        else:
-            # 舊格式
-            self.members.append({"name": "", "byte_size": 0, "bit_size": 0})
+        self.members.append({"name": "", "type": "int", "bit_size": 0})
         self._render_member_table()
         self._on_manual_struct_change()
 
@@ -405,14 +364,6 @@ class StructView(tk.Tk):
 
     def _update_member_type(self, idx, var):
         self.members[idx]["type"] = var.get()
-        self._on_manual_struct_change()
-
-    def _update_member_byte(self, idx, var):
-        try:
-            value = var.get()
-            self.members[idx]["byte_size"] = int(value) if str(value).strip() else 0
-        except Exception:
-            self.members[idx]["byte_size"] = 0
         self._on_manual_struct_change()
 
     def _update_member_bit(self, idx, var):
@@ -444,13 +395,7 @@ class StructView(tk.Tk):
         while new_name in existing_names:
             new_name = f"{base_name}_copy{count}"
             count += 1
-        
-        # 支援向後相容性
-        if "type" in orig:
-            new_m = {"name": new_name, "type": orig["type"], "bit_size": orig["bit_size"]}
-        else:
-            new_m = {"name": new_name, "byte_size": orig["byte_size"], "bit_size": orig["bit_size"]}
-        
+        new_m = {"name": new_name, "type": orig["type"], "bit_size": orig["bit_size"]}
         self.members.insert(idx+1, new_m)
         self._render_member_table()
         self._on_manual_struct_change()
@@ -462,20 +407,10 @@ class StructView(tk.Tk):
         self.validation_label.config(text="")
 
     def get_manual_struct_definition(self):
-        # 支援向後相容性：根據成員格式決定返回格式
-        if self.members and "type" in self.members[0]:
-            # V3 格式
-            members_data = [
-                {"name": m["name"], "type": m.get("type", ""), "bit_size": m["bit_size"]}
-                for m in self.members
-            ]
-        else:
-            # 舊格式
-            members_data = [
-                {"name": m["name"], "byte_size": m.get("byte_size", 0), "bit_size": m["bit_size"]}
-                for m in self.members
-            ]
-        # 防呆：size_var 只允許數字
+        members_data = [
+            {"name": m["name"], "type": m.get("type", ""), "bit_size": m["bit_size"]}
+            for m in self.members
+        ]
         try:
             total_size = self.size_var.get()
         except Exception:

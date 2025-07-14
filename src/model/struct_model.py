@@ -36,36 +36,8 @@ class StructModel:
         self.input_processor = InputFieldProcessor()
         self.manual_struct = None  # 新增屬性
 
-    def _merge_byte_and_bit_size(self, members):
-        """
-        將所有 member 做合併：只要 bit_size > 0，則 new_bit_size = byte_size*8 + bit_size，byte_size=0。
-        """
-        merged = []
-        for m in members:
-            # 兼容舊格式: 若只有 length，轉為 bit_size
-            if "length" in m and "bit_size" not in m and "byte_size" not in m:
-                merged.append({
-                    "name": m["name"],
-                    "byte_size": 0,
-                    "bit_size": m["length"]
-                })
-                continue
-            byte_size = m.get("byte_size", 0)
-            bit_size = m.get("bit_size", 0)
-            if bit_size > 0:
-                merged.append({
-                    "name": m["name"],
-                    "byte_size": 0,
-                    "bit_size": byte_size * 8 + bit_size
-                })
-            elif byte_size > 0:
-                merged.append({
-                    "name": m["name"],
-                    "byte_size": byte_size,
-                    "bit_size": 0
-                })
-            # byte_size=0 且 bit_size=0 的 member 直接略過
-        return merged
+    # 移除 _merge_byte_and_bit_size
+    # 完全移除 _convert_legacy_member 及舊格式相容邏輯
 
     def set_manual_struct(self, members, total_size):
         # 統一格式：轉換為 C++ 標準型別格式
@@ -132,30 +104,8 @@ class StructModel:
             self.layout = orig_layout
             self.total_size = orig_total_size
 
-    def _convert_legacy_member(self, member):
-        """支援舊格式的 member（包含 byte_size）"""
-        if "byte_size" in member and "type" not in member:
-            # 舊格式：根據 byte_size 推斷型別
-            byte_size = member.get("byte_size", 0)
-            bit_size = member.get("bit_size", 0)
-            
-            if bit_size > 0:
-                return "unsigned int"  # bitfield 預設型別
-            elif byte_size == 1:
-                return "char"
-            elif byte_size == 2:
-                return "short"
-            elif byte_size == 4:
-                return "int"
-            elif byte_size == 8:
-                return "long long"
-            else:
-                return "unsigned char"  # 其他大小
-        
-        return member.get("type", "")
-
     def _convert_to_cpp_members(self, members):
-        """將 type/bit 欄位轉換為 C++ 標準型別（V3 版本），支援 tuple 格式。"""
+        """將 type/bit 欄位轉換為 C++ 標準型別（V3/V4 版本），支援 tuple 格式。"""
         new_members = []
         for m in members:
             # 支援 tuple 格式 ('type', 'name')
@@ -165,9 +115,7 @@ class StructModel:
             name = m.get("name", "")
             type_name = m.get("type", "")
             bit_size = m.get("bit_size", 0)
-            # 支援舊格式（向後相容）
-            if not type_name:
-                type_name = self._convert_legacy_member(m)
+            # 僅接受有 type 的 member
             if not type_name or type_name not in TYPE_INFO:
                 continue
             if bit_size > 0:
@@ -196,9 +144,6 @@ class StructModel:
             m = members[i]
             type_name = m.get("type", "")
             bit_size = m.get("bit_size", 0)
-            # 支援舊格式（向後相容）
-            if not type_name:
-                type_name = self._convert_legacy_member(m)
             if type_name in TYPE_INFO:
                 if bit_size > 0:
                     # 連續 bitfield group
@@ -207,7 +152,7 @@ class StructModel:
                     # 收集連續同型別 bitfield
                     while i < n:
                         m2 = members[i]
-                        t2 = m2.get("type", "") or self._convert_legacy_member(m2)
+                        t2 = m2.get("type", "")
                         b2 = m2.get("bit_size", 0)
                         if b2 > 0 and t2 == type_name:
                             group_bits += b2
@@ -229,11 +174,6 @@ class StructModel:
             type_name = m.get("type", "")
             bit_size = m.get("bit_size", 0)
             byte_size = m.get("byte_size", 0)
-            if not type_name and "byte_size" in m:
-                type_name = self._convert_legacy_member(m)
-            if "byte_size" in m:
-                if not isinstance(byte_size, int) or byte_size < 0:
-                    errors.append(f"member '{m.get('name', '?')}' byte_size 需為 0 或正整數")
             if not type_name:
                 errors.append(f"member '{m.get('name', '?')}' 必須指定型別")
             elif type_name not in TYPE_INFO:
@@ -284,26 +224,19 @@ class StructModel:
         return layout
 
     def export_manual_struct_to_h(self, struct_name=None):
-        """匯出手動 struct 為 C header 檔案（V3 版本）"""
+        """匯出手動 struct 為 C header 檔案（V4 版本）"""
         members = self.manual_struct["members"] if self.manual_struct else []
         total_size = self.manual_struct["total_size"] if self.manual_struct else 0
         struct_name = struct_name or "MyStruct"
         lines = [f"struct {struct_name} {{"]
-        
         for m in members:
             type_name = m.get("type", "")
             name = m.get("name", "")
             bit_size = m.get("bit_size", 0)
-            
-            # 支援舊格式（向後相容）
-            if not type_name and "byte_size" in m:
-                type_name = self._convert_legacy_member(m)
-            
             if bit_size > 0:
                 lines.append(f"    {type_name} {name} : {bit_size};")
             else:
                 lines.append(f"    {type_name} {name};")
-        
         lines.append("};")
         lines.append(f"// total size: {total_size} bytes")
         return "\n".join(lines)

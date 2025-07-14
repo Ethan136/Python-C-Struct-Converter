@@ -20,12 +20,7 @@ class ManualStructXMLTestLoader(BaseXMLTestLoader):
         members_elem = case.find('members')
         if members_elem is not None:
             for m in members_elem.findall('member'):
-                member = {k: m.get(k) for k in m.keys()}
-                # 型別轉換
-                if 'bit_size' in member:
-                    member['bit_size'] = int(member['bit_size'])
-                if 'byte_size' in member:
-                    member['byte_size'] = int(member['byte_size'])
+                member = {"name": m.get("name", ""), "type": m.get("type", ""), "bit_size": int(m.get("bit_size", 0))}
                 members.append(member)
         # 解析 expected_errors
         expected_errors = []

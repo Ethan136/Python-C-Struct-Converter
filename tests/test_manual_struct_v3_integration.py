@@ -134,54 +134,6 @@ class TestManualStructV3Integration(unittest.TestCase):
         self.assertGreater(len(errors), 0)
         self.assertTrue(any("bitfield 只支援" in error for error in errors))
     
-    def test_backward_compatibility_legacy_format(self):
-        """測試向後相容性 - 舊格式支援"""
-        # 設定結構體
-        self.view.struct_name_var.set("LegacyStruct")
-        self.view.size_var.set(8)
-        
-        # 使用舊格式的成員資料（包含 byte_size）
-        legacy_members = [
-            {"name": "a", "byte_size": 4, "bit_size": 0},
-            {"name": "b", "byte_size": 0, "bit_size": 4}
-        ]
-        
-        # 驗證 Model 層能處理舊格式
-        errors = self.model.validate_manual_struct(legacy_members, 8)
-        self.assertEqual(len(errors), 0)
-        
-        # 驗證型別轉換
-        converted_members = self.model._convert_to_cpp_members(legacy_members)
-        self.assertEqual(len(converted_members), 2)
-        self.assertEqual(converted_members[0]["type"], "int")
-        self.assertEqual(converted_members[1]["type"], "unsigned int")
-        self.assertTrue(converted_members[1]["is_bitfield"])
-    
-    def test_mixed_format_support(self):
-        """測試混合格式支援（新舊格式混合）"""
-        # 設定結構體
-        self.view.struct_name_var.set("MixedStruct")
-        self.view.size_var.set(12)
-        
-        # 混合新舊格式
-        mixed_members = [
-            {"name": "legacy", "byte_size": 4, "bit_size": 0},  # 舊格式
-            {"name": "new", "type": "char", "bit_size": 0},     # 新格式
-            {"name": "bitfield", "type": "unsigned int", "bit_size": 8}  # 新格式 bitfield
-        ]
-        
-        # 驗證 Model 層能處理混合格式
-        errors = self.model.validate_manual_struct(mixed_members, 12)
-        self.assertEqual(len(errors), 0)
-        
-        # 驗證型別轉換
-        converted_members = self.model._convert_to_cpp_members(mixed_members)
-        self.assertEqual(len(converted_members), 3)
-        self.assertEqual(converted_members[0]["type"], "int")
-        self.assertEqual(converted_members[1]["type"], "char")
-        self.assertEqual(converted_members[2]["type"], "unsigned int")
-        self.assertTrue(converted_members[2]["is_bitfield"])
-    
     def test_remaining_space_calculation(self):
         """測試剩餘空間計算"""
         # 設定結構體

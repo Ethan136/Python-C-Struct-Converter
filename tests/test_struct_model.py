@@ -627,8 +627,8 @@ class TestStructModel(unittest.TestCase):
     def test_set_manual_struct_sets_members_and_size(self):
         """Test that set_manual_struct correctly sets members and total_size."""
         members = [
-            {"name": "a", "byte_size": 1, "bit_size": 0},
-            {"name": "b", "byte_size": 2, "bit_size": 0}
+            {"name": "a", "type": "char", "bit_size": 0},
+            {"name": "b", "type": "short", "bit_size": 0}
         ]
         total_size = 3
         self.model.set_manual_struct(members, total_size)
@@ -643,18 +643,18 @@ class TestStructModel(unittest.TestCase):
     def test_validate_manual_struct_errors_and_success(self):
         # 測試 member 欄位錯誤（total_size 足夠大）
         members = [
-            {"name": "a", "byte_size": 0, "bit_size": -1},
-            {"name": "b", "byte_size": -1, "bit_size": 0}
+            {"name": "a", "type": "char", "bit_size": -1},
+            {"name": "b", "type": "short", "bit_size": 0}
         ]
         total_size = 10  # 足夠大，確保 layout 不會先失敗
         errors = self.model.validate_manual_struct(members, total_size)
         self.assertIn("member 'a' bit_size 需為 0 或正整數", errors)
-        self.assertIn("member 'b' byte_size 需為 0 或正整數", errors)
+        # 已移除 byte_size 驗證
 
         # 測試名稱重複（total_size 足夠大）
         members = [
-            {"name": "a", "byte_size": 1, "bit_size": 0},
-            {"name": "a", "byte_size": 2, "bit_size": 0}
+            {"name": "a", "type": "char", "bit_size": 0},
+            {"name": "a", "type": "short", "bit_size": 0}
         ]
         total_size = 10
         errors = self.model.validate_manual_struct(members, total_size)
@@ -662,7 +662,7 @@ class TestStructModel(unittest.TestCase):
 
         # 測試 total_size 錯誤（member 欄位正確）
         members = [
-            {"name": "a", "byte_size": 1, "bit_size": 0}
+            {"name": "a", "type": "char", "bit_size": 0}
         ]
         total_size = -1
         errors = self.model.validate_manual_struct(members, total_size)
@@ -670,8 +670,8 @@ class TestStructModel(unittest.TestCase):
 
         # 測試 layout 錯誤（member 欄位正確，但 total_size 太小）
         members = [
-            {"name": "a", "byte_size": 1, "bit_size": 0},
-            {"name": "b", "byte_size": 1, "bit_size": 0}
+            {"name": "a", "type": "char", "bit_size": 0},
+            {"name": "b", "type": "short", "bit_size": 0}
         ]
         total_size = 1  # 故意設小一點，讓 layout 驗證失敗
         errors = self.model.validate_manual_struct(members, total_size)
@@ -679,8 +679,8 @@ class TestStructModel(unittest.TestCase):
 
         # 驗證通過情境
         members = [
-            {"name": "a", "byte_size": 1, "bit_size": 0},
-            {"name": "b", "byte_size": 2, "bit_size": 0}
+            {"name": "a", "type": "char", "bit_size": 0},
+            {"name": "b", "type": "short", "bit_size": 0}
         ]
         total_size = 4  # C++ align: char + short = 4 bytes
         errors = self.model.validate_manual_struct(members, total_size)
@@ -689,9 +689,9 @@ class TestStructModel(unittest.TestCase):
     def test_calculate_manual_layout_no_padding(self):
         # 測試 bitfield 緊密排列、無 padding（C++ 標準行為：同一 storage unit）
         members = [
-            {"name": "a", "byte_size": 0, "bit_size": 3},
-            {"name": "b", "byte_size": 0, "bit_size": 5},
-            {"name": "c", "byte_size": 0, "bit_size": 8}
+            {"name": "a", "type": "unsigned int", "bit_size": 3},
+            {"name": "b", "type": "unsigned int", "bit_size": 5},
+            {"name": "c", "type": "unsigned int", "bit_size": 8}
         ]
         total_size = 4  # C++ align 4
         layout = self.model.calculate_manual_layout(members, total_size)
@@ -712,9 +712,9 @@ class TestStructModel(unittest.TestCase):
     def test_export_manual_struct_to_h(self):
         # 多欄位 bitfield
         members = [
-            {"name": "a", "byte_size": 0, "bit_size": 3},
-            {"name": "b", "byte_size": 0, "bit_size": 5},
-            {"name": "c", "byte_size": 0, "bit_size": 8}
+            {"name": "a", "type": "unsigned int", "bit_size": 3},
+            {"name": "b", "type": "unsigned int", "bit_size": 5},
+            {"name": "c", "type": "unsigned int", "bit_size": 8}
         ]
         total_size = 2
         self.model.set_manual_struct(members, total_size)
@@ -726,7 +726,7 @@ class TestStructModel(unittest.TestCase):
         self.assertIn("// total size: 2 bytes", h_content)
 
         # 單一欄位
-        members = [{"name": "x", "byte_size": 0, "bit_size": 16}]
+        members = [{"name": "x", "type": "unsigned int", "bit_size": 16}]
         total_size = 2
         self.model.set_manual_struct(members, total_size)
         h_content = self.model.export_manual_struct_to_h()
@@ -743,8 +743,8 @@ class TestStructModel(unittest.TestCase):
     def test_export_manual_struct_to_h_with_custom_name(self):
         # 測試 struct_name 參數自訂時的輸出
         members = [
-            {"name": "a", "byte_size": 0, "bit_size": 3},
-            {"name": "b", "byte_size": 0, "bit_size": 5}
+            {"name": "a", "type": "unsigned int", "bit_size": 3},
+            {"name": "b", "type": "unsigned int", "bit_size": 5}
         ]
         total_size = 1
         self.model.set_manual_struct(members, total_size)
@@ -757,10 +757,10 @@ class TestStructModel(unittest.TestCase):
     def test_manual_struct_byte_bit_size_layout(self):
         model = StructModel()
         members = [
-            {"name": "a", "byte_size": 1, "bit_size": 0},
-            {"name": "b", "byte_size": 0, "bit_size": 12},
-            {"name": "c", "byte_size": 2, "bit_size": 0},
-            {"name": "d", "byte_size": 0, "bit_size": 4}
+            {"name": "a", "type": "char", "bit_size": 0},
+            {"name": "b", "type": "unsigned int", "bit_size": 12},
+            {"name": "c", "type": "short", "bit_size": 0},
+            {"name": "d", "type": "unsigned int", "bit_size": 4}
         ]
         total_size = 16  # C++ align 4, 8, 2, etc.，實際會比 5 大
         # 驗證 set_manual_struct

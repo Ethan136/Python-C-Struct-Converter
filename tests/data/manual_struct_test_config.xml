@@ -32,8 +32,8 @@
         <struct_name>LegacyStruct</struct_name>
         <total_size>8</total_size>
         <members>
-            <member name="a" byte_size="4" bit_size="0"/>
-            <member name="b" byte_size="0" bit_size="4"/>
+            <member name="a" type="int" bit_size="0"/>
+            <member name="b" type="unsigned int" bit_size="4"/>
         </members>
         <expected_errors></expected_errors>
         <expected_types>
@@ -45,7 +45,7 @@
         <struct_name>MixedStruct</struct_name>
         <total_size>12</total_size>
         <members>
-            <member name="legacy" byte_size="4" bit_size="0"/>
+            <member name="legacy" type="int" bit_size="0"/>
             <member name="new" type="char" bit_size="0"/>
             <member name="bitfield" type="unsigned int" bit_size="8"/>
         </members>
@@ -60,9 +60,9 @@
         <struct_name>MyStruct</struct_name>
         <total_size>4</total_size>
         <members>
-            <member name="a" byte_size="0" bit_size="3"/>
-            <member name="b" byte_size="0" bit_size="5"/>
-            <member name="c" byte_size="0" bit_size="8"/>
+            <member name="a" type="unsigned int" bit_size="3"/>
+            <member name="b" type="unsigned int" bit_size="5"/>
+            <member name="c" type="unsigned int" bit_size="8"/>
         </members>
         <expected_errors></expected_errors>
         <expected_export_contains>
