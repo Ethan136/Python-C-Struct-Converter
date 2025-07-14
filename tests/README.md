@@ -490,6 +490,17 @@ python3 -m unittest test_struct_manual_integration -v
 - 測試 debug bytes 格式於兩個 tab 完全一致，便於比對與除錯。
 - 以上皆有自動化測試驗證。 
 
+## 測試格式統一公告（v4+）
+
+> **重要說明：**
+> - 自 v4 起，所有 struct member 測試資料、XML、mock、驗證僅支援新格式：
+>   - 每個 member 僅允許 `type`、`name`，bitfield 額外有 `bit_size`。
+>   - 舊有 `byte_size`、`_convert_legacy_member`、is_legacy 等欄位/格式已全面移除。
+>   - 測試、loader、GUI、驗證、匯出等皆統一新格式，完全對齊 C++ 標準。
+> - 若有舊資料或自動化腳本，請先轉換為新格式再升級。
+
+詳細規劃與轉換說明，請見 [`../docs/development/v4_data_type_refactor.md`](../docs/development/v4_data_type_refactor.md)。
+
 ## 如何撰寫與擴充 XML 驅動測試
 
 本專案所有核心測試（struct model、input conversion、input field processor 等）皆已標準化為 XML 驅動架構。以下說明如何撰寫、擴充與除錯：

@@ -23,41 +23,73 @@ This project provides a graphical user interface (GUI) tool built with Python an
 ## Project Structure
 
 ```
-├── src/                      # Source code
+├── src/                      # Source code (MVP Architecture)
 │   ├── __init__.py           # Package initialization
 │   ├── main.py               # Application entry point
 │   ├── model/                # Model layer (business logic)
 │   │   ├── __init__.py
-│   │   ├── struct_model.py
-│   │   └── STRUCT_PARSING.md
+│   │   ├── struct_model.py           # Core struct logic
+│   │   ├── struct_parser.py          # Struct parsing utilities
+│   │   ├── layout.py                 # Layout calculation
+│   │   ├── input_field_processor.py  # Input field processing
+│   │   ├── STRUCT_PARSING.md         # Model documentation
+│   │   └── README.md
 │   ├── view/                 # View layer (UI)
 │   │   ├── __init__.py
-│   │   └── struct_view.py
+│   │   ├── struct_view.py
+│   │   ├── GUI_DEVELOPER_GUIDE.md
+│   │   └── README.md
 │   ├── presenter/            # Presenter layer (coordination)
 │   │   ├── __init__.py
-│   │   └── struct_presenter.py
+│   │   ├── struct_presenter.py
+│   │   ├── PRESENTER_DEVELOPER_GUIDE.md
+│   │   └── README.md
 │   └── config/               # Configuration layer
 │       ├── __init__.py
 │       ├── ui_strings.py
-│       └── ui_strings.xml
-├── examples/                  # Example files
-│   └── example.h             # Example C++ struct file
+│       ├── ui_strings.xml
+│       └── README.md
+├── examples/                 # Example files
+│   ├── example.h             # Example C++ struct file
+│   └── README.md
 ├── docs/                     # Documentation
+│   ├── README.md
+│   ├── PROJECT_STRUCTURE.md
 │   ├── ARCHITECTURE.md
 │   ├── analysis/
-│   │   └── input_conversion_analysis.md  # Input conversion analysis
+│   │   └── input_conversion_analysis.md
 │   └── development/
-│       └── string_refactor_plan.md
-├── tests/                    # Test files
+│       ├── string_refactor_plan.md
+│       └── ... (other dev/design docs)
+├── tests/                    # Test files & automation
 │   ├── __init__.py
-│   ├── README.md             # Test documentation
-│   ├── data/
-│   │   └── test_config.xml   # Test configuration
+│   ├── README.md
+│   ├── data/                 # XML test configs, .h files
+│   │   ├── test_config.xml
+│   │   └── ... (other XML/.h)
 │   ├── test_string_parser.py
-│   └── test_input_conversion.py
+│   ├── test_input_conversion.py
+│   ├── test_struct_model.py
+│   ├── test_struct_view.py
+│   ├── test_manual_struct_v3_integration.py
+│   ├── test_struct_model_v3.py
+│   ├── test_struct_view_padding.py
+│   ├── base_xml_test_loader.py
+│   ├── xml_manual_struct_loader.py
+│   ├── xml_input_conversion_loader.py
+│   ├── xml_input_field_processor_loader.py
+│   ├── xml_struct_model_loader.py
+│   └── ... (integration/refactor/mock tests)
+├── packing/                  # Build/packaging scripts
+│   ├── build.py
+│   ├── executable_tester.py
+│   ├── CppStructParser-windows.spec
+│   ├── CppStructParser-macos.spec
+│   └── README.md
 ├── .github/workflows/        # GitHub Actions workflows
-│   ├── build-windows-exe.yml # Windows executable build
-│   └── release.yml           # Release automation
+│   ├── build-windows-exe.yml
+│   ├── release.yml
+│   └── pr-check.yml
 ├── run.py                    # Application launcher
 ├── run_tests.py              # Test runner
 ├── run_all_tests.py          # Cross-platform test runner (separates GUI/non-GUI tests)
@@ -67,8 +99,17 @@ This project provides a graphical user interface (GUI) tool built with Python an
 ├── setup.py                  # Package configuration
 ├── requirements.txt          # Dependencies
 ├── DEPLOYMENT.md             # Deployment guide
+├── .gitignore                # Git ignore rules
+├── .venv/                    # Python virtual environment (not versioned)
+├── dist/                     # Build output (not versioned)
+├── build/                    # Build temp files (not versioned)
 └── README.md                 # This file
 ```
+
+- 各子資料夾皆有 README 或開發者指南，詳細說明模組職責與擴充方式。
+- `tests/` 內含完整自動化測試、XML loader、integration/refactor/mock 測試，`data/` 內有多份 XML 測資與 .h 範例。
+- `packing/` 目錄包含打包/測試腳本與 spec。
+- `.venv/`、`dist/`、`build/`、`.gitignore` 為輔助/產物目錄。
 
 ## Developer Guides
 
@@ -275,3 +316,14 @@ For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 3. 測試程式會自動讀取所有 config 並驗證，無需改動 Python 程式
 
 詳細教學與 schema 範例，請見 [`tests/README.md`](tests/README.md) 的「如何撰寫與擴充 XML 驅動測試」章節。
+
+## Struct Member Format Notice (v4+)
+
+> **Important:**
+> - Starting from v4, this project **only supports the new struct member format**:
+>   - Each member must have: `type`, `name`, and (optionally) `bit_size` (for bitfields).
+>   - The legacy format (with `byte_size`, `_convert_legacy_member`, or any backward compatibility logic) is **no longer supported** in any part of the codebase, GUI, or tests.
+>   - All parsing, validation, and export logic is unified on the new format, fully matching C++ struct/bitfield layout and alignment rules.
+> - If you have old data or scripts using the legacy format, please migrate to the new format before upgrading.
+
+For migration details and rationale, see [`docs/development/v4_data_type_refactor.md`](docs/development/v4_data_type_refactor.md).
