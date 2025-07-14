@@ -64,6 +64,22 @@ class LayoutCalculator:
         info = TYPE_INFO[mtype]
         return info["size"], info["align"]
 
+    # Array processing -------------------------------------------------
+    def _process_array_member(self, name: str, mtype: str, array_dims: list):
+        """Placeholder for array member handling.
+
+        Currently treats the array as a single element to preserve legacy
+        behavior. This will be expanded for full N-D array support in the
+        future.
+        """
+        size, alignment = self._get_type_size_and_align(mtype)
+        if alignment > self.max_alignment:
+            self.max_alignment = alignment
+        self._add_padding_if_needed(alignment)
+        # TODO: expand array dimensions in future implementation
+        self._add_member_to_layout(name, mtype, size)
+        self.current_offset += size
+
     def calculate(self, members: List[Union[Tuple[str, str], dict]]):
         """Calculate the complete memory layout for the struct."""
         for member in members:
@@ -104,8 +120,12 @@ class LayoutCalculator:
         else:
             raise ValueError(f"Invalid member format: {member}")
 
+        if array_dims:
+            self._process_array_member(member_name, member_type, array_dims)
+            return
+
         size, alignment = self._get_type_size_and_align(member_type)
-        
+
         if alignment > self.max_alignment:
             self.max_alignment = alignment
 
