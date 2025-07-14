@@ -14,13 +14,13 @@ from .struct_parser import parse_struct_definition, parse_member_line
 # parse_struct_definition 與 parse_member_line 已移至 ``struct_parser`` 模組，
 # 於此重新匯入以維持相容性。
 
-def calculate_layout(members, calculator_cls=None):
+def calculate_layout(members, calculator_cls=None, pack_alignment=None):
     """Calculate the memory layout using the specified calculator class."""
     if not members:
         return [], 0, 1
 
     calculator_cls = calculator_cls or LayoutCalculator
-    layout_calculator = calculator_cls()
+    layout_calculator = calculator_cls(pack_alignment=pack_alignment)
     return layout_calculator.calculate(members)
 
 
