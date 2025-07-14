@@ -203,31 +203,28 @@ class LayoutCalculator:
         """Add padding if needed to meet alignment requirements."""
         padding = (alignment - (self.current_offset % alignment)) % alignment
         if padding > 0:
-            self.layout.append({
-                "name": "(padding)",
-                "type": "padding",
-                "size": padding,
-                "offset": self.current_offset,
-                "is_bitfield": False,
-                "bit_offset": 0,
-                "bit_size": padding * 8
-            })
-            self.current_offset += padding
-    
+            self._add_padding_entry("(padding)", padding)
+
     def _add_final_padding(self):
         """Add final padding to align the whole struct."""
-        final_padding = (self.max_alignment - (self.current_offset % self.max_alignment)) % self.max_alignment
+        final_padding = (
+            self.max_alignment - (self.current_offset % self.max_alignment)
+        ) % self.max_alignment
         if final_padding > 0:
-            self.layout.append({
-                "name": "(final padding)",
-                "type": "padding",
-                "size": final_padding,
-                "offset": self.current_offset,
-                "is_bitfield": False,
-                "bit_offset": 0,
-                "bit_size": final_padding * 8
-            })
-            self.current_offset += final_padding
+            self._add_padding_entry("(final padding)", final_padding)
+
+    def _add_padding_entry(self, name, size):
+        """Append a padding entry to the layout and advance the offset."""
+        self.layout.append({
+            "name": name,
+            "type": "padding",
+            "size": size,
+            "offset": self.current_offset,
+            "is_bitfield": False,
+            "bit_offset": 0,
+            "bit_size": size * 8,
+        })
+        self.current_offset += size
 
 class StructModel:
     def __init__(self):
