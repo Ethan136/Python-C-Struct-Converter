@@ -56,13 +56,39 @@ def parse_member_line(line):
     return None
 
 
+def _extract_struct_body(file_content):
+    """Return struct name and body substring.
+
+    This helper isolates struct body extraction logic so that nested
+    structures can be supported in the future.
+    """
+    match = re.search(r"struct\s+(\w+)\s*\{", file_content)
+    if not match:
+        return None, None
+    struct_name = match.group(1)
+    start = match.end()
+    brace_count = 1
+    i = start
+    while i < len(file_content) and brace_count > 0:
+        char = file_content[i]
+        if char == '{':
+            brace_count += 1
+        elif char == '}':
+            brace_count -= 1
+        i += 1
+
+    if brace_count != 0:
+        return None, None
+
+    struct_body = file_content[start:i - 1]
+    return struct_name, struct_body
+
+
 def parse_struct_definition(file_content):
     """Parse a C/C++ struct definition string."""
-    struct_match = re.search(r"struct\s+(\w+)\s*\{([^}]+)\};", file_content, re.DOTALL)
-    if not struct_match:
+    struct_name, struct_content = _extract_struct_body(file_content)
+    if not struct_name:
         return None, None
-    struct_name = struct_match.group(1)
-    struct_content = struct_match.group(2)
     struct_content = re.sub(r"//.*", "", struct_content)
     lines = struct_content.split(';')
     members = []
