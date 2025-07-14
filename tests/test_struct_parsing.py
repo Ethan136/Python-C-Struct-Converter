@@ -6,7 +6,8 @@ import sys
 # Add src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from model.struct_model import parse_struct_definition, calculate_layout, LayoutCalculator
+from model.struct_model import parse_struct_definition, calculate_layout
+from model.layout import LayoutCalculator, LayoutItem
 
 class TestParseStructDefinition(unittest.TestCase):
     """Test cases for struct definition parsing functionality."""
@@ -196,6 +197,19 @@ class TestLayoutCalculator(unittest.TestCase):
         non_bf = [item for item in layout if not item.get("is_bitfield") and item["type"] != "padding"]
         self.assertEqual(len(non_bf), 1)
         self.assertEqual(non_bf[0]["name"], "c")
+
+class TestLayoutItemDataclass(unittest.TestCase):
+    """Ensure calculate_layout returns LayoutItem objects."""
+
+    def test_layout_item_instances(self):
+        members = [("char", "a"), ("int", "b")]
+        layout, _, _ = calculate_layout(members)
+        self.assertTrue(all(isinstance(item, LayoutItem) for item in layout))
+        self.assertEqual(layout[0].name, "a")
+        b_entry = next((item for item in layout if item.name == "b"), None)
+        self.assertIsNotNone(b_entry)
+        self.assertEqual(b_entry.type, "int")
+
 
 
 if __name__ == '__main__':
