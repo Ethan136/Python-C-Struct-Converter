@@ -60,6 +60,22 @@ class BaseLayoutCalculator(ABC):
         self.bitfield_bit_offset = 0
         self.bitfield_unit_offset = 0
 
+    def _get_attr(
+        self, member: Union[Tuple[str, str], dict, object], attr: str, default=None
+    ):
+        """Retrieve attribute from ``member`` supporting multiple formats."""
+        if isinstance(member, tuple):
+            if attr == "type":
+                return member[0]
+            if attr == "name":
+                return member[1]
+            return default
+        if hasattr(member, attr):
+            return getattr(member, attr)
+        if isinstance(member, dict):
+            return member.get(attr, default)
+        return default
+
     @abstractmethod
     def calculate(self, members: List[Union[Tuple[str, str], dict]]):
         """Calculate layout for given members."""
@@ -111,14 +127,9 @@ class StructLayoutCalculator(BaseLayoutCalculator):
 
     # Internal helpers -------------------------------------------------
     def _process_bitfield_member(self, member):
-        if hasattr(member, "type"):
-            mtype = member.type
-            mname = member.name
-            mbit_size = member.bit_size
-        else:
-            mtype = member["type"]
-            mname = member["name"]
-            mbit_size = member["bit_size"]
+        mtype = self._get_attr(member, "type")
+        mname = self._get_attr(member, "name")
+        mbit_size = self._get_attr(member, "bit_size")
         info = TYPE_INFO[mtype]
         size, alignment = info["size"], info["align"]
 
@@ -133,19 +144,9 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         self.bitfield_unit_type = None
         self.bitfield_bit_offset = 0
 
-        if isinstance(member, tuple):
-            member_type, member_name = member
-            array_dims = []
-        elif isinstance(member, dict):
-            member_type = member["type"]
-            member_name = member["name"]
-            array_dims = member.get("array_dims", [])
-        elif hasattr(member, "type"):
-            member_type = member.type
-            member_name = member.name
-            array_dims = getattr(member, "array_dims", [])
-        else:
-            raise ValueError(f"Invalid member format: {member}")
+        member_type = self._get_attr(member, "type")
+        member_name = self._get_attr(member, "name")
+        array_dims = self._get_attr(member, "array_dims") or []
 
         if array_dims:
             self._process_array_member(member_name, member_type, array_dims)
