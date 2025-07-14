@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from typing import List, Tuple, Union
+from abc import ABC, abstractmethod
 
 
 # Based on a common 64-bit system (like GCC on x86-64)
@@ -46,8 +47,8 @@ class LayoutItem:
         return hasattr(self, key)
 
 
-class LayoutCalculator:
-    """Helper class for calculating struct memory layout."""
+class BaseLayoutCalculator(ABC):
+    """Abstract base class for layout calculators."""
 
     def __init__(self):
         self.layout: List[LayoutItem] = []
@@ -58,6 +59,18 @@ class LayoutCalculator:
         self.bitfield_unit_align = 0
         self.bitfield_bit_offset = 0
         self.bitfield_unit_offset = 0
+
+    @abstractmethod
+    def calculate(self, members: List[Union[Tuple[str, str], dict]]):
+        """Calculate layout for given members."""
+        raise NotImplementedError
+
+
+class StructLayoutCalculator(BaseLayoutCalculator):
+    """Helper class for calculating struct memory layout."""
+
+    def __init__(self):
+        super().__init__()
 
     def _get_type_size_and_align(self, mtype: str) -> Tuple[int, int]:
         """Return (size, alignment) for a given C type."""
@@ -217,4 +230,8 @@ class LayoutCalculator:
             )
         )
         self.current_offset += size
+
+
+# Maintain backward compatibility
+LayoutCalculator = StructLayoutCalculator
 
