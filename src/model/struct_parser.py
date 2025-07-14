@@ -1,19 +1,36 @@
 """Utilities for parsing C/C++ struct definitions."""
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 from .layout import TYPE_INFO
 
 
 @dataclass
 class MemberDef:
-    """Unified representation of a struct member."""
+    """Unified representation of a struct or union member."""
 
     type: str
     name: str
     is_bitfield: bool = False
     bit_size: int = 0
     array_dims: List[int] = field(default_factory=list)
+    nested: Optional[Union["StructDef", "UnionDef"]] = None
+
+
+@dataclass
+class StructDef:
+    """Representation of a C struct definition."""
+
+    name: str
+    members: List[MemberDef]
+
+
+@dataclass
+class UnionDef:
+    """Representation of a C union definition."""
+
+    name: str
+    members: List[MemberDef]
 
 
 def _extract_array_dims(name_token):
@@ -144,6 +161,14 @@ def parse_struct_definition_v2(file_content: str) -> Tuple[Optional[str], Option
     return struct_name, members
 
 
+def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
+    """Parse a struct definition and return a :class:`StructDef` object."""
+    name, members = parse_struct_definition_v2(file_content)
+    if not name:
+        return None
+    return StructDef(name=name, members=members)
+
+
 def parse_c_definition(file_content: str) -> Tuple[Optional[str], Optional[str], Optional[List[dict]]]:
     """Parse a C structure or union definition.
 
@@ -154,3 +179,12 @@ def parse_c_definition(file_content: str) -> Tuple[Optional[str], Optional[str],
     if name is None:
         return None, None, None
     return "struct", name, members
+
+
+def parse_c_definition_ast(file_content: str) -> Optional[Union[StructDef, UnionDef]]:
+    """Parse a C struct or union and return a definition object.
+
+    Union support is not yet implemented and will return ``None`` if a union
+    definition is encountered.
+    """
+    return parse_struct_definition_ast(file_content)

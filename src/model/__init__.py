@@ -4,9 +4,13 @@
 from model.struct_model import StructModel, parse_struct_definition, calculate_layout
 from model.struct_parser import (
     MemberDef,
+    StructDef,
+    UnionDef,
     parse_member_line_v2,
     parse_struct_definition_v2,
+    parse_struct_definition_ast,
     parse_c_definition,
+    parse_c_definition_ast,
 )
 from model.layout import (
     LayoutCalculator,
@@ -26,7 +30,11 @@ __all__ = [
     'UnionLayoutCalculator',
     'LayoutItem',
     'MemberDef',
+    'StructDef',
+    'UnionDef',
     'parse_member_line_v2',
     'parse_struct_definition_v2',
+    'parse_struct_definition_ast',
     'parse_c_definition',
+    'parse_c_definition_ast',
 ]
