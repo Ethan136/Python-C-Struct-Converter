@@ -1,5 +1,5 @@
 import unittest
-from model.struct_parser import parse_member_line
+from model.struct_parser import parse_member_line, _extract_struct_body
 
 class TestParseMemberLine(unittest.TestCase):
     def test_regular_member(self):
@@ -22,6 +22,20 @@ class TestParseMemberLine(unittest.TestCase):
         self.assertEqual(result['type'], 'short')
         self.assertEqual(result['name'], 'data')
         self.assertEqual(result.get('array_dims'), [4, 2])
+
+
+class TestExtractStructBody(unittest.TestCase):
+    def test_simple_body_extraction(self):
+        content = """
+        struct Simple {
+            int a;
+            char b;
+        };
+        """
+        name, body = _extract_struct_body(content)
+        self.assertEqual(name, "Simple")
+        self.assertIn("int a;", body)
+        self.assertIn("char b;", body)
 
 if __name__ == '__main__':
     unittest.main()
