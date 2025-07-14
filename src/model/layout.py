@@ -54,7 +54,14 @@ class LayoutItem:
 class BaseLayoutCalculator(ABC):
     """Abstract base class for layout calculators."""
 
-    def __init__(self):
+    def __init__(self, pack_alignment: Optional[int] = None):
+        """Initialize the layout calculator.
+
+        ``pack_alignment`` allows future support for ``#pragma pack`` style
+        alignment control. The parameter is accepted but currently ignored so
+        that existing behaviour remains unchanged.
+        """
+        self.pack_alignment = pack_alignment
         self.layout: List[LayoutItem] = []
         self.current_offset = 0
         self.max_alignment = 1
@@ -63,6 +70,14 @@ class BaseLayoutCalculator(ABC):
         self.bitfield_unit_align = 0
         self.bitfield_bit_offset = 0
         self.bitfield_unit_offset = 0
+
+    def _effective_alignment(self, alignment: int) -> int:
+        """Return the effective alignment.
+
+        This method simply returns ``alignment`` for now but provides a single
+        point to apply ``pack_alignment`` rules in the future.
+        """
+        return alignment
 
     def _get_attr(
         self, member: Union[Tuple[str, str], dict, object], attr: str, default=None
@@ -89,8 +104,8 @@ class BaseLayoutCalculator(ABC):
 class StructLayoutCalculator(BaseLayoutCalculator):
     """Helper class for calculating struct memory layout."""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, pack_alignment: Optional[int] = None):
+        super().__init__(pack_alignment=pack_alignment)
 
     def _get_type_size_and_align(self, mtype: str) -> Tuple[int, int]:
         """Return (size, alignment) for a given C type."""
@@ -216,14 +231,16 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         )
 
     def _add_padding_if_needed(self, alignment: int):
-        padding = (alignment - (self.current_offset % alignment)) % alignment
+        effective = self._effective_alignment(alignment)
+        padding = (effective - (self.current_offset % effective)) % effective
         if padding > 0:
             self._add_padding_entry("(padding)", padding)
 
     def _add_final_padding(self):
+        effective = self._effective_alignment(self.max_alignment)
         final_padding = (
-            self.max_alignment - (self.current_offset % self.max_alignment)
-        ) % self.max_alignment
+            effective - (self.current_offset % effective)
+        ) % effective
         if final_padding > 0:
             self._add_padding_entry("(final padding)", final_padding)
 
@@ -245,8 +262,8 @@ class StructLayoutCalculator(BaseLayoutCalculator):
 class UnionLayoutCalculator(BaseLayoutCalculator):
     """Calculate memory layout for a C union."""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, pack_alignment: Optional[int] = None):
+        super().__init__(pack_alignment=pack_alignment)
 
     def _get_type_size_and_align(self, mtype: str) -> Tuple[int, int]:
         info = TYPE_INFO[mtype]
