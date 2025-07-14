@@ -480,3 +480,9 @@ python3 -m unittest test_struct_manual_integration -v
 - **解法**：
   - 確認 sys.path 有包含 src/ 及 tests/ 目錄。
   - 使用相對 import 或調整 sys.path。 
+
+### GUI 一致性與同步測試
+- 測試 MyStruct 與 .H tab 的 Treeview 欄位、欄位寬度、scrollbar、欄位顯示完全一致（見 test_struct_view.py、test_struct_view_padding.py）。
+- 測試 tab 切換時，Treeview、hex grid、欄位驗證等 GUI 行為即時同步。
+- 測試 debug bytes 格式於兩個 tab 完全一致，便於比對與除錯。
+- 以上皆有自動化測試驗證。 

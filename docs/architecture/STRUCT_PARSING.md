@@ -249,3 +249,11 @@ The struct parsing system follows TDD principles with comprehensive test coverag
 - **Backward Compatibility**: Maintained for existing functionality
 - **Documentation**: All changes documented and tested
 - **Code Quality**: TDD approach ensures robust implementation
+
+## GUI Integration & Real-time Behavior (2024/07 Update)
+
+- GUI 內「手動 struct 定義」tab 及「.H 檔載入」tab 的欄位顯示、hex grid 輸入、欄位驗證、Treeview 欄位等行為已完全一致，皆以共用方法（如 _build_hex_grid、_rebuild_manual_hex_grid、_populate_tree）實作。
+- 欄位驗證（如 hex 輸入長度、合法字元）於輸入時即時檢查，錯誤會即時顯示於 GUI。
+- Treeview 於欄位變更、tab 切換、hex grid 變更時自動更新，確保顯示內容與 C++ 標準一致。
+- bitfield、padding、offset 等資訊於 Treeview 內即時顯示，完全對齊 C++ 記憶體配置。
+- 所有欄位、padding、bitfield 的顯示與驗證邏輯皆有自動化測試驗證。

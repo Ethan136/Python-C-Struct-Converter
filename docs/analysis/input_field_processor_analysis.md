@@ -122,3 +122,11 @@ This document outlines the requirements and design for a new module responsible 
   - Future versions will support direct input and validation for bitfield fields (e.g., restrict input to valid bit width, auto-pack user input into correct storage unit for struct_model.py integration).
   - Will provide helper functions to convert user bitfield input into packed integer values, and vice versa.
   - Will integrate with struct_model.py to ensure bitfield input/output is consistent with memory layout and parsing logic. 
+
+## GUI Integration & Real-time Validation (2024/07 Update)
+
+- GUI 內所有 hex 輸入欄位（含手動 struct 與 .H 檔 tab）皆以共用方法產生，並於輸入時即時驗證長度與合法字元。
+- 欄位驗證（如 hex 輸入長度、合法字元）於每次輸入時即時檢查，錯誤會即時顯示於 GUI。
+- 欄位顯示、欄位寬度、tab 切換等行為完全一致，確保跨 tab 體驗一致。
+- bitfield 欄位未來將支援直接輸入與即時驗證，並與 struct_model.py 的 bitfield packing 行為一致。
+- 所有欄位驗證、bitfield 處理、欄位顯示等細節皆有自動化測試驗證。 

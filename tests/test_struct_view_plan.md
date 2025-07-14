@@ -63,6 +63,21 @@
         4.  呼叫 `show_error_message` 方法。
         5.  斷言 `messagebox.showerror` 被以正確的參數呼叫。
 
+### 3.4. GUI 細節一致性與同步測試
+
+-   **`test_treeview_column_consistency`**:
+    -   **目的**: 驗證 MyStruct 與 .H tab 的 Treeview 欄位、欄位寬度、標題完全一致。
+-   **`test_scrollbar_presence`**:
+    -   **目的**: 驗證兩個 tab 主框架皆有右側 scrollbar。
+-   **`test_bitfield_and_padding_display`**:
+    -   **目的**: 驗證 bitfield 與 padding 欄位於 Treeview 內正確顯示。
+-   **`test_debug_bytes_format_consistency`**:
+    -   **目的**: 驗證 debug bytes 格式於兩個 tab 完全一致。
+-   **`test_tab_switch_sync`**:
+    -   **目的**: 驗證 tab 切換時，Treeview、hex grid、欄位驗證等 GUI 行為即時同步。
+-   **`test_field_validation_realtime`**:
+    -   **目的**: 驗證欄位驗證（長度、合法字元）於輸入時即時顯示。
+
 ## 4. 測試環境
 
 -   **框架**: `unittest`

@@ -182,17 +182,13 @@ def calculate_manual_layout(self, members, total_size):
 - `"member 'name' bit_size 需為 0 或正整數"`: Invalid bit size
 - `"成員名稱 'name' 重複"`: Duplicate member names
 
-## GUI Integration
+## GUI Integration (2024/07 Update)
 
-### Real-time Feedback
-- **Remaining Space**: Shows available bits/bytes in real-time
-- **Validation Errors**: Displays validation errors immediately
-- **Layout Preview**: Shows the calculated memory layout
-
-### Export Functionality
-- **C Header Export**: Generates valid C++ struct declarations
-- **Bitfield Syntax**: Proper bitfield syntax for bit-sized members
-- **Type Compatibility**: Ensures exported code compiles correctly
+- GUI 內「手動 struct 定義」tab 及「.H 檔載入」tab 的欄位顯示、hex grid 輸入、欄位驗證、Treeview 欄位等行為已完全一致，皆以共用方法（如 _build_hex_grid、_rebuild_manual_hex_grid、_populate_tree）實作。
+- 欄位驗證（如 hex 輸入長度、合法字元）於輸入時即時檢查，錯誤會即時顯示於 GUI。
+- Treeview 於欄位變更、tab 切換、hex grid 變更時自動更新，確保顯示內容與 C++ 標準一致。
+- bitfield、padding、offset 等資訊於 Treeview 內即時顯示，完全對齊 C++ 記憶體配置。
+- 所有欄位、padding、bitfield 的顯示與驗證邏輯皆有自動化測試驗證。
 
 ## GUI Display Behavior (2024/07 Update)
 
