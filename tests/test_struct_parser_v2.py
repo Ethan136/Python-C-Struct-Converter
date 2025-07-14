@@ -1,5 +1,19 @@
 import unittest
-from model.struct_parser import parse_member_line_v2, parse_struct_definition_v2, MemberDef
+import sys
+import os
+
+# Add project root to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(project_root, 'src'))
+sys.path.insert(0, project_root)
+
+from model.struct_parser import (
+    parse_member_line_v2,
+    parse_struct_definition_v2,
+    parse_struct_definition_ast,
+    MemberDef,
+    StructDef,
+)
 from model.layout import LayoutCalculator
 
 class TestParseMemberLineV2(unittest.TestCase):
@@ -10,6 +24,7 @@ class TestParseMemberLineV2(unittest.TestCase):
         self.assertEqual(m.name, 'value')
         self.assertFalse(m.is_bitfield)
         self.assertEqual(m.array_dims, [])
+        self.assertIsNone(m.nested)
 
     def test_pointer_member(self):
         m = parse_member_line_v2('char* ptr')
@@ -37,6 +52,20 @@ class TestParseStructDefinitionV2(unittest.TestCase):
         self.assertEqual(len(members), 2)
         self.assertIsInstance(members[0], MemberDef)
 
+class TestParseStructDefinitionAst(unittest.TestCase):
+    def test_ast_return(self):
+        content = '''
+        struct Simple {
+            char a;
+            int b;
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        self.assertIsInstance(sdef, StructDef)
+        self.assertEqual(sdef.name, 'Simple')
+        self.assertEqual(len(sdef.members), 2)
+        self.assertIsInstance(sdef.members[0], MemberDef)
+
 class TestLayoutCalculatorWithMemberDef(unittest.TestCase):
     def test_layout_with_memberdef(self):
         members = [MemberDef('char', 'a'), MemberDef('int', 'b')]
@@ -51,3 +80,4 @@ class TestLayoutCalculatorWithMemberDef(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
