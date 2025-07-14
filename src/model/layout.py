@@ -59,6 +59,11 @@ class LayoutCalculator:
         self.bitfield_bit_offset = 0
         self.bitfield_unit_offset = 0
 
+    def _get_type_size_and_align(self, mtype: str) -> Tuple[int, int]:
+        """Return (size, alignment) for a given C type."""
+        info = TYPE_INFO[mtype]
+        return info["size"], info["align"]
+
     def calculate(self, members: List[Union[Tuple[str, str], dict]]):
         """Calculate the complete memory layout for the struct."""
         for member in members:
@@ -91,15 +96,16 @@ class LayoutCalculator:
 
         if isinstance(member, tuple):
             member_type, member_name = member
+            array_dims = []
         elif isinstance(member, dict):
             member_type = member["type"]
             member_name = member["name"]
+            array_dims = member.get("array_dims", [])
         else:
             raise ValueError(f"Invalid member format: {member}")
 
-        info = TYPE_INFO[member_type]
-        size, alignment = info["size"], info["align"]
-
+        size, alignment = self._get_type_size_and_align(member_type)
+        
         if alignment > self.max_alignment:
             self.max_alignment = alignment
 
