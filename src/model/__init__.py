@@ -2,12 +2,18 @@
 # Contains data structures and business logic independent of UI
 
 from model.struct_model import StructModel, parse_struct_definition, calculate_layout
-from model.struct_parser import MemberDef, parse_member_line_v2, parse_struct_definition_v2
+from model.struct_parser import (
+    MemberDef,
+    parse_member_line_v2,
+    parse_struct_definition_v2,
+    parse_c_definition,
+)
 from model.layout import (
     LayoutCalculator,
     LayoutItem,
     BaseLayoutCalculator,
     StructLayoutCalculator,
+    UnionLayoutCalculator,
 )
 
 __all__ = [
@@ -17,8 +23,10 @@ __all__ = [
     'LayoutCalculator',
     'BaseLayoutCalculator',
     'StructLayoutCalculator',
+    'UnionLayoutCalculator',
     'LayoutItem',
     'MemberDef',
     'parse_member_line_v2',
     'parse_struct_definition_v2',
+    'parse_c_definition',
 ]

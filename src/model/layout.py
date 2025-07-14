@@ -232,6 +232,52 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         self.current_offset += size
 
 
+class UnionLayoutCalculator(BaseLayoutCalculator):
+    """Calculate memory layout for a C union."""
+
+    def __init__(self):
+        super().__init__()
+
+    def _get_type_size_and_align(self, mtype: str) -> Tuple[int, int]:
+        info = TYPE_INFO[mtype]
+        return info["size"], info["align"]
+
+    def calculate(self, members: List[Union[Tuple[str, str], dict]]):
+        max_size = 0
+        for member in members:
+            if isinstance(member, tuple):
+                mtype, mname = member
+            elif isinstance(member, dict):
+                mtype = member["type"]
+                mname = member["name"]
+            elif hasattr(member, "type"):
+                mtype = member.type
+                mname = member.name
+            else:
+                raise ValueError(f"Invalid member format: {member}")
+
+            size, alignment = self._get_type_size_and_align(mtype)
+            if alignment > self.max_alignment:
+                self.max_alignment = alignment
+            if size > max_size:
+                max_size = size
+            self.layout.append(
+                LayoutItem(
+                    name=mname,
+                    type=mtype,
+                    size=size,
+                    offset=0,
+                    is_bitfield=False,
+                    bit_offset=0,
+                    bit_size=size * 8,
+                )
+            )
+
+        self.current_offset = max_size
+        self._add_final_padding()
+        return self.layout, self.current_offset, self.max_alignment
+
+
 # Maintain backward compatibility
 LayoutCalculator = StructLayoutCalculator
 
