@@ -101,18 +101,26 @@ def parse_member_line(line):
 def parse_member_line_v2(line: str) -> Optional[MemberDef]:
     """Parse a struct member line and return a :class:`MemberDef`."""
     parsed = parse_member_line(line)
-    if parsed is None:
-        return None
-    if isinstance(parsed, tuple):
-        mtype, name = parsed
-        return MemberDef(type=mtype, name=name)
-    return MemberDef(
-        type=parsed["type"],
-        name=parsed["name"],
-        is_bitfield=parsed.get("is_bitfield", False),
-        bit_size=parsed.get("bit_size", 0),
-        array_dims=parsed.get("array_dims", []),
-    )
+    if parsed is not None:
+        if isinstance(parsed, tuple):
+            mtype, name = parsed
+            return MemberDef(type=mtype, name=name)
+        return MemberDef(
+            type=parsed["type"],
+            name=parsed["name"],
+            is_bitfield=parsed.get("is_bitfield", False),
+            bit_size=parsed.get("bit_size", 0),
+            array_dims=parsed.get("array_dims", []),
+        )
+
+    line = line.strip()
+    if line.startswith("struct") and "{" in line and "}" in line:
+        struct_def = parse_struct_definition_ast(line + ";")
+        if struct_def:
+            after = line[line.rfind("}") + 1 :].strip()
+            member_name = after.split()[0] if after else None
+            return MemberDef(type="struct", name=member_name, nested=struct_def)
+    return None
 
 
 def _extract_struct_body(file_content, keyword="struct"):
@@ -164,10 +172,25 @@ def parse_struct_definition_v2(file_content: str) -> Tuple[Optional[str], Option
     if not struct_name:
         return None, None
     struct_content = re.sub(r"//.*", "", struct_content)
-    lines = struct_content.split(';')
     members: List[MemberDef] = []
-    for line in lines:
-        parsed = parse_member_line_v2(line)
+    current = ""
+    brace = 0
+    for ch in struct_content:
+        if ch == '{':
+            brace += 1
+            current += ch
+        elif ch == '}':
+            brace -= 1
+            current += ch
+        elif ch == ';' and brace == 0:
+            parsed = parse_member_line_v2(current)
+            if parsed is not None:
+                members.append(parsed)
+            current = ""
+        else:
+            current += ch
+    if current.strip():
+        parsed = parse_member_line_v2(current)
         if parsed is not None:
             members.append(parsed)
     return struct_name, members

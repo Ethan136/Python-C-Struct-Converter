@@ -167,6 +167,33 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         member_type = self._get_attr(member, "type")
         member_name = self._get_attr(member, "name")
         array_dims = self._get_attr(member, "array_dims") or []
+        nested = self._get_attr(member, "nested")
+
+        if nested is not None:
+            calc = StructLayoutCalculator(pack_alignment=self.pack_alignment)
+            nested_layout, nested_size, nested_align = calc.calculate(nested.members)
+            if nested_align > self.max_alignment:
+                self.max_alignment = nested_align
+            self._add_padding_if_needed(nested_align)
+            for item in nested_layout:
+                if item.type == "padding":
+                    new_name = item.name
+                else:
+                    new_name = f"{member_name}.{item.name}" if item.name else item.name
+                self.layout.append(
+                    LayoutItem(
+                        name=new_name,
+                        type=item.type,
+                        size=item.size,
+                        offset=self.current_offset + item.offset,
+                        is_bitfield=item.is_bitfield,
+                        bit_offset=item.bit_offset,
+                        bit_size=item.bit_size,
+                        array_dims=item.array_dims,
+                    )
+                )
+            self.current_offset += nested_size
+            return
 
         if array_dims:
             self._process_array_member(member_name, member_type, array_dims)

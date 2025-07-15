@@ -6,7 +6,11 @@
 """
 from model.input_field_processor import InputFieldProcessor
 from .layout import LayoutCalculator, LayoutItem, TYPE_INFO
-from .struct_parser import parse_struct_definition, parse_member_line
+from .struct_parser import (
+    parse_struct_definition,
+    parse_member_line,
+    parse_struct_definition_ast,
+)
 import math
 
 
@@ -50,11 +54,13 @@ class StructModel:
     def load_struct_from_file(self, file_path):
         with open(file_path, 'r') as f:
             content = f.read()
-        struct_name, members = parse_struct_definition(content)
-        if not struct_name or not members:
+        struct_def = parse_struct_definition_ast(content)
+        if not struct_def:
             raise ValueError("Could not find a valid struct definition in the file.")
+        struct_name = struct_def.name
+        members = struct_def.members
         self.struct_name = struct_name
-        self.members = self._convert_to_cpp_members(members)
+        self.members = members
         self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
         return self.struct_name, self.layout, self.total_size, self.struct_align
 
