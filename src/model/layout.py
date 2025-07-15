@@ -193,7 +193,11 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         nested = self._get_attr(member, "nested")
 
         if nested is not None:
-            calc = StructLayoutCalculator(pack_alignment=self.pack_alignment)
+            from .struct_parser import UnionDef
+            if isinstance(nested, UnionDef):
+                calc = UnionLayoutCalculator(pack_alignment=self.pack_alignment)
+            else:
+                calc = StructLayoutCalculator(pack_alignment=self.pack_alignment)
             nested_layout, nested_size, nested_align = calc.calculate(nested.members)
             if nested_align > self.max_alignment:
                 self.max_alignment = nested_align

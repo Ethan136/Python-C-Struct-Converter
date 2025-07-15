@@ -378,6 +378,43 @@ class TestCalculateLayout(unittest.TestCase):
         self.assertEqual(total, 20)
         self.assertEqual(align, 4)
 
+    def test_calculate_layout_nested_union(self):
+        content = '''
+        struct Outer {
+            int a;
+            union U {
+                int x;
+                char y;
+            } u;
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        layout, total, align = calculate_layout(sdef.members)
+        names = [item.name for item in layout]
+        self.assertEqual(names, ["a", "u.x", "u.y"])
+        self.assertEqual(total, 8)
+        self.assertEqual(align, 4)
+
+    def test_calculate_layout_nested_union_array(self):
+        content = '''
+        struct Outer {
+            int a;
+            union U {
+                int x;
+                char y;
+            } u_arr[2];
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        layout, total, align = calculate_layout(sdef.members)
+        names = [item.name for item in layout]
+        self.assertEqual(
+            names,
+            ["a", "u_arr[0].x", "u_arr[0].y", "u_arr[1].x", "u_arr[1].y"]
+        )
+        self.assertEqual(total, 12)
+        self.assertEqual(align, 4)
+
 
 class TestStructModel(unittest.TestCase):
     """Test cases for StructModel class."""

@@ -13,6 +13,7 @@ from model.struct_parser import (
     parse_struct_definition_ast,
     MemberDef,
     StructDef,
+    UnionDef,
 )
 from model.layout import LayoutCalculator
 
@@ -105,6 +106,45 @@ class TestParseStructDefinitionAst(unittest.TestCase):
         self.assertEqual(arr_member.array_dims, [2])
         self.assertIsNotNone(arr_member.nested)
         self.assertEqual(arr_member.nested.name, 'Inner')
+        self.assertEqual(len(arr_member.nested.members), 2)
+
+    def test_nested_union(self):
+        content = '''
+        struct Outer {
+            int a;
+            union U {
+                int x;
+                char y;
+            } u;
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        self.assertIsInstance(sdef, StructDef)
+        self.assertEqual(len(sdef.members), 2)
+        u_member = sdef.members[1]
+        self.assertEqual(u_member.name, 'u')
+        self.assertIsNotNone(u_member.nested)
+        self.assertIsInstance(u_member.nested, UnionDef)
+        self.assertEqual(len(u_member.nested.members), 2)
+
+    def test_nested_union_array(self):
+        content = '''
+        struct Outer {
+            int a;
+            union U {
+                int x;
+                char y;
+            } u_arr[2];
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        self.assertIsInstance(sdef, StructDef)
+        self.assertEqual(len(sdef.members), 2)
+        arr_member = sdef.members[1]
+        self.assertEqual(arr_member.name, 'u_arr')
+        self.assertEqual(arr_member.array_dims, [2])
+        self.assertIsNotNone(arr_member.nested)
+        self.assertIsInstance(arr_member.nested, UnionDef)
         self.assertEqual(len(arr_member.nested.members), 2)
 
 class TestLayoutCalculatorWithMemberDef(unittest.TestCase):

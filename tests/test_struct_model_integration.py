@@ -282,6 +282,59 @@ class TestStructModel(unittest.TestCase):
             self.assertEqual(values, ['1', '65', '2', '66', '3'])
         finally:
             os.unlink(file_path)
+
+    def test_parse_hex_data_nested_union(self):
+        """Test parsing hex data for nested union."""
+        content = '''
+        struct Outer {
+            int a;
+            union U {
+                int x;
+                char y;
+            } u;
+        };
+        '''
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.h') as f:
+            f.write(content)
+            file_path = f.name
+        try:
+            self.model.load_struct_from_file(file_path)
+            hex_data = '0100000041000000'
+            result = self.model.parse_hex_data(hex_data, 'little')
+            names = [item['name'] for item in result]
+            self.assertEqual(names, ['a', 'u.x', 'u.y'])
+            values = [item['value'] for item in result if item['name'] != '(padding)']
+            self.assertEqual(values, ['1', '65', '65'])
+        finally:
+            os.unlink(file_path)
+
+    def test_parse_hex_data_nested_union_array(self):
+        """Test parsing hex data for nested union arrays."""
+        content = '''
+        struct Outer {
+            int a;
+            union U {
+                int x;
+                char y;
+            } u_arr[2];
+        };
+        '''
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.h') as f:
+            f.write(content)
+            file_path = f.name
+        try:
+            self.model.load_struct_from_file(file_path)
+            hex_data = '010000004100000042000000'
+            result = self.model.parse_hex_data(hex_data, 'little')
+            names = [item['name'] for item in result]
+            self.assertEqual(
+                names,
+                ['a', 'u_arr[0].x', 'u_arr[0].y', 'u_arr[1].x', 'u_arr[1].y']
+            )
+            values = [item['value'] for item in result if item['name'] != '(padding)']
+            self.assertEqual(values, ['1', '65', '65', '66', '66'])
+        finally:
+            os.unlink(file_path)
     
     def test_parse_hex_data_padding(self):
         """Test parsing hex data with padding."""
