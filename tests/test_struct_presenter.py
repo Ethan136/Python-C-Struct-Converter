@@ -101,5 +101,32 @@ class TestStructPresenter(unittest.TestCase):
         hits, misses = self.presenter.get_cache_stats()
         self.assertEqual((hits, misses), (0, 0))
 
+    def test_layout_cache_edge_cases(self):
+        # Empty members
+        self.model.calculate_manual_layout.side_effect = lambda m, s: []
+        l1 = self.presenter.compute_member_layout([], 0)
+        self.assertEqual(l1, [])
+        hits, misses = self.presenter.get_cache_stats()
+        self.assertEqual((hits, misses), (0, 1))
+        # Call again (should hit cache)
+        l2 = self.presenter.compute_member_layout([], 0)
+        self.assertIs(l1, l2)
+        hits, misses = self.presenter.get_cache_stats()
+        self.assertEqual((hits, misses), (1, 1))
+        # Very large struct
+        big_members = [{"name": f"f{i}", "type": "int", "bit_size": 0} for i in range(1000)]
+        self.model.calculate_manual_layout.side_effect = lambda m, s: m
+        l3 = self.presenter.compute_member_layout(big_members, 4000)
+        self.assertEqual(len(l3), 1000)
+        # Invalid member format (should not cache if exception)
+        def raise_error(m, s):
+            raise ValueError("bad format")
+        self.model.calculate_manual_layout.side_effect = raise_error
+        with self.assertRaises(ValueError):
+            self.presenter.compute_member_layout([{"bad": "field"}], 8)
+        # Cache stats should not increment hit/miss for failed call
+        hits2, misses2 = self.presenter.get_cache_stats()
+        self.assertEqual((hits2, misses2), (1, 2))
+
 if __name__ == "__main__":
     unittest.main() 

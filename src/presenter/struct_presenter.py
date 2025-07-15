@@ -27,7 +27,11 @@ class StructPresenter:
         self._cache_misses = 0
 
     def _make_cache_key(self, members, total_size):
-        key = tuple(sorted((m['name'], m['type'], m.get('bit_size', 0)) for m in members))
+        key = tuple(sorted((
+            m.get('name', '<invalid>'),
+            m.get('type', '<invalid>'),
+            m.get('bit_size', 0)
+        ) for m in members))
         return (key, total_size)
 
     def _process_hex_parts(self, hex_parts, byte_order):
@@ -208,7 +212,11 @@ class StructPresenter:
         if cache_key in self._layout_cache:
             self._cache_hits += 1
             return self._layout_cache[cache_key]
-        layout = self.model.calculate_manual_layout(members, total_size)
+        try:
+            layout = self.model.calculate_manual_layout(members, total_size)
+        except Exception:
+            # 不記錄 miss，不快取
+            raise
         self._layout_cache[cache_key] = layout
         self._cache_misses += 1
         return layout
