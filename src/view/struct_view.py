@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, messagebox
-from unittest.mock import MagicMock
 # from config import get_string
 from model.struct_model import StructModel
 
@@ -53,6 +52,7 @@ class StructView(tk.Tk):
 
             self._create_tab_control()
         else:
+            from unittest.mock import MagicMock
             # When patched with a Mock object, create minimal attributes used in
             # tests without constructing real Tk widgets.
             self.presenter = presenter
