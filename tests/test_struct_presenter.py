@@ -128,5 +128,28 @@ class TestStructPresenter(unittest.TestCase):
         hits2, misses2 = self.presenter.get_cache_stats()
         self.assertEqual((hits2, misses2), (1, 2))
 
+    def test_layout_performance_hook(self):
+        import time as _time
+        self.model.calculate_manual_layout.side_effect = lambda m, s: _time.sleep(0.01) or [dict(name=x['name'], size=1) for x in m]
+        m1 = [{"name": "a", "type": "char", "bit_size": 0}]
+        # Before any calculation
+        self.assertIsNone(self.presenter.get_last_layout_time())
+        # First call: miss, should record time
+        self.presenter.compute_member_layout(m1, 8)
+        t1 = self.presenter.get_last_layout_time()
+        self.assertIsInstance(t1, float)
+        self.assertGreater(t1, 0)
+        # Second call: hit, time should not change
+        self.presenter.compute_member_layout(m1, 8)
+        t2 = self.presenter.get_last_layout_time()
+        self.assertEqual(t1, t2)
+        # New key: miss, time should update
+        m2 = [{"name": "b", "type": "char", "bit_size": 0}]
+        self.presenter.compute_member_layout(m2, 8)
+        t3 = self.presenter.get_last_layout_time()
+        self.assertIsInstance(t3, float)
+        self.assertGreater(t3, 0)
+        self.assertNotEqual(t1, t3)
+
 if __name__ == "__main__":
     unittest.main() 

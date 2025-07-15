@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog
 from config import get_string
 from model.input_field_processor import InputFieldProcessor
+import time
 
 
 class HexProcessingError(Exception):
@@ -20,6 +21,7 @@ class StructPresenter:
         self._layout_cache = {}  # (members_key, total_size) -> layout
         self._cache_hits = 0
         self._cache_misses = 0
+        self._last_layout_time = None
 
     def invalidate_cache(self):
         self._layout_cache.clear()
@@ -213,13 +215,20 @@ class StructPresenter:
             self._cache_hits += 1
             return self._layout_cache[cache_key]
         try:
+            start = time.perf_counter()
             layout = self.model.calculate_manual_layout(members, total_size)
+            elapsed = time.perf_counter() - start
+            self._last_layout_time = elapsed
         except Exception:
             # 不記錄 miss，不快取
             raise
         self._layout_cache[cache_key] = layout
         self._cache_misses += 1
         return layout
+
+    def get_last_layout_time(self):
+        """回傳最近一次 layout 計算（非 cache）所花秒數（float）。"""
+        return self._last_layout_time
 
     def get_cache_stats(self):
         """回傳 (hit, miss) 統計。"""
