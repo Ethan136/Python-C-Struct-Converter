@@ -1,6 +1,6 @@
 """Data structures and helpers for struct layout calculations."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Tuple, Union, Optional
 from abc import ABC, abstractmethod
 
@@ -40,6 +40,7 @@ class LayoutItem:
     is_bitfield: bool
     bit_offset: int
     bit_size: int
+    array_dims: List[int] = field(default_factory=list)
 
     def __getitem__(self, key: str):
         return getattr(self, key)
@@ -114,19 +115,19 @@ class StructLayoutCalculator(BaseLayoutCalculator):
 
     # Array processing -------------------------------------------------
     def _process_array_member(self, name: str, mtype: str, array_dims: list):
-        """Placeholder for array member handling.
+        """Handle multi-dimensional array members."""
+        elem_size, alignment = self._get_type_size_and_align(mtype)
+        total_elems = 1
+        for d in array_dims:
+            total_elems *= d
+        total_size = elem_size * total_elems
 
-        Currently treats the array as a single element to preserve legacy
-        behavior. This will be expanded for full N-D array support in the
-        future.
-        """
-        size, alignment = self._get_type_size_and_align(mtype)
         if alignment > self.max_alignment:
             self.max_alignment = alignment
+
         self._add_padding_if_needed(alignment)
-        # TODO: expand array dimensions in future implementation
-        self._add_member_to_layout(name, mtype, size)
-        self.current_offset += size
+        self._add_member_to_layout(name, mtype, total_size, array_dims)
+        self.current_offset += total_size
 
     def calculate(self, members: List[Union[Tuple[str, str], dict]]):
         """Calculate the complete memory layout for the struct."""
@@ -217,7 +218,7 @@ class StructLayoutCalculator(BaseLayoutCalculator):
             )
         )
 
-    def _add_member_to_layout(self, name: str, member_type: str, size: int):
+    def _add_member_to_layout(self, name: str, member_type: str, size: int, array_dims: Optional[List[int]] = None):
         self.layout.append(
             LayoutItem(
                 name=name,
@@ -227,6 +228,7 @@ class StructLayoutCalculator(BaseLayoutCalculator):
                 is_bitfield=False,
                 bit_offset=0,
                 bit_size=size * 8,
+                array_dims=array_dims or [],
             )
         )
 

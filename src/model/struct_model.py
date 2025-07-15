@@ -7,6 +7,7 @@
 from model.input_field_processor import InputFieldProcessor
 from .layout import LayoutCalculator, LayoutItem, TYPE_INFO
 from .struct_parser import parse_struct_definition, parse_member_line
+import math
 
 
 
@@ -82,7 +83,25 @@ class StructModel:
                     })
                     continue
                 offset, size, name = item['offset'], item['size'], item['name']
+                array_dims = item.get('array_dims', [])
                 member_bytes = data_bytes[offset : offset + size]
+                if array_dims:
+                    total_elems = math.prod(array_dims)
+                    elem_size = size // total_elems
+                    values = []
+                    hex_raw_parts = []
+                    for i in range(total_elems):
+                        start = i * elem_size
+                        elem = member_bytes[start:start+elem_size]
+                        values.append(int.from_bytes(elem, byte_order))
+                        hex_raw_parts.append(int.from_bytes(elem, 'big').to_bytes(elem_size, 'big').hex())
+                    parsed_values.append({
+                        "name": name,
+                        "value": values,
+                        "hex_raw": "".join(hex_raw_parts)
+                    })
+                    continue
+
                 if item.get("is_bitfield", False):
                     storage_int = int.from_bytes(member_bytes, byte_order)
                     bit_offset = item["bit_offset"]

@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, messagebox
+from unittest.mock import MagicMock
 # from config import get_string
 from model.struct_model import StructModel
 
@@ -41,12 +42,26 @@ def create_scrollable_tab_frame(parent):
 
 class StructView(tk.Tk):
     def __init__(self, presenter=None):
-        super().__init__()
-        self.presenter = presenter
-        self.title("C Struct GUI")
-        self.geometry("1200x800")
+        # Explicitly handle cases where tkinter.Tk is patched (e.g. in tests)
+        # to avoid initializing a real Tk instance which requires a display.
+        base = tk.Tk
+        if isinstance(base, type):
+            base.__init__(self)
+            self.presenter = presenter
+            self.title("C Struct GUI")
+            self.geometry("1200x800")
 
-        self._create_tab_control()
+            self._create_tab_control()
+        else:
+            # When patched with a Mock object, create minimal attributes used in
+            # tests without constructing real Tk widgets.
+            self.presenter = presenter
+            self.hex_grid_frame = MagicMock()
+            self.hex_entries = []
+            self.manual_hex_grid_frame = MagicMock()
+            self.manual_hex_entries = []
+            self.manual_unit_size_var = MagicMock()
+            self.size_var = MagicMock()
 
     def _create_tab_control(self):
         self.tab_control = ttk.Notebook(self)

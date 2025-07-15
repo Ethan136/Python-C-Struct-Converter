@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from model.struct_model import parse_struct_definition, calculate_layout
 from model.layout import LayoutCalculator, LayoutItem
+from model.struct_parser import parse_member_line_v2
 
 class TestParseStructDefinition(unittest.TestCase):
     """Test cases for struct definition parsing functionality."""
@@ -212,18 +213,40 @@ class TestLayoutItemDataclass(unittest.TestCase):
 
 
 class TestArrayMemberStubBehavior(unittest.TestCase):
-    """Ensure array members are currently treated as single elements."""
+    """Ensure array members are expanded based on dimensions."""
 
     def test_array_member_single_element_layout(self):
         calc = LayoutCalculator()
         members = [{"type": "int", "name": "arr", "array_dims": [3, 2]}]
         layout, total_size, alignment = calc.calculate(members)
 
-        self.assertEqual(total_size, 4)
+        self.assertEqual(total_size, 24)
         self.assertEqual(alignment, 4)
         self.assertEqual(len(layout), 1)
         self.assertEqual(layout[0].name, "arr")
-        self.assertEqual(layout[0].size, 4)
+        self.assertEqual(layout[0].size, 24)
+        self.assertEqual(layout[0].array_dims, [3, 2])
+
+
+class TestArrayParsing(unittest.TestCase):
+    """Verify multi-dimensional array parsing."""
+
+    def test_parse_member_line_v2_array_dims(self):
+        m = parse_member_line_v2("int arr[3][2]")
+        self.assertEqual(m.array_dims, [3, 2])
+
+
+class TestArrayLayout(unittest.TestCase):
+    """Verify layout calculation for arrays."""
+
+    def test_array_layout_size_and_offset(self):
+        calc = LayoutCalculator()
+        members = [{"type": "int", "name": "arr", "array_dims": [3, 2]}]
+        layout, total, align = calc.calculate(members)
+        self.assertEqual(total, 24)
+        self.assertEqual(align, 4)
+        self.assertEqual(layout[0].offset, 0)
+        self.assertEqual(layout[0].size, 24)
 
 
 
