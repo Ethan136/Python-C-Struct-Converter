@@ -215,8 +215,11 @@ class StructLayoutCalculator(BaseLayoutCalculator):
                         if item.type == "padding":
                             new_name = item.name
                         else:
-                            prefix = f"{member_name}{idx_str}"
-                            new_name = f"{prefix}.{item.name}" if item.name else item.name
+                            if member_name is not None:
+                                prefix = f"{member_name}{idx_str}"
+                                new_name = f"{prefix}.{item.name}" if item.name else prefix
+                            else:
+                                new_name = item.name
                         self.layout.append(
                             LayoutItem(
                                 name=new_name,
@@ -235,7 +238,10 @@ class StructLayoutCalculator(BaseLayoutCalculator):
                     if item.type == "padding":
                         new_name = item.name
                     else:
-                        new_name = f"{member_name}.{item.name}" if item.name else item.name
+                        if member_name is not None:
+                            new_name = f"{member_name}.{item.name}" if item.name else member_name
+                        else:
+                            new_name = item.name
                     self.layout.append(
                         LayoutItem(
                             name=new_name,
@@ -359,9 +365,13 @@ class UnionLayoutCalculator(BaseLayoutCalculator):
                     for idx_tuple in itertools.product(*index_ranges):
                         idx_str = "".join(f"[{i}]" for i in idx_tuple)
                         for item in nested_layout:
-                            new_name = (
-                                f"{mname}{idx_str}.{item.name}" if item.name else item.name
-                            )
+                            if mname is not None:
+                                prefix = f"{mname}{idx_str}"
+                                new_name = (
+                                    f"{prefix}.{item.name}" if item.name else prefix
+                                )
+                            else:
+                                new_name = item.name
                             self.layout.append(
                                 LayoutItem(
                                     name=new_name,
@@ -376,7 +386,10 @@ class UnionLayoutCalculator(BaseLayoutCalculator):
                             )
                 else:
                     for item in nested_layout:
-                        new_name = f"{mname}.{item.name}" if item.name else item.name
+                        if mname is not None:
+                            new_name = f"{mname}.{item.name}" if item.name else mname
+                        else:
+                            new_name = item.name
                         self.layout.append(
                             LayoutItem(
                                 name=new_name,

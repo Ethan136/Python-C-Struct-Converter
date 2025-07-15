@@ -11,6 +11,7 @@ from model.struct_parser import (
     parse_member_line_v2,
     parse_struct_definition_v2,
     parse_struct_definition_ast,
+    parse_c_definition_ast,
     MemberDef,
     StructDef,
     UnionDef,
@@ -146,6 +147,74 @@ class TestParseStructDefinitionAst(unittest.TestCase):
         self.assertIsNotNone(arr_member.nested)
         self.assertIsInstance(arr_member.nested, UnionDef)
         self.assertEqual(len(arr_member.nested.members), 2)
+
+    def test_anonymous_nested_struct(self):
+        content = '''
+        struct Outer {
+            int a;
+            struct {
+                char b;
+                int c;
+            };
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        self.assertIsInstance(sdef, StructDef)
+        self.assertEqual(len(sdef.members), 2)
+        anon = sdef.members[1]
+        self.assertIsNone(anon.name)
+        self.assertIsNotNone(anon.nested)
+        self.assertIsInstance(anon.nested, StructDef)
+        self.assertEqual(len(anon.nested.members), 2)
+
+    def test_anonymous_nested_union(self):
+        content = '''
+        struct Outer {
+            int a;
+            union {
+                int x;
+                char y;
+            };
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        self.assertIsInstance(sdef, StructDef)
+        self.assertEqual(len(sdef.members), 2)
+        anon = sdef.members[1]
+        self.assertIsNone(anon.name)
+        self.assertIsNotNone(anon.nested)
+        self.assertIsInstance(anon.nested, UnionDef)
+        self.assertEqual(len(anon.nested.members), 2)
+
+    def test_nested_struct_multi_dim_array(self):
+        content = '''
+        struct Outer {
+            struct Inner {
+                int x;
+            } matrix[2][2];
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        arr = sdef.members[0]
+        self.assertEqual(arr.name, 'matrix')
+        self.assertEqual(arr.array_dims, [2, 2])
+        self.assertIsNotNone(arr.nested)
+
+    def test_nested_union_multi_dim_array(self):
+        content = '''
+        union U {
+            union V {
+                int x;
+            } arr[2][2];
+            int y;
+        };
+        '''
+        udef = parse_c_definition_ast(content)
+        self.assertIsInstance(udef, UnionDef)
+        arr = udef.members[0]
+        self.assertEqual(arr.name, 'arr')
+        self.assertEqual(arr.array_dims, [2, 2])
+        self.assertIsNotNone(arr.nested)
 
 class TestLayoutCalculatorWithMemberDef(unittest.TestCase):
     def test_layout_with_memberdef(self):

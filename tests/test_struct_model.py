@@ -20,7 +20,7 @@ from model.struct_model import (
     StructModel,
     TYPE_INFO
 )
-from model.struct_parser import parse_struct_definition_ast
+from model.struct_parser import parse_struct_definition_ast, parse_c_definition_ast
 from tests.xml_struct_model_loader import load_struct_model_tests
 from tests.xml_struct_parse_definition_loader import load_struct_parse_definition_tests
 
@@ -413,6 +413,90 @@ class TestCalculateLayout(unittest.TestCase):
             ["a", "u_arr[0].x", "u_arr[0].y", "u_arr[1].x", "u_arr[1].y"]
         )
         self.assertEqual(total, 12)
+        self.assertEqual(align, 4)
+
+    def test_calculate_layout_anonymous_nested_struct(self):
+        content = '''
+        struct Outer {
+            int a;
+            struct {
+                char b;
+                int c;
+            };
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        layout, total, align = calculate_layout(sdef.members)
+        names = [item.name for item in layout]
+        self.assertEqual(names, ["a", "b", "(padding)", "c"])
+        self.assertEqual(total, 12)
+        self.assertEqual(align, 4)
+
+    def test_calculate_layout_anonymous_nested_union(self):
+        content = '''
+        struct Outer {
+            int a;
+            union {
+                int x;
+                char y;
+            };
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        layout, total, align = calculate_layout(sdef.members)
+        names = [item.name for item in layout]
+        self.assertEqual(names, ["a", "x", "y"])
+        self.assertEqual(total, 8)
+        self.assertEqual(align, 4)
+
+    def test_calculate_layout_nested_struct_multi_dim_array(self):
+        content = '''
+        struct Outer {
+            struct Inner {
+                int x;
+            } matrix[2][2];
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        layout, total, align = calculate_layout(sdef.members)
+        names = [item.name for item in layout]
+        self.assertEqual(
+            names,
+            [
+                "matrix[0][0].x",
+                "matrix[0][1].x",
+                "matrix[1][0].x",
+                "matrix[1][1].x",
+            ],
+        )
+        self.assertEqual(total, 16)
+        self.assertEqual(align, 4)
+
+    def test_calculate_layout_nested_union_multi_dim_array(self):
+        content = '''
+        union U {
+            union V {
+                int x;
+            } arr[2][2];
+            int y;
+        };
+        '''
+        udef = parse_c_definition_ast(content)
+        layout, total, align = calculate_layout(udef.members, kind='union')
+        names = [item.name for item in layout]
+        self.assertEqual(
+            names,
+            [
+                "arr[0][0].x",
+                "arr[0][1].x",
+                "arr[1][0].x",
+                "arr[1][1].x",
+                "y",
+            ],
+        )
+        for item in layout:
+            self.assertEqual(item.offset, 0)
+        self.assertEqual(total, 4)
         self.assertEqual(align, 4)
 
 
