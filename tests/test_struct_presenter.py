@@ -351,5 +351,26 @@ class TestStructPresenter(unittest.TestCase):
         hits, misses = self.presenter.get_cache_stats()
         self.assertEqual((hits, misses), (1, 4))
 
+    def test_presenter_observer_invalidate_cache(self):
+        from model.struct_model import StructModel
+        model = StructModel()
+        presenter = StructPresenter(model)
+        presenter._layout_cache[('dummy', 1)] = [1]
+        presenter._cache_hits = 5
+        presenter._cache_misses = 3
+        # 模擬 model 狀態變更
+        presenter.update("manual_struct_changed", model)
+        assert presenter._layout_cache == {}
+        assert presenter.get_cache_stats() == (0, 0)
+        # 再次通知
+        presenter._layout_cache[('dummy', 1)] = [1]
+        presenter._cache_hits = 2
+        presenter.update("file_struct_loaded", model)
+        assert presenter._layout_cache == {}
+        assert presenter.get_cache_stats() == (0, 0)
+        # 未註冊 observer 也不會出錯
+        model.remove_observer(presenter)
+        model._notify_observers("manual_struct_changed")  # 不會影響已移除的 presenter
+
 if __name__ == "__main__":
     unittest.main() 

@@ -24,6 +24,15 @@ class StructPresenter:
         self._cache_hits = 0
         self._cache_misses = 0
         self._last_layout_time = None
+        # Observer pattern: 註冊自己為 model observer
+        if hasattr(self.model, "add_observer"):
+            self.model.add_observer(self)
+
+    def update(self, event_type, model, **kwargs):
+        """Observer callback: 當 model 狀態變更時自動呼叫。"""
+        if event_type in ("manual_struct_changed", "file_struct_loaded"):
+            self.invalidate_cache()
+        # 可根據 event_type 擴充自動行為
 
     def invalidate_cache(self):
         self._layout_cache.clear()
