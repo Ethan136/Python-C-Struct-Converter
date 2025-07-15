@@ -476,11 +476,28 @@ class StructView(tk.Tk):
 
     def _on_browse_file(self):
         if self.presenter:
-            self.presenter.browse_file()
+            result = self.presenter.browse_file()
+            if result['type'] == 'ok':
+                self.show_file_path(result['file_path'])
+                self.show_struct_layout(result['struct_name'], result['layout'], result['total_size'], result['struct_align'])
+                self.show_struct_debug(result['struct_content'])
+                self.enable_parse_button()
+                self.clear_results()
+                self.rebuild_hex_grid(result['total_size'], 1)
+            else:
+                self.show_error('載入檔案錯誤', result['message'])
+                self.disable_parse_button()
+                self.clear_results()
+                self.rebuild_hex_grid(0, 1)
 
     def _on_parse_file(self):
         if self.presenter:
-            self.presenter.parse_hex_data()
+            result = self.presenter.parse_hex_data()
+            if result['type'] == 'ok':
+                self.show_parsed_values(result['parsed_values'])
+                self.show_debug_bytes(result['debug_lines'])
+            else:
+                self.show_error('解析錯誤', result['message'])
 
     def enable_parse_button(self):
         self.parse_button.config(state="normal")
@@ -663,13 +680,17 @@ class StructView(tk.Tk):
         pass  # 可根據需要擴充
 
     def _on_parse_manual_hex(self):
-        # 取得 hex 輸入
         hex_parts = [(entry.get().strip(), expected_len) for entry, expected_len in self.manual_hex_entries]
-        # TODO: 呼叫 presenter/model 解析 hex data，並顯示在 manual_member_tree/manual_debug_text
         if self.presenter and hasattr(self.presenter, 'parse_manual_hex_data'):
-            self.presenter.parse_manual_hex_data(hex_parts, self.get_manual_struct_definition(), self.manual_endian_var.get())
+            struct_def = self.get_manual_struct_definition()
+            struct_def['unit_size'] = self.get_selected_manual_unit_size()
+            result = self.presenter.parse_manual_hex_data(hex_parts, struct_def, self.manual_endian_var.get())
+            if result['type'] == 'ok':
+                self.show_manual_parsed_values(result['parsed_values'])
+                self.show_manual_debug_bytes(result['debug_lines'])
+            else:
+                self.show_error('解析錯誤', result['message'])
         else:
-            # 預設顯示 debug
             self.manual_debug_text.config(state="normal")
             self.manual_debug_text.delete("1.0", tk.END)
             self.manual_debug_text.insert("1.0", f"hex_parts: {hex_parts}\n(需由 presenter/model 實作解析)")
