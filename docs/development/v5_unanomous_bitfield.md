@@ -7,41 +7,27 @@
 
 ## 現況檢查
 1. `MemberDef.name` 及 `LayoutItem.name` 已為 `Optional[str]`【F:src/model/struct_parser.py†L10-L23】【F:src/model/layout.py†L25-L40】，預留匿名欄位可能性。
-2. `_parse_bitfield_declaration` 的 regex `r"(.+?)\s+([\w\[\]]+)\s*:\s*(\d+)$"` 限制必須有名稱【F:src/model/struct_parser.py†L50-L66】。
-3. `parse_member_line_v2` 依賴上述函式，在 `parse_member_line_v2` 建立 `MemberDef` 時假設 `name` 必定存在【F:src/model/struct_parser.py†L101-L114】，若解析失敗則回傳 `None`，因此匿名 bitfield 會被忽略。
-4. `LayoutCalculator._add_bitfield_to_layout` 已註解日後可接受 `name=None`【F:src/model/layout.py†L287-L301】。
-5. `parse_hex_data` 在組合結果時直接使用 `item['name']`，若值為 `None` 仍可處理，但 GUI 尚未顯示此狀態【F:src/model/struct_model.py†L93-L138】。
-6. 測試檔 `tests/test_struct_parser_utils.py` 已對匿名 bitfield 標示 `xfail`【F:tests/test_struct_parser_utils.py†L20-L26】，代表功能未實作。
+2. `_parse_bitfield_declaration` 的 regex 已改為 `r"(.+?)\s+(?:([\w\[\]]+)\s*)?:\s*(\d+)$"`，名稱為可選【F:src/model/struct_parser.py†L50-L72】。
+3. `parse_member_line_v2` 會將取得的名稱直接傳入 `MemberDef`，因此能回傳 `name=None` 的物件【F:src/model/struct_parser.py†L101-L117】。
+4. `LayoutCalculator._add_bitfield_to_layout` 現已接受 `name=None`，並直接寫入 layout【F:src/model/layout.py†L292-L308】。
+5. `parse_hex_data` 在組合結果時使用 `item['name']`，若值為 `None` 仍能正常處理【F:src/model/struct_model.py†L93-L138】。
+6. `tests/test_struct_parser_utils.py` 中已包含解析匿名 bitfield 的測試並正常通過【F:tests/test_struct_parser_utils.py†L20-L26】。
 
 ## TDD 實作步驟
 以下流程每一步皆遵循 **Red → Green → Refactor**：先撰寫或啟用測試，確認失敗後再實作使其通過。
 
 ### 1. Parser 支援
-1. **啟用測試**：移除 `pytest.mark.xfail` 標註，讓 `TestParseMemberLine.test_anonymous_bitfield_member` 變成正式失敗測試。
-2. **新增測試**：在 `tests/test_struct_parser_v2.py` 中加入：
-   - `test_parse_anonymous_bitfield_v2`：確認 `parse_member_line_v2('int : 5')` 回傳 `MemberDef(type='int', name=None, is_bitfield=True, bit_size=5)`。
-   - `test_struct_with_anonymous_bitfield`：以 `parse_struct_definition_ast` 解析含匿名 bitfield 的 struct，驗證 members 序列包含 `name is None` 之項目。
-3. **實作**：
-   - 修改 `_parse_bitfield_declaration` 允許名稱省略，regex 可改為 `r"(.+?)\s+(?:([\w\[\]]+)\s*)?:\s*(\d+)$"`，捕捉 `name` 群組為可選；若未匹配則設為 `None`。
-   - `parse_member_line_v2` 需在建立 `MemberDef` 時接受 `name=None`。
-4. **重構**：確認一般 bitfield 行為不受影響，並適度整理重複程式碼。
+本功能已完成實作並具備測試：
+1. `tests/test_struct_parser_utils.py` 的 `test_anonymous_bitfield_member` 驗證 `parse_member_line` 可處理匿名 bitfield【F:tests/test_struct_parser_utils.py†L20-L26】。
+2. `tests/test_struct_parser_v2.py` 包含 `test_parse_anonymous_bitfield_v2` 與 `test_struct_with_anonymous_bitfield`，確認新版 parser 也能解析【F:tests/test_struct_parser_v2.py†L44-L49】【F:tests/test_struct_parser_v2.py†L196-L209】。
+因此不需再啟用 `xfail` 或新增額外測試，僅需維護既有測試通過。
 
 ### 2. Layout 計算
-1. **新增測試**：於 `tests/test_struct_model.py` 新增 `test_anonymous_bitfield_layout`：
-   ```python
-   members = [
-       {"type": "int", "name": "a", "is_bitfield": True, "bit_size": 3},
-       {"type": "int", "name": None, "is_bitfield": True, "bit_size": 5},
-       {"type": "int", "name": "b", "is_bitfield": True, "bit_size": 4},
-   ]
-   layout, total, align = calculate_layout(members)
-   ```
-   預期三者共用同一 storage unit，`layout[1].name is None` 且 `bit_offset` 正確為 3。
-2. **實作**：`LayoutCalculator` 目前已支援 `name=None` 的加入，僅需確保 `parse_member_line_v2` 產生的資料格式正確即可。
+對應測試 `test_anonymous_bitfield_layout` 已於 `tests/test_struct_model.py` 實作並通過【F:tests/test_struct_model.py†L322-L336】。
+現行 `LayoutCalculator` 支援 `name=None`，僅需維護其正確性。
 
 ### 3. Hex 資料解析
-1. **新增測試**：在 `tests/test_struct_model.py` 或整合測試檔新增 `test_parse_hex_data_with_anonymous_bitfield`，輸入對應 hex 並驗證回傳 list 仍包含 `{"name": None, "value": "..."}`。
-2. **實作**：`StructModel.parse_hex_data` 已能處理 `name=None`，但為清晰起見，可在結果中將 `None` 名稱轉為 `"(anon bitfield)"` 或保持 `None`，視 GUI 需求調整。
+`tests/test_struct_model.py` 中的 `test_parse_hex_data_with_anonymous_bitfield` 驗證 `StructModel.parse_hex_data` 能處理 `name=None` 的欄位【F:tests/test_struct_model.py†L650-L669】。
 
 ### 4. GUI 與文件
 1. **GUI 測試**：若 GUI 需顯示匿名 bitfield，可在 `tests/test_struct_view.py` 內新增對應顯示測試，先使用 `@unittest.expectedFailure`。
