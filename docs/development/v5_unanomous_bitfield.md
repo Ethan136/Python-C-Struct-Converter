@@ -12,7 +12,10 @@
 4. `LayoutCalculator._add_bitfield_to_layout` 現已接受 `name=None`，並直接寫入 layout【F:src/model/layout.py†L292-L308】。
 5. `parse_hex_data` 在組合結果時使用 `item['name']`，若值為 `None` 仍能正常處理【F:src/model/struct_model.py†L93-L138】。
 6. `tests/test_struct_parser_utils.py` 中已包含解析匿名 bitfield 的測試並正常通過【F:tests/test_struct_parser_utils.py†L20-L26】。
-7. `export_manual_struct_to_h` 在遇到 `name=None` 時仍會輸出 `None` 字串，需改成省略名稱【F:src/model/struct_model.py†L267-L283】。
+7. `export_manual_struct_to_h` 已更新：若成員 `name=None` 會直接省略名稱，避免輸出
+   `None` 字串【F:src/model/struct_model.py†L267-L286】。對應測試
+   `test_export_manual_struct_to_h_anonymous_bitfield` 已驗證此行為
+   【F:tests/test_struct_model.py†L961-L973】。
 
 ## TDD 實作步驟
 以下流程每一步皆遵循 **Red → Green → Refactor**：先撰寫或啟用測試，確認失敗後再實作使其通過。
@@ -32,7 +35,9 @@
 
 ### 4. GUI 與文件
 1. **GUI 測試**：若 GUI 需顯示匿名 bitfield，可在 `tests/test_struct_view.py` 內新增對應顯示測試，先使用 `@unittest.expectedFailure`。
-2. **文件更新**：更新 `STRUCT_PARSING.md` 以及 `README.md` 的功能列表，說明支援匿名 bit field。
+2. **文件更新**：`STRUCT_PARSING.md` 與 `README.md` 已加入匿名 bit field
+   說明，分別見【F:docs/architecture/STRUCT_PARSING.md†L6-L9】以及
+   【F:README.md†L8-L10】【F:README.md†L134-L135】。
 3. **匯出功能**：新增 `test_export_manual_struct_to_h_anonymous_bitfield` 測試，確保 `export_manual_struct_to_h` 省略名稱時輸出正確【F:tests/test_struct_model.py†L961-L973】。
 
 ### 5. 迭代與驗證
