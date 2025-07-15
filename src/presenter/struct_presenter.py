@@ -17,6 +17,14 @@ class StructPresenter:
         self.model = model
         self.view = view # This will be set by main.py after view is instantiated
         self.input_processor = InputFieldProcessor()
+        self._layout_cache = {}  # (members_key, total_size) -> layout
+
+    def invalidate_cache(self):
+        self._layout_cache.clear()
+
+    def _make_cache_key(self, members, total_size):
+        key = tuple(sorted((m['name'], m['type'], m.get('bit_size', 0)) for m in members))
+        return (key, total_size)
 
     def _process_hex_parts(self, hex_parts, byte_order):
         """Convert list of hex input parts to a hex string and debug lines."""
@@ -191,8 +199,13 @@ class StructPresenter:
             self.view.manual_member_tree.delete(*self.view.manual_member_tree.get_children())
 
     def compute_member_layout(self, members, total_size):
-        """計算 struct member 的 layout，回傳 layout list。"""
-        return self.model.calculate_manual_layout(members, total_size)
+        """計算 struct member 的 layout，回傳 layout list，含 cache 機制。"""
+        cache_key = self._make_cache_key(members, total_size)
+        if cache_key in self._layout_cache:
+            return self._layout_cache[cache_key]
+        layout = self.model.calculate_manual_layout(members, total_size)
+        self._layout_cache[cache_key] = layout
+        return layout
 
     def calculate_remaining_space(self, members, total_size):
         """計算剩餘可用空間（bits, bytes）。"""

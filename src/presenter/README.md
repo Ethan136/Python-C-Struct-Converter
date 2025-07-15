@@ -19,3 +19,10 @@
 ## 相關設計文檔
 - [MVP 架構說明](../../docs/architecture/MVP_ARCHITECTURE_COMPLETE.md)
 - [Presenter/Model 職責差異](../MODEL_PRESENTER_DIFFERENCES.md) 
+
+## Layout Cache 機制（2024/07）
+- 自 v4 起，StructPresenter 實作 layout cache：
+  - 介面：`compute_member_layout(members, total_size)` 會自動快取 layout 結果，key 為 (members, total_size) tuple。
+  - 介面：`invalidate_cache()` 於 members/size 變動時由 view 呼叫，確保 cache 失效。
+  - 觸發時機：任何 struct 成員或 size 變動（新增、刪除、修改、複製、移動、重設）時，view 會呼叫 invalidate_cache。
+  - TDD 測試：cache hit/miss、失效、效能、異常情境皆有自動化測試（見 tests/test_struct_presenter.py）。 

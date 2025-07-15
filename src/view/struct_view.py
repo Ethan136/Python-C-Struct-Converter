@@ -350,20 +350,28 @@ class StructView(tk.Tk):
 
     def _add_member(self):
         self.members.append({"name": "", "type": "int", "bit_size": 0})
+        if self.presenter:
+            self.presenter.invalidate_cache()
         self._render_member_table()
         self._on_manual_struct_change()
 
     def _delete_member(self, idx):
         del self.members[idx]
+        if self.presenter:
+            self.presenter.invalidate_cache()
         self._render_member_table()
         self._on_manual_struct_change()
 
     def _update_member_name(self, idx, var):
         self.members[idx]["name"] = var.get()
+        if self.presenter:
+            self.presenter.invalidate_cache()
         self._on_manual_struct_change()
 
     def _update_member_type(self, idx, var):
         self.members[idx]["type"] = var.get()
+        if self.presenter:
+            self.presenter.invalidate_cache()
         self._on_manual_struct_change()
 
     def _update_member_bit(self, idx, var):
@@ -372,17 +380,23 @@ class StructView(tk.Tk):
             self.members[idx]["bit_size"] = int(value) if str(value).strip() else 0
         except Exception:
             self.members[idx]["bit_size"] = 0
+        if self.presenter:
+            self.presenter.invalidate_cache()
         self._on_manual_struct_change()
 
     def _move_member_up(self, idx):
         if idx > 0:
             self.members[idx-1], self.members[idx] = self.members[idx], self.members[idx-1]
+            if self.presenter:
+                self.presenter.invalidate_cache()
             self._render_member_table()
             self._on_manual_struct_change()
 
     def _move_member_down(self, idx):
         if idx < len(self.members) - 1:
             self.members[idx+1], self.members[idx] = self.members[idx], self.members[idx+1]
+            if self.presenter:
+                self.presenter.invalidate_cache()
             self._render_member_table()
             self._on_manual_struct_change()
 
@@ -397,12 +411,16 @@ class StructView(tk.Tk):
             count += 1
         new_m = {"name": new_name, "type": orig["type"], "bit_size": orig["bit_size"]}
         self.members.insert(idx+1, new_m)
+        if self.presenter:
+            self.presenter.invalidate_cache()
         self._render_member_table()
         self._on_manual_struct_change()
 
     def _reset_manual_struct(self):
         self.size_var.set(0)
         self.members.clear()
+        if self.presenter:
+            self.presenter.invalidate_cache()
         self._render_member_table()
         self.validation_label.config(text="")
 

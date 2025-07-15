@@ -21,5 +21,10 @@
 - 原本的自訂 memory layout 表格已移除。
 - 此行為已通過自動化測試驗證（見 tests/test_struct_view_padding.py）。
 
+## Cache 觸發與效能優化（2024/07）
+- 任何 struct 成員或 size 變動（新增、刪除、修改、複製、移動、重設）時，皆會呼叫 presenter.invalidate_cache()，確保 layout cache 正確失效。
+- 依賴介面：presenter 必須實作 invalidate_cache、compute_member_layout。
+- TDD 驗證：所有觸發點皆有自動化測試（見 tests/test_struct_view.py），確保 cache 行為與 UI 操作同步。
+
 ## 相關設計文檔
 - [MVP 架構說明](../../docs/architecture/MVP_ARCHITECTURE_COMPLETE.md) 

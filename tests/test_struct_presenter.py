@@ -43,5 +43,36 @@ class TestStructPresenter(unittest.TestCase):
             self.presenter._process_hex_parts([("zz", 2)], "big")
         self.assertEqual(cm.exception.kind, "invalid_input")
 
+    def test_layout_cache_hit_and_miss(self):
+        # 模擬 model 回傳不同 layout
+        self.model.calculate_manual_layout.side_effect = lambda m, s: [dict(name=x['name'], size=1) for x in m]
+        m1 = [{"name": "a", "type": "char", "bit_size": 0}]
+        m2 = [{"name": "a", "type": "char", "bit_size": 0}, {"name": "b", "type": "int", "bit_size": 0}]
+        l1 = self.presenter.compute_member_layout(m1, 8)
+        l2 = self.presenter.compute_member_layout(m1, 8)
+        self.assertIs(l1, l2)  # cache hit
+        l3 = self.presenter.compute_member_layout(m2, 8)
+        self.assertIsNot(l3, l1)  # cache miss
+
+    def test_layout_cache_invalidation(self):
+        self.model.calculate_manual_layout.side_effect = lambda m, s: [dict(name=x['name'], size=1) for x in m]
+        m1 = [{"name": "a", "type": "char", "bit_size": 0}]
+        l1 = self.presenter.compute_member_layout(m1, 8)
+        self.presenter.invalidate_cache()
+        l2 = self.presenter.compute_member_layout(m1, 8)
+        self.assertIsNot(l1, l2)  # cache miss after invalidation
+
+    def test_layout_cache_performance(self):
+        call_count = 0
+        def fake_layout(m, s):
+            nonlocal call_count
+            call_count += 1
+            return [dict(name=x['name'], size=1) for x in m]
+        self.model.calculate_manual_layout.side_effect = fake_layout
+        m = [{"name": f"f{i}", "type": "int", "bit_size": 0} for i in range(100)]
+        for _ in range(20):
+            self.presenter.compute_member_layout(m, 128)
+        self.assertEqual(call_count, 1)  # 只計算一次
+
 if __name__ == "__main__":
     unittest.main() 

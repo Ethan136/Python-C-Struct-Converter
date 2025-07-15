@@ -33,6 +33,12 @@
 - 調整 layout：可修改 Treeview 欄位、Entry 欄位產生邏輯
 - 支援新功能：建議先於 presenter/model 增加邏輯，再於 view 增加 UI 與事件
 
+## Cache 觸發與效能優化
+- 主要觸發點：_add_member、_delete_member、_update_member_*、_move_member_up/down、_copy_member、_reset_manual_struct。
+- 這些操作皆會呼叫 presenter.invalidate_cache()，確保 layout cache 失效。
+- 依賴介面：presenter 必須實作 invalidate_cache、compute_member_layout。
+- TDD 測試：所有觸發點、cache 行為、異常情境皆有自動化測試（見 tests/test_struct_view.py）。
+
 ## 參考
 - 主要元件初始化：`StructView.__init__`、`_create_tab_control`、`_create_file_tab_frame`、`_create_manual_struct_frame`
 - 事件 callback 實作：`_on_browse_file`、`_on_parse_file`、`_on_unit_size_change`、`_on_endianness_change`、`_add_member`、`_on_parse_manual_hex` 等 

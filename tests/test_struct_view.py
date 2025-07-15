@@ -31,6 +31,8 @@ class PresenterStub:
         # 回傳真實 layout，過濾掉 padding
         layout = self.model.calculate_manual_layout(members, total_size)
         return [item for item in layout if item.get("type") != "padding"]
+    def invalidate_cache(self):
+        pass
 
 class TestStructView(unittest.TestCase):
     def setUp(self):

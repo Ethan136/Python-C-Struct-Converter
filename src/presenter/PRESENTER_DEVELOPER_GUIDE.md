@@ -32,6 +32,13 @@
 - 自訂 HexProcessingError 例外類別，細分錯誤型態
 - 所有錯誤皆由 Presenter 處理，View 僅負責顯示
 
+## Layout Cache 機制與介面
+- `compute_member_layout(members, total_size)`：自動快取 layout 結果，減少重算。
+- `invalidate_cache()`：由 view 於 struct 成員/size 變動時呼叫，確保 cache 失效。
+- cache key 為 (members, total_size) tuple，排序後 hash，確保唯一性。
+- TDD 測試：cache hit/miss、失效、異常、極端 struct/bitfield、效能皆有自動化覆蓋。
+- 擴充建議：如需更細粒度 cache 或 LRU，可依需求擴充。
+
 ## 擴充指引
 - 新增事件：於 Presenter 增加對應方法，於 View callback 呼叫
 - 擴充資料驗證/轉換：可於 Presenter 增加前置處理，再呼叫 Model
