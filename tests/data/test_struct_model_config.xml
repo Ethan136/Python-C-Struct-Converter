@@ -182,4 +182,18 @@
             <member name="val" value_little="2378182078228332544" value_big="289" hex_raw="0000000000000121"/>
         </expected_results>
     </test_case>
-</struct_model_tests> 
+
+    <test_case name="array_struct" description="Test parsing array struct" endianness="big">
+        <struct_definition><![CDATA[
+            struct ArrayStruct {
+                int arr[3][2];
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>000000000000000100000002000000030000000400000005</hex>
+        </input_data>
+        <expected_results>
+            <member name="arr" value="[0, 1, 2, 3, 4, 5]"/>
+        </expected_results>
+    </test_case>
+</struct_model_tests>

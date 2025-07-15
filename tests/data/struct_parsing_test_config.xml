@@ -20,6 +20,28 @@
         </expected_results>
     </test_case>
 
+    <!-- Test configuration for struct with multi-dimensional array -->
+    <test_case name="array_struct_test"
+               struct_file="test_struct_with_array.h"
+               description="Test struct with int arr[3][2]">
+        <input_data>
+            <input index="0" value="0" unit_size="4" description="arr[0][0]"/>
+            <input index="1" value="1" unit_size="4" description="arr[0][1]"/>
+            <input index="2" value="2" unit_size="4" description="arr[1][0]"/>
+            <input index="3" value="3" unit_size="4" description="arr[1][1]"/>
+            <input index="4" value="4" unit_size="4" description="arr[2][0]"/>
+            <input index="5" value="5" unit_size="4" description="arr[2][1]"/>
+        </input_data>
+        <expected_results>
+            <endianness name="little">
+                <member name="arr" expected_value="[0, 1, 2, 3, 4, 5]" expected_hex="000000000100000002000000030000000400000005000000"/>
+            </endianness>
+            <endianness name="big">
+                <member name="arr" expected_value="[0, 1, 2, 3, 4, 5]" expected_hex="000000000000000100000002000000030000000400000005"/>
+            </endianness>
+        </expected_results>
+    </test_case>
+
     <!-- Test configuration for struct with padding -->
     <test_case name="struct_with_padding_test" 
                struct_file="test_struct_with_padding.h" 

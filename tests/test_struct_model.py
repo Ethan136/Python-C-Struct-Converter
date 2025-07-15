@@ -963,6 +963,7 @@ class TestParseHexDataArray(unittest.TestCase):
         result = model.parse_hex_data(hex_data, "big")
         arr_entry = next(item for item in result if item["name"] == "arr")
         self.assertEqual(arr_entry["value"], list(range(6)))
+        self.assertEqual(arr_entry["hex_raw"], hex_data)
 
 
 if __name__ == "__main__":
