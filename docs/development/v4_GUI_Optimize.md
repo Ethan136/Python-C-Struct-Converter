@@ -181,6 +181,170 @@ def test_large_struct_performance():
 - 可用 pytest + tkinter event 模擬，或以 mock patch 統計 presenter/model 方法呼叫次數。
 - 驗證 UI refresh、驗證提示、錯誤處理皆與 baseline 一致。
 
+### 9. 進階細化主題與規範
+
+#### 1. GUI Layout Cache 機制設計細節
+- **Cache key/hash 計算**：
+  - 將 members 轉為 tuple of (name, type, bit_size)，再與 total_size 組成 key。
+  - 範例：`key = (tuple((m['name'], m['type'], m.get('bit_size', 0)) for m in members), total_size)`
+- **Cache 失效觸發點**：
+  - 新增/刪除/修改 member
+  - 修改 struct size
+  - 匯入/重設 struct
+- **Cache 清理策略**：
+  - 若 struct 操作頻繁，可設計 LRU cache 或定期清空
+  - 預設僅保留最近一次 layout 結果即可
+
+#### 2. GUI 操作流程與異常情境清單
+- **常見操作流程**：
+  | 操作         | 預期 cache 行為 | 需重算 layout |
+  |--------------|----------------|--------------|
+  | 新增成員     | cache 失效     | 是           |
+  | 刪除成員     | cache 失效     | 是           |
+  | 修改型別     | cache 失效     | 是           |
+  | 切換 tab     | cache 不變     | 否           |
+  | 僅驗證提示   | cache 不變     | 否           |
+- **異常情境與處理**：
+  - 型別錯誤：raise 並不寫入 cache
+  - bit_size 不合法：raise 並不寫入 cache
+  - UI 卡死：log error 並顯示提示
+  - cache 污染：invalidate 並強制重算
+
+#### 3. 效能指標與回歸門檻
+- **效能指標**：
+  - 200 members 操作 10 次，layout 計算不得超過 2 次，總耗時 < 1 秒
+  - 單次 UI refresh < 100ms
+- **回歸門檻**：
+  - CI/CD 若 layout 計算次數 > 2 或總耗時 > 1 秒則警告
+
+#### 4. 自動化測試腳本設計規範
+- **命名慣例**：
+  - 單元測試：`test_cache_hit_miss`、`test_cache_invalidation_on_member_change`
+  - 整合測試：`test_gui_add_member_performance`
+- **Mock/patch 技巧**：
+  - 用 patch 統計 presenter/model 方法呼叫次數
+- **測試資料生成**：
+  - 隨機產生 100~500 members，覆蓋極端情境
+
+#### 5. CI/CD 效能監控與報告格式
+- **自動化流程**：
+  - 在 GitHub Actions 加入效能測試步驟
+  - 失敗時自動產生 markdown 報告，內容包含：
+    - 測試名稱、操作次數、layout 計算次數、總耗時、是否通過
+- **報告範例**：
+  ```markdown
+  | 測試        | 操作次數 | layout 計算 | 總耗時(s) | 結果 |
+  |-------------|----------|-------------|----------|------|
+  | add_member  | 10       | 2           | 0.85     | 通過 |
+  ```
+
+#### 6. 文件與程式碼同步機制
+- **同步原則**：
+  - 每次 cache/GUI/測試邏輯變動，必須同步更新本文件與 README
+  - PR/merge 時 reviewer 檢查文件是否同步
+- **審查流程建議**：
+  - 每次 major 變動，先更新細節文件，review 通過後再進行 code 實作
+
+### 10. 細節展開與具體規格
+
+#### 1. Cache Key/Hash 設計與流程圖
+- **Key 算法**：
+  - 將 members 轉為 tuple of (name, type, bit_size)，排序後與 total_size 組成 key。
+  - 範例：
+    ```python
+    def make_cache_key(members, total_size):
+        key = tuple(sorted((m['name'], m['type'], m.get('bit_size', 0)) for m in members))
+        return (key, total_size)
+    ```
+- **碰撞處理**：
+  - 若 key 相同但 layout 結果不符，log warning 並強制重算。
+- **失效觸發流程圖**：
+  ```mermaid
+  flowchart TD
+    A[UI 操作] --> B{members/size 是否變動?}
+    B -- 是 --> C[cache 失效, 重算 layout]
+    B -- 否 --> D[cache 命中, 直接取用]
+  ```
+
+#### 2. GUI 操作流程圖與異常分支表
+- **操作流程圖**：
+  ```mermaid
+  flowchart TD
+    S[開始] --> A[新增/刪除/修改成員]
+    A -->|cache 失效| B[重算 layout]
+    S --> C[切換 tab/驗證提示]
+    C -->|cache 不變| D[直接顯示]
+    B --> E[UI refresh]
+    D --> E
+  ```
+- **異常分支表**：
+  | 操作         | 可能異常         | 處理方式           | 用戶提示           |
+  |--------------|------------------|--------------------|--------------------|
+  | 新增成員     | 型別錯誤         | raise, 不寫入 cache| 顯示型別錯誤訊息   |
+  | 修改 bit_size| 非法 bit_size    | raise, 不寫入 cache| 顯示 bitfield 錯誤 |
+  | 匯入 struct  | 格式不符         | raise, cache 清空  | 顯示匯入失敗訊息   |
+  | UI 卡死      | 計算超時         | log, 強制重算      | 顯示效能警告       |
+
+#### 3. 效能指標分級表與 CI/CD 回報流程
+- **分級表**：
+  | 規模         | 操作次數 | layout 計算上限 | 總耗時上限 | 等級 |
+  |--------------|----------|----------------|------------|------|
+  | 50 members   | 10       | 2              | 0.3s       | A    |
+  | 200 members  | 10       | 2              | 1.0s       | A    |
+  | 500 members  | 10       | 3              | 2.5s       | B    |
+- **CI/CD 回報流程圖**：
+  ```mermaid
+  flowchart TD
+    T[效能測試] --> A{是否超過門檻?}
+    A -- 否 --> B[標記通過]
+    A -- 是 --> C[產生報告, PR 警告]
+    C --> D[需人工 review]
+  ```
+
+#### 4. 測試命名/覆蓋率/範例
+- **命名規則**：
+  - `test_cache_key_uniqueness`、`test_cache_invalidation_on_import`、`test_gui_performance_large_struct`
+- **覆蓋率要求**：
+  - cache 行為、異常分支、極端 struct、效能回歸皆需覆蓋
+- **範例**：
+  ```python
+  def test_cache_key_uniqueness():
+      k1 = make_cache_key([{"name": "a", "type": "int", "bit_size": 0}], 8)
+      k2 = make_cache_key([{"name": "a", "type": "int", "bit_size": 0}], 8)
+      assert k1 == k2
+  def test_cache_invalidation_on_import():
+      ... # 匯入新 struct 後 cache 必須失效
+  ```
+
+#### 5. CI/CD 報告 markdown/html 範例與產生流程
+- **Markdown 報告範例**：
+  ```markdown
+  ## GUI 效能測試報告
+  | 測試        | 規模      | 操作次數 | layout 計算 | 總耗時(s) | 結果 |
+  |-------------|-----------|----------|-------------|----------|------|
+  | add_member  | 200       | 10       | 2           | 0.85     | 通過 |
+  | import      | 500       | 5        | 3           | 2.1      | 通過 |
+  ```
+- **HTML 報告產生**：
+  - 可用 pytest-html 或 coverage.py 產生互動式報告，附連結於 PR
+
+#### 6. 文件同步 checklist/自動檢查腳本/審查流程圖
+- **Checklist**：
+  - [ ] cache/GUI/測試/效能邏輯有無變動？
+  - [ ] 文件/README 是否同步？
+  - [ ] 測試/CI/CD 報告有無更新？
+- **自動檢查腳本**：
+  - 可用 pre-commit hook 比對文件與 code 變動
+- **審查流程圖**：
+  ```mermaid
+  flowchart TD
+    S[PR 開啟] --> A[自動檢查文件同步]
+    A -- 通過 --> B[人工 review]
+    A -- 不通過 --> C[要求補文件]
+    B --> D[merge]
+    C --> D
+  ```
+
 ---
 
-> 本文件持續補充具體改動細節與測試腳本，歡迎貢獻更多自動化測試與效能數據。 
+> 本文件已展開所有細節主題，包含 cache 算法、流程圖、異常分支、效能分級、測試規範、CI/CD 報告與文件同步機制，確保開發流程高效、可追蹤、可維護。 
