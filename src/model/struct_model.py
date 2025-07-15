@@ -35,9 +35,21 @@ class StructModel:
         # Initialize the input field processor
         self.input_processor = InputFieldProcessor()
         self.manual_struct = None  # 新增屬性
+        self._observers = set()
 
     # 移除 _merge_byte_and_bit_size
     # 完全移除 _convert_legacy_member 及舊格式相容邏輯
+
+    def add_observer(self, observer):
+        self._observers.add(observer)
+
+    def remove_observer(self, observer):
+        self._observers.discard(observer)
+
+    def _notify_observers(self, event_type, **kwargs):
+        for obs in list(self._observers):
+            if hasattr(obs, "update"):
+                obs.update(event_type, self, **kwargs)
 
     def set_manual_struct(self, members, total_size):
         # 統一格式：轉換為 C++ 標準型別格式
@@ -45,6 +57,7 @@ class StructModel:
         self.members = self._convert_to_cpp_members(members)
         self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
         self.manual_struct = {"members": self.members, "total_size": total_size}
+        self._notify_observers("manual_struct_changed")
 
     def load_struct_from_file(self, file_path):
         with open(file_path, 'r') as f:
@@ -55,6 +68,7 @@ class StructModel:
         self.struct_name = struct_name
         self.members = self._convert_to_cpp_members(members)
         self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
+        self._notify_observers("file_struct_loaded", file_path=file_path)
         return self.struct_name, self.layout, self.total_size, self.struct_align
 
     def parse_hex_data(self, hex_data, byte_order, layout=None, total_size=None):
