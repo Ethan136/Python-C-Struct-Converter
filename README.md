@@ -6,7 +6,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
 
 - **Model (`src/model/`)**: Contains the core business logic, data structures, and data manipulation. It's independent of the UI.
   - `struct_model.py`: Handles parsing C++ struct definitions, calculating memory layouts (including padding), and interpreting raw hexadecimal data based on endianness.
-  - **Supports bitfield members** (e.g., `int a : 1;`) with proper packing and storage unit alignment.
+  - **Supports bitfield members** (including anonymous bitfields like `int : 1;`) with proper packing and storage unit alignment.
   - **Union parsing** with correct layout calculation.
   - **N-D array support** for parsing and layout of multi-dimensional arrays.
   - **Manual struct definition** with byte/bit size validation and export functionality.
@@ -131,7 +131,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
   - The size and alignment of each member.
   - The required memory padding between members.
   - The final total size of the struct.
-- **Bitfield Support**: Full support for C/C++ bitfield members (e.g., `int a : 1;`) with proper packing and storage unit alignment.
+  - **Bitfield Support**: Full support for C/C++ bitfield members (including anonymous bitfields) with proper packing and storage unit alignment.
 - **Union Support**: Parses C `union` definitions with correct layout calculation.
 - **Manual Struct Definition**: Define structs directly in the GUI with byte/bit size validation and real-time remaining space display.
 - **Chunked Hexadecimal Data Input**: Allows inputting hex data in user-defined chunks (1, 4, or 8 bytes) for better readability and ease of entry.
@@ -148,7 +148,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
 The application fully supports C/C++ bitfield members with the following features:
 
 ### Bitfield Parsing
-- Parses bitfield declarations like `int a : 1;` from C++ header files
+- Parses bitfield declarations like `int a : 1;` and anonymous forms `int : 1;` from C++ header files
 - Supports multiple bitfields in the same storage unit with proper bit offset calculation
 - Handles bitfield packing across storage unit boundaries
 

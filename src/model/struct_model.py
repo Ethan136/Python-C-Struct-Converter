@@ -272,12 +272,18 @@ class StructModel:
         lines = [f"struct {struct_name} {{"]
         for m in members:
             type_name = m.get("type", "")
-            name = m.get("name", "")
+            name = m.get("name")
             bit_size = m.get("bit_size", 0)
             if bit_size > 0:
-                lines.append(f"    {type_name} {name} : {bit_size};")
+                if name:
+                    lines.append(f"    {type_name} {name} : {bit_size};")
+                else:
+                    lines.append(f"    {type_name} : {bit_size};")
             else:
-                lines.append(f"    {type_name} {name};")
+                if name:
+                    lines.append(f"    {type_name} {name};")
+                else:
+                    lines.append(f"    {type_name};")
         lines.append("};")
         lines.append(f"// total size: {total_size} bytes")
         return "\n".join(lines)
