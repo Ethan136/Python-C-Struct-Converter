@@ -5,11 +5,13 @@
 字典介面存取欄位資訊。
 """
 from model.input_field_processor import InputFieldProcessor
-from .layout import LayoutCalculator, LayoutItem, TYPE_INFO
+from .layout import LayoutCalculator, LayoutItem, TYPE_INFO, UnionLayoutCalculator
 from .struct_parser import (
     parse_struct_definition,
     parse_member_line,
     parse_struct_definition_ast,
+    parse_c_definition_ast,
+    UnionDef,
 )
 import math
 
@@ -19,12 +21,20 @@ import math
 # parse_struct_definition 與 parse_member_line 已移至 ``struct_parser`` 模組，
 # 於此重新匯入以維持相容性。
 
-def calculate_layout(members, calculator_cls=None, pack_alignment=None):
-    """Calculate the memory layout using the specified calculator class."""
+def calculate_layout(members, calculator_cls=None, pack_alignment=None, kind=None):
+    """Calculate the memory layout using the specified calculator class.
+
+    If ``calculator_cls`` is not provided, it will be chosen based on ``kind``.
+    """
     if not members:
         return [], 0, 1
 
-    calculator_cls = calculator_cls or LayoutCalculator
+    if calculator_cls is None:
+        if kind == "union":
+            calculator_cls = UnionLayoutCalculator
+        else:
+            calculator_cls = LayoutCalculator
+
     layout_calculator = calculator_cls(pack_alignment=pack_alignment)
     return layout_calculator.calculate(members)
 
@@ -37,6 +47,7 @@ class StructModel:
         self.layout = []
         self.total_size = 0
         self.struct_align = 1
+        self.kind = 'struct'
         # Initialize the input field processor
         self.input_processor = InputFieldProcessor()
         self.manual_struct = None  # 新增屬性
@@ -54,14 +65,15 @@ class StructModel:
     def load_struct_from_file(self, file_path):
         with open(file_path, 'r') as f:
             content = f.read()
-        struct_def = parse_struct_definition_ast(content)
-        if not struct_def:
+        def_obj = parse_c_definition_ast(content)
+        if not def_obj:
             raise ValueError("Could not find a valid struct definition in the file.")
-        struct_name = struct_def.name
-        members = struct_def.members
+        self.kind = 'union' if isinstance(def_obj, UnionDef) else 'struct'
+        struct_name = def_obj.name
+        members = def_obj.members
         self.struct_name = struct_name
         self.members = members
-        self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
+        self.layout, self.total_size, self.struct_align = calculate_layout(self.members, kind=self.kind)
         return self.struct_name, self.layout, self.total_size, self.struct_align
 
     def parse_hex_data(self, hex_data, byte_order, layout=None, total_size=None):

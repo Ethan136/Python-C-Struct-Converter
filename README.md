@@ -7,6 +7,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
 - **Model (`src/model/`)**: Contains the core business logic, data structures, and data manipulation. It's independent of the UI.
   - `struct_model.py`: Handles parsing C++ struct definitions, calculating memory layouts (including padding), and interpreting raw hexadecimal data based on endianness.
   - **Supports bitfield members** (e.g., `int a : 1;`) with proper packing and storage unit alignment.
+  - **Union parsing** with correct layout calculation.
   - **N-D array support** for parsing and layout of multi-dimensional arrays.
   - **Manual struct definition** with byte/bit size validation and export functionality.
 
@@ -131,6 +132,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
   - The required memory padding between members.
   - The final total size of the struct.
 - **Bitfield Support**: Full support for C/C++ bitfield members (e.g., `int a : 1;`) with proper packing and storage unit alignment.
+- **Union Support**: Parses C `union` definitions with correct layout calculation.
 - **Manual Struct Definition**: Define structs directly in the GUI with byte/bit size validation and real-time remaining space display.
 - **Chunked Hexadecimal Data Input**: Allows inputting hex data in user-defined chunks (1, 4, or 8 bytes) for better readability and ease of entry.
 - **Auto-Padding Hex Input**: Automatically pads shorter hexadecimal inputs with leading zeros to match the expected chunk size (e.g., `12` in a 4-byte field becomes `00000012`).

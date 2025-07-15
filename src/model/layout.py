@@ -102,6 +102,28 @@ class BaseLayoutCalculator(ABC):
         """Calculate layout for given members."""
         raise NotImplementedError
 
+    def _add_final_padding(self):
+        effective = self._effective_alignment(self.max_alignment)
+        final_padding = (
+            effective - (self.current_offset % effective)
+        ) % effective
+        if final_padding > 0:
+            self._add_padding_entry("(final padding)", final_padding)
+
+    def _add_padding_entry(self, name: str, size: int):
+        self.layout.append(
+            LayoutItem(
+                name=name,
+                type="padding",
+                size=size,
+                offset=self.current_offset,
+                is_bitfield=False,
+                bit_offset=0,
+                bit_size=size * 8,
+            )
+        )
+        self.current_offset += size
+
 
 class StructLayoutCalculator(BaseLayoutCalculator):
     """Helper class for calculating struct memory layout."""
@@ -295,27 +317,6 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         if padding > 0:
             self._add_padding_entry("(padding)", padding)
 
-    def _add_final_padding(self):
-        effective = self._effective_alignment(self.max_alignment)
-        final_padding = (
-            effective - (self.current_offset % effective)
-        ) % effective
-        if final_padding > 0:
-            self._add_padding_entry("(final padding)", final_padding)
-
-    def _add_padding_entry(self, name: str, size: int):
-        self.layout.append(
-            LayoutItem(
-                name=name,
-                type="padding",
-                size=size,
-                offset=self.current_offset,
-                is_bitfield=False,
-                bit_offset=0,
-                bit_size=size * 8,
-            )
-        )
-        self.current_offset += size
 
 
 class UnionLayoutCalculator(BaseLayoutCalculator):

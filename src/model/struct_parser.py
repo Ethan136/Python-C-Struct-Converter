@@ -210,22 +210,80 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
     return StructDef(name=name, members=members)
 
 
-def parse_c_definition(file_content: str) -> Tuple[Optional[str], Optional[str], Optional[List[dict]]]:
-    """Parse a C structure or union definition.
+def parse_union_definition(file_content):
+    """Parse a C union definition string."""
+    union_name, union_content = _extract_struct_body(file_content, "union")
+    if not union_name:
+        return None, None
+    union_content = re.sub(r"//.*", "", union_content)
+    lines = union_content.split(';')
+    members = []
+    for line in lines:
+        parsed = parse_member_line(line)
+        if parsed is not None:
+            members.append(parsed)
+    return union_name, members
 
-    Union parsing is not yet implemented, so this function currently
-    only recognizes ``struct`` definitions.
-    """
-    name, members = parse_struct_definition(file_content)
+
+def parse_union_definition_v2(file_content: str) -> Tuple[Optional[str], Optional[List[MemberDef]]]:
+    """Parse a C union definition string and return ``MemberDef`` objects."""
+    union_name, union_content = _extract_struct_body(file_content, "union")
+    if not union_name:
+        return None, None
+    union_content = re.sub(r"//.*", "", union_content)
+    members: List[MemberDef] = []
+    current = ""
+    brace = 0
+    for ch in union_content:
+        if ch == '{':
+            brace += 1
+            current += ch
+        elif ch == '}':
+            brace -= 1
+            current += ch
+        elif ch == ';' and brace == 0:
+            parsed = parse_member_line_v2(current)
+            if parsed is not None:
+                members.append(parsed)
+            current = ""
+        else:
+            current += ch
+    if current.strip():
+        parsed = parse_member_line_v2(current)
+        if parsed is not None:
+            members.append(parsed)
+    return union_name, members
+
+
+def parse_union_definition_ast(file_content: str) -> Optional[UnionDef]:
+    """Parse a union definition and return a :class:`UnionDef` object."""
+    name, members = parse_union_definition_v2(file_content)
+    if not name:
+        return None
+    return UnionDef(name=name, members=members)
+
+
+def parse_c_definition(file_content: str) -> Tuple[Optional[str], Optional[str], Optional[List[dict]]]:
+    """Parse a C structure or union definition."""
+    kind_match = re.match(r"\s*(struct|union)\s+", file_content)
+    if not kind_match:
+        return None, None, None
+    kind = kind_match.group(1)
+    if kind == "struct":
+        name, members = parse_struct_definition(file_content)
+    else:
+        name, members = parse_union_definition(file_content)
     if name is None:
         return None, None, None
-    return "struct", name, members
+    return kind, name, members
 
 
 def parse_c_definition_ast(file_content: str) -> Optional[Union[StructDef, UnionDef]]:
-    """Parse a C struct or union and return a definition object.
-
-    Union support is not yet implemented and will return ``None`` if a union
-    definition is encountered.
-    """
-    return parse_struct_definition_ast(file_content)
+    """Parse a C struct or union and return a definition object."""
+    kind_match = re.match(r"\s*(struct|union)\s+", file_content)
+    if not kind_match:
+        return None
+    kind = kind_match.group(1)
+    if kind == "struct":
+        return parse_struct_definition_ast(file_content)
+    return parse_union_definition_ast(file_content)
