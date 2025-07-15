@@ -39,3 +39,25 @@
 - 手動 struct 定義頁面 (`StructView` 與 `StructPresenter`) 尚未處理陣列輸入，未來視需求擴充 GUI 邏輯與對應測試。
 - 後續如要支援陣列內含 bitfield 或巢狀結構，需再擴充 `LayoutCalculator` 與解析流程。
 
+## 7. 影響模組與修改項目
+1. **`src/model/layout.py`**
+   - `LayoutItem` dataclass 新增 `array_dims: List[int]` 欄位，預設為 `[]`。
+   - 完成 `_process_array_member` 邏輯：計算元素大小、乘上維度總積後建立單一 `LayoutItem`，並記錄 `array_dims`。
+   - `_process_regular_member` 在偵測到 `array_dims` 時改呼叫此新實作。
+2. **`src/model/struct_model.py`**
+   - `parse_hex_data` 讀取 layout 時，若項目含 `array_dims`，依元素大小循序切片，組成 list 值寫入結果。
+3. **`src/model/struct_parser.py`**
+   - 現有 `_extract_array_dims` 與 `parse_member_line_v2` 已支援多維陣列，新增測試強化覆蓋率。
+4. **XML Loader 與測試資料**
+   - `tests/data/` 新增含陣列的 `.h` 檔與 XML 測試配置，若需要比對 array 元素，可在 `<expected_results>` 中列出各元素。
+
+## 8. 新增測試清單
+- `TestArrayParsing`：驗證解析階段能正確取得 `array_dims`。
+- `TestArrayLayout`：確認 `_process_array_member` 依維度計算 size、offset、alignment。
+- `TestParseHexDataArray`：`StructModel.parse_hex_data` 應回傳元素 list，並比對 hex 值。
+- XML 驅動案例：在 `struct_parsing_test_config.xml` 內新增陣列測試，透過既有 loader 執行。
+
+## 9. 後續擴充方向
+- 陣列元素若為 nested struct 或 bitfield，需再擴充遞迴處理與 bitfield packing。
+- GUI 手動輸入陣列值與驗證邏輯仍待規劃。
+
