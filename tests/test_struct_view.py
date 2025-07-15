@@ -19,8 +19,12 @@ class PresenterStub:
         self.model = StructModel()
     def on_manual_struct_change(self, struct_data):
         self.last_struct_data = struct_data
+        # 模擬回傳 dict
+        return {"errors": []}
     def on_export_manual_struct(self):
         self.export_called = True
+        # 模擬回傳 dict
+        return {"h_content": "struct ManualStruct { ... }"}
     def calculate_remaining_space(self, members, total_size):
         # 真實計算剩餘 bits/bytes
         used_bits = self.model.calculate_used_bits(members)
@@ -67,6 +71,9 @@ class TestStructView(unittest.TestCase):
     def test_export_button_triggers_presenter(self):
         self.view.on_export_manual_struct()
         self.assertTrue(self.presenter.export_called)
+        # 驗證 show_exported_struct 被正確呼叫
+        # 這裡可驗證 h_content 是否正確顯示
+        # 但因為 show_exported_struct 彈窗，僅驗證 export_called
 
     def test_move_member_up(self):
         # 新增三個 member
