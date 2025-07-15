@@ -134,6 +134,7 @@ class StructModel:
             name = m.get("name", "")
             type_name = m.get("type", "")
             bit_size = m.get("bit_size", 0)
+            array_dims = m.get("array_dims", [])
             # 僅接受有 type 的 member
             if not type_name or type_name not in TYPE_INFO:
                 continue
@@ -147,11 +148,14 @@ class StructModel:
                 })
             else:
                 # 普通欄位
-                new_members.append({
+                entry = {
                     "type": type_name,
                     "name": name,
-                    "is_bitfield": False
-                })
+                    "is_bitfield": False,
+                }
+                if array_dims:
+                    entry["array_dims"] = array_dims
+                new_members.append(entry)
         return new_members
 
     def calculate_used_bits(self, members):

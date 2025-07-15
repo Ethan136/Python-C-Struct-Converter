@@ -2,6 +2,7 @@ import unittest
 import sys
 import os
 import xml.etree.ElementTree as ET
+import math
 
 # Add src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -28,12 +29,25 @@ class TestStructParsingCore(unittest.TestCase):
         for item in layout:
             if item['type'] == 'padding':
                 continue
-            input_item = input_data[input_idx]
-            value = input_item['value']
-            unit_size = input_item['unit_size']
-            raw_bytes = self.input_processor.process_input_field(value, unit_size, endianness)
-            struct_bytes[item['offset']:item['offset']+item['size']] = raw_bytes
-            input_idx += 1
+            array_dims = item.get('array_dims', [])
+            if array_dims:
+                total_elems = math.prod(array_dims)
+                elem_size = item['size'] // total_elems
+                for elem_index in range(total_elems):
+                    input_item = input_data[input_idx]
+                    value = input_item['value']
+                    unit_size = input_item['unit_size']
+                    raw_bytes = self.input_processor.process_input_field(value, unit_size, endianness)
+                    start = item['offset'] + elem_index * elem_size
+                    struct_bytes[start:start+elem_size] = raw_bytes
+                    input_idx += 1
+            else:
+                input_item = input_data[input_idx]
+                value = input_item['value']
+                unit_size = input_item['unit_size']
+                raw_bytes = self.input_processor.process_input_field(value, unit_size, endianness)
+                struct_bytes[item['offset']:item['offset']+item['size']] = raw_bytes
+                input_idx += 1
         return struct_bytes.hex()
 
     def test_struct_parsing_cases(self):
@@ -58,7 +72,7 @@ class TestStructParsingCore(unittest.TestCase):
                         self.assertIsNotNone(parsed_member, f"Member '{member_name}' not found in parsed results")
                         expected_value = expected_data['expected_value']
                         actual_value = parsed_member['value']
-                        self.assertEqual(actual_value, expected_value,
+                        self.assertEqual(str(actual_value), str(expected_value),
                                          f"Value mismatch for {member_name} in {endianness} endian: "
                                          f"expected {expected_value}, got {actual_value}")
                         expected_hex = expected_data['expected_hex']
