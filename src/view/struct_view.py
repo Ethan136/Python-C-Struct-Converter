@@ -344,7 +344,9 @@ class StructView(tk.Tk):
     def _on_manual_struct_change(self):
         struct_data = self.get_manual_struct_definition()
         if self.presenter:
-            self.presenter.on_manual_struct_change(struct_data)
+            result = self.presenter.on_manual_struct_change(struct_data)
+            errors = result.get("errors")
+            self.show_manual_struct_validation(errors)
         # 變更時即時更新下方標準 struct layout treeview
         self._update_manual_layout_tree()
 
@@ -457,13 +459,14 @@ class StructView(tk.Tk):
 
     def on_export_manual_struct(self):
         if self.presenter:
-            # 匯出前先同步 model 的 manual_struct
             struct_data = self.get_manual_struct_definition()
             # 先調用 on_manual_struct_change 來設定 last_struct_data
             self.presenter.on_manual_struct_change(struct_data)
             if hasattr(self.presenter, "model") and self.presenter.model:
                 self.presenter.model.set_manual_struct(struct_data["members"], struct_data["total_size"])
-            self.presenter.on_export_manual_struct()
+            result = self.presenter.on_export_manual_struct()
+            h_content = result.get("h_content")
+            self.show_exported_struct(h_content)
 
     def show_exported_struct(self, h_content):
         # 可彈出新視窗顯示匯出內容
@@ -594,7 +597,10 @@ class StructView(tk.Tk):
 
     def _on_unit_size_change(self):
         if self.presenter:
-            self.presenter.on_unit_size_change()
+            result = self.presenter.on_unit_size_change()
+            unit_size = result.get("unit_size")
+            if unit_size is not None and hasattr(self, "rebuild_hex_grid"):
+                self.rebuild_hex_grid(self.model.total_size if hasattr(self, "model") and hasattr(self.model, "total_size") else 0, unit_size)
 
     def _on_endianness_change(self):
         if self.presenter:
@@ -695,3 +701,9 @@ class StructView(tk.Tk):
             self.manual_debug_text.delete("1.0", tk.END)
             self.manual_debug_text.insert("1.0", f"hex_parts: {hex_parts}\n(需由 presenter/model 實作解析)")
             self.manual_debug_text.config(state="disabled")
+
+    def get_presenter_cache_stats(self):
+        """取得 Presenter 的 layout cache hit/miss 統計（for debug/perf 分析用）"""
+        if self.presenter and hasattr(self.presenter, "get_cache_stats"):
+            return self.presenter.get_cache_stats()
+        return (None, None)

@@ -102,8 +102,10 @@ class StructPresenter:
     def on_unit_size_change(self, *args):
         # This method is called when the unit size dropdown changes
         if self.model.total_size > 0: # Only rebuild if a struct is loaded
-            unit_size = self.view.get_selected_unit_size()
-            self.view.rebuild_hex_grid(self.model.total_size, unit_size)
+            # 只回傳 unit_size，讓 View 決定如何處理
+            unit_size = self.view.get_selected_unit_size() if self.view else None
+            return {"unit_size": unit_size}
+        return {"unit_size": None}
 
     def on_endianness_change(self, *args):
         # This method is called when the endianness dropdown changes
@@ -144,13 +146,13 @@ class StructPresenter:
 
     def on_manual_struct_change(self, struct_data):
         errors = self.model.validate_manual_struct(struct_data["members"], struct_data["total_size"])
-        self.view.show_manual_struct_validation(errors)
+        return {"errors": errors}
 
     def on_export_manual_struct(self):
-        struct_data = self.view.get_manual_struct_definition()
-        struct_name = struct_data.get("struct_name", "MyStruct")
+        struct_data = self.view.get_manual_struct_definition() if self.view else None
+        struct_name = struct_data.get("struct_name", "MyStruct") if struct_data else "MyStruct"
         h_content = self.model.export_manual_struct_to_h(struct_name)
-        self.view.show_exported_struct(h_content)
+        return {"h_content": h_content}
 
     def parse_manual_hex_data(self, hex_parts, struct_def, endian):
         """解析 MyStruct tab 的 hex 資料，回傳 dict 結果，不操作 view"""
