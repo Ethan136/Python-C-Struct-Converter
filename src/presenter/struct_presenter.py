@@ -4,6 +4,7 @@ from tkinter import filedialog
 from config import get_string
 from model.input_field_processor import InputFieldProcessor
 import time
+from collections import OrderedDict
 
 
 class HexProcessingError(Exception):
@@ -18,7 +19,8 @@ class StructPresenter:
         self.model = model
         self.view = view # This will be set by main.py after view is instantiated
         self.input_processor = InputFieldProcessor()
-        self._layout_cache = {}  # (members_key, total_size) -> layout
+        self._lru_cache_size = 32  # 預設 LRU cache 大小
+        self._layout_cache = OrderedDict()  # (members_key, total_size) -> layout
         self._cache_hits = 0
         self._cache_misses = 0
         self._last_layout_time = None
@@ -180,10 +182,15 @@ class StructPresenter:
             return {'type': 'error', 'message': f"解析 hex 資料時發生錯誤: {e}"}
 
     def compute_member_layout(self, members, total_size):
-        """計算 struct member 的 layout，回傳 layout list，含 cache 機制。"""
+        """計算 struct member 的 layout，回傳 layout list，含 LRU cache 機制。"""
         cache_key = self._make_cache_key(members, total_size)
-        if cache_key in self._layout_cache:
+        print(f"[DEBUG] cache_key: {cache_key}")
+        print(f"[DEBUG] cache keys before: {list(self._layout_cache.keys())}")
+        if self._lru_cache_size > 0 and cache_key in self._layout_cache:
             self._cache_hits += 1
+            # LRU: move to end
+            self._layout_cache.move_to_end(cache_key)
+            print(f"[DEBUG] cache hit: {cache_key}")
             return self._layout_cache[cache_key]
         try:
             start = time.perf_counter()
@@ -193,8 +200,14 @@ class StructPresenter:
         except Exception:
             # 不記錄 miss，不快取
             raise
-        self._layout_cache[cache_key] = layout
+        if self._lru_cache_size > 0:
+            self._layout_cache[cache_key] = layout
+            self._layout_cache.move_to_end(cache_key)
+            if len(self._layout_cache) > self._lru_cache_size:
+                evicted = self._layout_cache.popitem(last=False)
+                print(f"[DEBUG] evicted: {evicted[0]}")
         self._cache_misses += 1
+        print(f"[DEBUG] cache keys after: {list(self._layout_cache.keys())}")
         return layout
 
     def get_last_layout_time(self):

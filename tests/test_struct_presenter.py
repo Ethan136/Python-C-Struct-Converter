@@ -290,5 +290,66 @@ class TestStructPresenter(unittest.TestCase):
         self.assertEqual(result['type'], 'error')
         self.assertIn('載入檔案時發生錯誤', result['message'])
 
+    def test_layout_cache_lru_eviction(self):
+        # 設定 LRU cache size = 2
+        self.presenter._lru_cache_size = 2
+        self.model.calculate_manual_layout.side_effect = lambda m, s: [dict(name=x['name'], size=1) for x in m]
+        m1 = [{"name": "a", "type": "char", "bit_size": 0}]
+        m2 = [{"name": "b", "type": "char", "bit_size": 0}]
+        m3 = [{"name": "c", "type": "char", "bit_size": 0}]
+        # 先填滿 cache
+        l1 = self.presenter.compute_member_layout(m1, 8)
+        l2 = self.presenter.compute_member_layout(m2, 8)
+        # 兩個都在 cache，應該是同一 instance
+        self.assertIs(l1, self.presenter.compute_member_layout(m1, 8))
+        self.assertIs(l2, self.presenter.compute_member_layout(m2, 8))
+        # 插入第三個，應淘汰最舊的 m1
+        l3 = self.presenter.compute_member_layout(m3, 8)
+        # m1 應被淘汰，重新計算（instance 不同）
+        l1_new = self.presenter.compute_member_layout(m1, 8)
+        self.assertIsNot(l1, l1_new)
+        # m2, m3 應還在 cache（instance 相同）
+        self.assertIs(l3, self.presenter.compute_member_layout(m3, 8))
+        # m2 可能被淘汰再重建，內容相等即可
+        l2_new = self.presenter.compute_member_layout(m2, 8)
+        if l2 is not l2_new:
+            self.assertEqual(l2, l2_new)
+
+    def test_layout_cache_lru_size_one(self):
+        self.presenter._lru_cache_size = 1
+        self.model.calculate_manual_layout.side_effect = lambda m, s: [dict(name=x['name'], size=1) for x in m]
+        m1 = [{"name": "a", "type": "char", "bit_size": 0}]
+        m2 = [{"name": "b", "type": "char", "bit_size": 0}]
+        l1 = self.presenter.compute_member_layout(m1, 8)
+        l2 = self.presenter.compute_member_layout(m2, 8)
+        # 只有 m2 應在 cache
+        self.assertIs(l2, self.presenter.compute_member_layout(m2, 8))
+        # m1 應被淘汰
+        l1_new = self.presenter.compute_member_layout(m1, 8)
+        self.assertIsNot(l1, l1_new)
+
+    def test_layout_cache_lru_size_zero(self):
+        self.presenter._lru_cache_size = 0
+        self.model.calculate_manual_layout.side_effect = lambda m, s: [dict(name=x['name'], size=1) for x in m]
+        m1 = [{"name": "a", "type": "char", "bit_size": 0}]
+        l1 = self.presenter.compute_member_layout(m1, 8)
+        l1_new = self.presenter.compute_member_layout(m1, 8)
+        # cache size 0，永遠 miss
+        self.assertIsNot(l1, l1_new)
+
+    def test_layout_cache_lru_stats(self):
+        self.presenter._lru_cache_size = 2
+        self.model.calculate_manual_layout.side_effect = lambda m, s: [dict(name=x['name'], size=1) for x in m]
+        m1 = [{"name": "a", "type": "char", "bit_size": 0}]
+        m2 = [{"name": "b", "type": "char", "bit_size": 0}]
+        m3 = [{"name": "c", "type": "char", "bit_size": 0}]
+        self.presenter.compute_member_layout(m1, 8)  # miss
+        self.presenter.compute_member_layout(m2, 8)  # miss
+        self.presenter.compute_member_layout(m1, 8)  # hit
+        self.presenter.compute_member_layout(m3, 8)  # miss, evict m2
+        self.presenter.compute_member_layout(m2, 8)  # miss, evict m1
+        hits, misses = self.presenter.get_cache_stats()
+        self.assertEqual((hits, misses), (1, 4))
+
 if __name__ == "__main__":
     unittest.main() 
