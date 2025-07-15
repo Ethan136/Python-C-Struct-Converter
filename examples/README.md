@@ -7,7 +7,7 @@
 
 ## 範例檔案格式
 - 檔案需為標準 C/C++ header 格式（副檔名 .h）
-- 僅支援 struct 宣告（不支援 union、enum、typedef、nested struct 等進階語法）
+ - 支援 struct 與 union 宣告
 - 支援 bitfield 宣告（如 `int a : 1;`）
 - 支援多型別混合、padding、自動對齊
 

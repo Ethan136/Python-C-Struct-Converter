@@ -4,7 +4,7 @@ This document explains how `struct_model.py` parses a C++ `struct` and computes 
 
 ## Overview
 - The parser is implemented in `src/model/struct_model.py`.
-- Only `struct` definitions are supported; `union` parsing is not implemented.
+- Supports both `struct` and `union` definitions.
 - **Supports bitfield members (e.g., `int a : 1;`), including bitfield packing and storage unit alignment.**
 - **Supports multi-dimensional array members with proper layout calculation and data extraction.**
 - **Supports manual struct definition with byte/bit size validation and export functionality.**
@@ -130,8 +130,8 @@ The system supports manual struct definition through GUI interface, allowing use
   - Maintains backward compatibility
   - Supports both old and new data formats
 
-## Extending for `union`
-The current implementation does not recognize `union` definitions. To add support, a new parsing branch would need to detect `union` keywords and adjust layout logic so that all members share offset `0` and the total size equals the largest member.
+## Union Layout Rules
+`union` members all share offset `0`. The total size of the union equals the size of its largest member and its alignment equals the largest member alignment.
 
 ## Struct Member Value Storage in Memory
 
@@ -232,11 +232,11 @@ The struct parsing system follows TDD principles with comprehensive test coverag
 - **TDD Workflow**: Test-first development approach for all new features
 
 ## 支援限制
- - 不支援 union、enum、typedef、#pragma pack、__attribute__ 等 C/C++ 語法。
+ - 不支援 enum、typedef、#pragma pack、__attribute__ 等 C/C++ 語法。
 - 只支援單一 struct 解析，不支援多 struct 同時解析。
 - bitfield 只支援 int/unsigned int/char/unsigned char 等基本型別，不支援 pointer bitfield。
-- 手動 struct 定義目前不支援 padding，所有成員緊密排列。
- > **Note:** Manual struct mode does not support padding or advanced C features (e.g., union, #pragma pack). All members are tightly packed.
+ - 手動 struct 定義目前不支援 padding，所有成員緊密排列。
+ > **Note:** Manual struct mode does not support padding or advanced C features (e.g., #pragma pack). All members are tightly packed.
 
 ## Future Enhancements
 
@@ -244,7 +244,7 @@ The struct parsing system follows TDD principles with comprehensive test coverag
 - **Pragma Pack Support**: Bit-level padding foundation ready for alignment mechanisms
 - **Advanced Alignment**: Framework in place for custom alignment rules
 - **Extended Type Support**: Architecture supports additional C types
-- **Union Support**: Framework ready for union parsing implementation
+- **Union Support**: Full parsing and layout support implemented
 
 ### Maintenance Notes
 - **Backward Compatibility**: Maintained for existing functionality
