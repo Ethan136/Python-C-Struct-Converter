@@ -412,3 +412,25 @@ last_time = presenter.get_last_layout_time()
 ---
 
 > 建議依上述順序逐步 TDD 實作，每步驟皆有明確測試與驗證指標，確保效能、正確性與可維護性同步提升。 
+
+## v4.2 UI/邏輯分離與 Observer Pattern 優化（2024/07）
+
+### 1. UI/邏輯分離
+- Presenter 所有 public 方法僅回傳純資料（dict/list），不直接操作 View。
+- View 層根據 Presenter 回傳資料決定 UI 呈現與錯誤提示。
+- 目標：減少耦合、提升可測性、支援多 UI 框架。
+- TDD：mock View 驗證 Presenter 回傳資料正確，View 測試只驗證 UI 呈現。
+
+### 2. Observer Pattern/自動 cache 失效
+- Presenter 提供 observer 註冊/通知介面，View 註冊自身為 observer。
+- 當 members/size 變動時，Presenter 自動通知 observer，並自動失效 cache。
+- 目標：減少手動同步錯誤，支援多視窗/多 Presenter 協同。
+- TDD：模擬多種變動情境，驗證 cache 自動失效與 observer 通知正確。
+
+### 3. TDD 與文件同步
+- 每步驟皆同步更新本文件，明確記錄介面、流程、TDD 覆蓋。
+- 單元測試與整合測試覆蓋所有分層與 observer 行為。
+
+---
+
+> 建議依上述順序逐步 TDD 實作，確保分層、彈性、可維護性同步提升。 
