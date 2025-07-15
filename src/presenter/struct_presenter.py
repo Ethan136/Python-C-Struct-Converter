@@ -5,6 +5,7 @@ from config import get_string
 from model.input_field_processor import InputFieldProcessor
 import time
 from collections import OrderedDict
+import os
 
 
 class HexProcessingError(Exception):
@@ -15,11 +16,16 @@ class HexProcessingError(Exception):
         self.kind = kind
 
 class StructPresenter:
-    def __init__(self, model, view=None):
+    def __init__(self, model, view=None, lru_cache_size=None):
         self.model = model
         self.view = view # This will be set by main.py after view is instantiated
         self.input_processor = InputFieldProcessor()
-        self._lru_cache_size = 32  # 預設 LRU cache 大小
+        # 支援從參數、環境變數初始化 cache size
+        if lru_cache_size is not None:
+            self._lru_cache_size = lru_cache_size
+        else:
+            env_size = os.environ.get("STRUCT_LRU_CACHE_SIZE")
+            self._lru_cache_size = int(env_size) if env_size is not None else 32
         self._layout_cache = OrderedDict()  # (members_key, total_size) -> layout
         self._cache_hits = 0
         self._cache_misses = 0
@@ -215,10 +221,13 @@ class StructPresenter:
         if self._lru_cache_size > 0:
             self._layout_cache[cache_key] = layout
             self._layout_cache.move_to_end(cache_key)
-            if len(self._layout_cache) > self._lru_cache_size:
+            while len(self._layout_cache) > self._lru_cache_size:
                 evicted = self._layout_cache.popitem(last=False)
                 self._last_evict_key = evicted[0]  # 新增
                 print(f"[DEBUG] evicted: {evicted[0]}")
+        else:
+            # cache size 0，不儲存任何項目
+            self._layout_cache.clear()
         self._cache_misses += 1
         print(f"[DEBUG] cache keys after: {list(self._layout_cache.keys())}")
         return layout
@@ -255,3 +264,20 @@ class StructPresenter:
             "last_hit": self._last_hit_key,
             "last_evict": self._last_evict_key
         }
+
+    def set_lru_cache_size(self, size):
+        """動態調整 LRU cache 容量，並自動淘汰多餘項目。"""
+        if not isinstance(size, int) or size < 0:
+            raise ValueError("Cache size must be a non-negative integer")
+        self._lru_cache_size = size
+        # 淘汰多餘項目
+        while len(self._layout_cache) > self._lru_cache_size:
+            evicted = self._layout_cache.popitem(last=False)
+            self._last_evict_key = evicted[0]
+        # 若設為 0，直接清空 cache
+        if self._lru_cache_size == 0:
+            self._layout_cache.clear()
+
+    def get_lru_cache_size(self):
+        """回傳目前 LRU cache 容量。"""
+        return self._lru_cache_size

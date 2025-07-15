@@ -372,5 +372,47 @@ class TestStructPresenter(unittest.TestCase):
         model.remove_observer(presenter)
         model._notify_observers("manual_struct_changed")  # 不會影響已移除的 presenter
 
+    def test_set_lru_cache_size_dynamic(self):
+        self.model.calculate_manual_layout.side_effect = lambda m, s: [dict(name=x['name'], size=1) for x in m]
+        presenter = self.presenter
+        presenter.set_lru_cache_size(3)
+        m1 = [{"name": "a", "type": "char", "bit_size": 0}]
+        m2 = [{"name": "b", "type": "char", "bit_size": 0}]
+        m3 = [{"name": "c", "type": "char", "bit_size": 0}]
+        m4 = [{"name": "d", "type": "char", "bit_size": 0}]
+        # 填滿 cache
+        l1 = presenter.compute_member_layout(m1, 8)
+        l2 = presenter.compute_member_layout(m2, 8)
+        l3 = presenter.compute_member_layout(m3, 8)
+        self.assertEqual(len(presenter._layout_cache), 3)
+        # 增加一個，應淘汰最舊的 m1
+        l4 = presenter.compute_member_layout(m4, 8)
+        self.assertEqual(len(presenter._layout_cache), 3)
+        self.assertNotIn(presenter._make_cache_key(m1, 8), presenter._layout_cache)
+        # 容量變大，不丟失現有項目
+        presenter.set_lru_cache_size(5)
+        l5 = presenter.compute_member_layout(m1, 8)
+        self.assertEqual(len(presenter._layout_cache), 4)
+        # 容量變小，應自動淘汰多餘項目
+        presenter.set_lru_cache_size(2)
+        self.assertLessEqual(len(presenter._layout_cache), 2)
+        # 容量設為 0，cache 不儲存任何項目
+        presenter.set_lru_cache_size(0)
+        l6 = presenter.compute_member_layout(m2, 8)
+        self.assertEqual(len(presenter._layout_cache), 0)
+        l7 = presenter.compute_member_layout(m3, 8)
+        self.assertEqual(len(presenter._layout_cache), 0)
+        # 再設回 2，cache 可正常運作
+        presenter.set_lru_cache_size(2)
+        l8 = presenter.compute_member_layout(m2, 8)
+        l9 = presenter.compute_member_layout(m3, 8)
+        self.assertEqual(len(presenter._layout_cache), 2)
+        # 多次動態調整容量，cache 行為正確
+        presenter.set_lru_cache_size(1)
+        self.assertLessEqual(len(presenter._layout_cache), 1)
+        presenter.set_lru_cache_size(3)
+        l10 = presenter.compute_member_layout(m4, 8)
+        self.assertEqual(len(presenter._layout_cache), 2)
+
 if __name__ == "__main__":
     unittest.main() 
