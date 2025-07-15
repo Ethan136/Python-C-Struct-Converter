@@ -7,6 +7,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
 - **Model (`src/model/`)**: Contains the core business logic, data structures, and data manipulation. It's independent of the UI.
   - `struct_model.py`: Handles parsing C++ struct definitions, calculating memory layouts (including padding), and interpreting raw hexadecimal data based on endianness.
   - **Supports bitfield members** (e.g., `int a : 1;`) with proper packing and storage unit alignment.
+  - **N-D array support** for parsing and layout of multi-dimensional arrays.
   - **Manual struct definition** with byte/bit size validation and export functionality.
 
 - **View (`src/view/`)**: Responsible for displaying the user interface and handling user interactions. It's passive and doesn't contain any business logic.
