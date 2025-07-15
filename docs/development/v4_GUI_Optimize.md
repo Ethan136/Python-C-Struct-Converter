@@ -463,3 +463,173 @@ last_time = presenter.get_last_layout_time()
 ---
 
 > 建議依上述順序逐步 TDD 實作，每步驟皆有明確測試與驗證指標，確保分層、彈性、可維護性同步提升。 
+
+## 九、2024/07 進階優化規劃與改動清單
+
+### 1. 目前可再優化重點
+- **效能/重複運算**：Hex grid、member table、Treeview 每次成員/size變動都整體重建，對大型 struct 有效能瓶頸。
+- **UI/UX 體驗**：欄位自動 focus、tab 鍵順序未優化，錯誤提示僅在 label，未即時 highlight 錯誤欄位。
+- **可維護性/擴充性**：file tab/manual tab 的 hex grid/member table 產生邏輯重複，未共用。事件 callback 命名與分層可再優化。
+- **進階功能/可觀察性**：View 層尚未支援 observer pattern，UI 無性能統計/分析介面。
+
+### 2. 所有需改動的地方（依主題分類）
+
+1. **效能優化**
+   - `src/view/struct_view.py`：
+     - `_render_member_table`、`_build_hex_grid`、`_update_manual_layout_tree`、`rebuild_hex_grid`、`_rebuild_manual_hex_grid`：改為增量更新或 debounce。
+     - Treeview/Entry 清空與重建邏輯，改為 diff/patch 或 reuse row widget。
+   - 測試：`tests/test_struct_view.py`、`tests/test_struct_view_v3.py` 增加大 struct 操作效能與 refresh 次數統計。
+
+2. **UI/UX 提升**
+   - `src/view/struct_view.py`：
+     - 新增自動 focus 新增欄位、tab 鍵順序管理。
+     - 錯誤欄位高亮、tooltip、即時驗證。
+   - 測試：增加 UI 行為驗證（如 focus、tab、錯誤高亮）。
+
+3. **共用元件/重構**
+   - `src/view/struct_view.py`、`src/view/`：
+     - 抽象 hex grid/member table 產生邏輯為共用 helper/class。
+   - 測試：覆蓋共用元件的所有分支。
+
+4. **UI observer pattern**
+   - `src/view/struct_view.py`、`src/view/`：
+     - 讓 View 支援 observer pattern，能自動響應 Model/Presenter 狀態變更。
+   - 測試：多視圖/多 observer 情境。
+
+5. **性能分析介面**
+   - `src/view/struct_view.py`：
+     - 增加 cache stats/性能資訊顯示（如 debug tab 或 status bar）。
+   - 測試：驗證 UI 能正確顯示 cache/perf 資訊。
+
+### 3. 改動順序與 TDD 規劃
+
+1. **效能優化（優先）**
+   - 先針對 `_render_member_table`、`_build_hex_grid`、Treeview/Entry 重建做增量更新或 debounce。
+   - TDD：mock patch presenter/model，統計 layout 計算/refresh 次數，驗證大 struct 操作效能提升。
+
+2. **UI/UX 提升**
+   - 新增自動 focus、tab 鍵順序、錯誤高亮。
+   - TDD：UI 行為驗證（focus、tab、錯誤高亮）。
+
+3. **共用元件/重構**
+   - 抽象 hex grid/member table 為共用 helper/class。
+   - TDD：覆蓋共用元件所有分支。
+
+4. **UI observer pattern**
+   - 讓 View 支援 observer，能自動響應 Model/Presenter 狀態變更。
+   - TDD：多視圖/多 observer 測試。
+
+5. **性能分析介面**
+   - 增加 cache stats/性能資訊顯示。
+   - TDD：驗證 UI 能正確顯示 cache/perf 資訊。
+
+### 4. TDD 原則與同步文件要求
+- 每一階段都先設計/補齊對應單元測試與整合測試。
+- 效能優化以 mock/patch 統計 refresh/計算次數為主，UI/UX 以行為驗證為主。
+- 每次改動都同步更新本文件與 README，確保文檔與程式碼一致。 
+
+### 5. 執行細節
+
+#### 1. 效能優化
+- **更動位置**：
+  - `src/view/struct_view.py`
+    - `_render_member_table`：改為僅更新變動 row，避免全表重建。
+    - `_build_hex_grid`、`rebuild_hex_grid`、`_rebuild_manual_hex_grid`：僅針對變動部分重建 Entry，或用 debounce 合併多次操作。
+    - `_update_manual_layout_tree`：僅 patch/diff Treeview 內容。
+  - **測試**：
+    - `tests/test_struct_view.py`、`tests/test_struct_view_v3.py`
+      - mock patch presenter/model，統計 layout 計算/refresh 次數。
+      - 新增大 struct 操作（>100 members）效能測試。
+- **執行細節**：
+  - 導入 row-level update/diff 機制（可用 dict/hash 比對）。
+  - 實作 debounce（如 50ms 內多次操作只 refresh 一次）。
+  - 增加 refresh 次數與耗時的自動化測試。
+
+#### 2. UI/UX 提升
+- **更動位置**：
+  - `src/view/struct_view.py`
+    - `_render_member_row`：新增自動 focus 新增欄位、tab 鍵順序管理。
+    - `_update_member_name/type/bit`：即時驗證並高亮錯誤欄位。
+    - `show_manual_struct_validation`：錯誤時 tooltip/紅框提示。
+  - **測試**：
+    - `tests/test_struct_view.py`
+      - 驗證 focus、tab、錯誤高亮行為。
+- **執行細節**：
+  - 用 `widget.focus_set()` 控制 focus。
+  - 用 `widget.config(highlightbackground='red')` 高亮錯誤欄位。
+  - 新增 tooltip class，滑鼠移到錯誤欄位顯示說明。
+  - 單元測試用 mock/patch 驗證 UI 狀態。
+
+#### 3. 共用元件/重構
+- **更動位置**：
+  - `src/view/struct_view.py`、`src/view/`
+    - 新增 `HexGridHelper`、`MemberTableHelper` class 或 module。
+    - file tab/manual tab 共用這些 helper。
+  - **測試**：
+    - `tests/test_struct_view.py`、`tests/test_struct_view_v3.py`
+      - 覆蓋共用元件所有分支。
+- **執行細節**：
+  - 將 hex grid/member table 產生邏輯抽出為 class，支援動態增刪/更新。
+  - 原有 tab 只負責調用 helper，減少重複碼。
+  - 單元測試直接針對 helper class 測試。
+
+#### 4. UI observer pattern
+- **更動位置**：
+  - `src/view/struct_view.py`、`src/view/`
+    - StructView 實作 observer 介面，註冊到 Presenter/Model。
+    - 新增 `update(event_type, model, **kwargs)`，自動響應狀態變更。
+  - **測試**：
+    - `tests/test_struct_view.py`
+      - 多視圖/多 observer 註冊、通知、移除測試。
+- **執行細節**：
+  - StructView 在 `__init__` 時註冊為 observer。
+  - 當收到通知時自動 refresh UI 或顯示提示。
+  - 測試多個 StructView 實例同時響應。
+
+#### 5. 性能分析介面
+- **更動位置**：
+  - `src/view/struct_view.py`
+    - 新增 debug tab 或 status bar，顯示 cache stats、layout 計算次數、耗時等。
+    - 介面可用 `Label` 或 `Text` 動態更新。
+  - **測試**：
+    - `tests/test_struct_view.py`
+      - 驗證 UI 能正確顯示 cache/perf 資訊。
+- **執行細節**：
+  - 介面設計為可隱藏/展開的 debug 區塊。
+  - 由 presenter 提供 cache stats，View 定時/操作後自動刷新。
+  - 測試用 mock presenter stats 驗證顯示正確。 
+
+### 6. 小步驟優化執行順序建議
+
+為降低風險、便於回溯與驗證，建議依下列順序由小到大、由低風險到高風險逐步優化：
+
+1. **性能分析介面（最小、最安全）**
+   - 先在 UI 增加 cache stats/性能資訊顯示（如 debug tab/status bar），不影響主流程。
+   - 測試：mock presenter stats 驗證 UI 顯示正確。
+
+2. **UI/UX 小幅提升**
+   - 新增自動 focus 新增欄位、tab 鍵順序管理。
+   - 錯誤欄位高亮、tooltip，僅針對單一欄位做小幅優化。
+   - 測試：UI 行為驗證（focus、tab、錯誤高亮）。
+
+3. **效能優化（局部）**
+   - 針對 `_render_member_table`、`_build_hex_grid` 實作 debounce，先不做 row-level diff。
+   - 測試：mock patch presenter/model，統計 refresh 次數。
+
+4. **共用元件/重構（局部）**
+   - 先抽出 hex grid 產生邏輯為 helper，file/manual tab 共用。
+   - 測試：helper class 單元測試。
+
+5. **效能優化（進階）**
+   - 導入 row-level update/diff 機制，僅 patch 變動 row。
+   - 測試：大 struct 操作效能明顯提升。
+
+6. **共用元件/重構（進階）**
+   - 抽象 member table 為共用 helper/class，進一步減少重複碼。
+   - 測試：覆蓋所有分支。
+
+7. **UI observer pattern**
+   - StructView 實作 observer 介面，註冊到 Presenter/Model。
+   - 測試：多視圖/多 observer 測試。
+
+> 每步驟皆以 TDD 驅動，先設計/補齊對應單元測試與整合測試，確保每次 commit 都可回溯、驗證。 
