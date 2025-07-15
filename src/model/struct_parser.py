@@ -148,10 +148,16 @@ def _extract_struct_body(file_content, keyword="struct"):
     """
     pattern = rf"{keyword}\s+(\w+)\s*\{{"
     match = re.search(pattern, file_content)
-    if not match:
-        return None, None
-    struct_name = match.group(1)
-    start = match.end()
+    if match:
+        struct_name = match.group(1)
+        start = match.end()
+    else:
+        pattern_anon = rf"{keyword}\s*\{{"
+        match = re.search(pattern_anon, file_content)
+        if not match:
+            return None, None
+        struct_name = None
+        start = match.end()
     brace_count = 1
     i = start
     while i < len(file_content) and brace_count > 0:
@@ -172,7 +178,7 @@ def _extract_struct_body(file_content, keyword="struct"):
 def parse_struct_definition(file_content):
     """Parse a C/C++ struct definition string."""
     struct_name, struct_content = _extract_struct_body(file_content, "struct")
-    if not struct_name:
+    if struct_content is None:
         return None, None
     struct_content = re.sub(r"//.*", "", struct_content)
     lines = struct_content.split(';')
@@ -187,7 +193,7 @@ def parse_struct_definition(file_content):
 def parse_struct_definition_v2(file_content: str) -> Tuple[Optional[str], Optional[List[MemberDef]]]:
     """Parse a C/C++ struct definition string and return ``MemberDef`` objects."""
     struct_name, struct_content = _extract_struct_body(file_content, "struct")
-    if not struct_name:
+    if struct_content is None:
         return None, None
     struct_content = re.sub(r"//.*", "", struct_content)
     members: List[MemberDef] = []
@@ -217,7 +223,7 @@ def parse_struct_definition_v2(file_content: str) -> Tuple[Optional[str], Option
 def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
     """Parse a struct definition and return a :class:`StructDef` object."""
     name, members = parse_struct_definition_v2(file_content)
-    if not name:
+    if members is None:
         return None
     return StructDef(name=name, members=members)
 
@@ -225,7 +231,7 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
 def parse_union_definition(file_content):
     """Parse a C union definition string."""
     union_name, union_content = _extract_struct_body(file_content, "union")
-    if not union_name:
+    if union_content is None:
         return None, None
     union_content = re.sub(r"//.*", "", union_content)
     lines = union_content.split(';')
@@ -240,7 +246,7 @@ def parse_union_definition(file_content):
 def parse_union_definition_v2(file_content: str) -> Tuple[Optional[str], Optional[List[MemberDef]]]:
     """Parse a C union definition string and return ``MemberDef`` objects."""
     union_name, union_content = _extract_struct_body(file_content, "union")
-    if not union_name:
+    if union_content is None:
         return None, None
     union_content = re.sub(r"//.*", "", union_content)
     members: List[MemberDef] = []
@@ -270,7 +276,7 @@ def parse_union_definition_v2(file_content: str) -> Tuple[Optional[str], Optiona
 def parse_union_definition_ast(file_content: str) -> Optional[UnionDef]:
     """Parse a union definition and return a :class:`UnionDef` object."""
     name, members = parse_union_definition_v2(file_content)
-    if not name:
+    if members is None:
         return None
     return UnionDef(name=name, members=members)
 
