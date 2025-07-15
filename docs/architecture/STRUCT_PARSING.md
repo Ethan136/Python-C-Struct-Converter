@@ -5,7 +5,7 @@ This document explains how `struct_model.py` parses a C++ `struct` and computes 
 ## Overview
 - The parser is implemented in `src/model/struct_model.py`.
 - Supports both `struct` and `union` definitions.
-- **Supports bitfield members (e.g., `int a : 1;`), including bitfield packing and storage unit alignment.**
+- **Supports bitfield members (e.g., `int a : 1;`), including anonymous bitfields and storage unit alignment.**
 - **Supports multi-dimensional array members with proper layout calculation and data extraction.**
 - **Supports manual struct definition with byte/bit size validation and export functionality.**
 - **Implements comprehensive validation logic with TDD testing approach.**

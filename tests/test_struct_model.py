@@ -958,6 +958,20 @@ class TestStructModel(unittest.TestCase):
         self.assertIn("unsigned int b : 5;", h_content)
         self.assertIn("// total size: 1 bytes", h_content)
 
+    def test_export_manual_struct_to_h_anonymous_bitfield(self):
+        members = [
+            {"name": "a", "type": "unsigned int", "bit_size": 3},
+            {"name": None, "type": "unsigned int", "bit_size": 5},
+            {"name": "b", "type": "unsigned int", "bit_size": 4},
+        ]
+        total_size = 2
+        self.model.set_manual_struct(members, total_size)
+        h_content = self.model.export_manual_struct_to_h()
+        self.assertIn("unsigned int a : 3;", h_content)
+        self.assertIn("unsigned int : 5;", h_content)
+        self.assertNotIn("None :", h_content)
+        self.assertIn("unsigned int b : 4;", h_content)
+
     def test_manual_struct_byte_bit_size_layout(self):
         model = StructModel()
         members = [
