@@ -10,8 +10,18 @@ from .layout import LayoutCalculator, LayoutItem, TYPE_INFO
 
 
 
+def _expand_array_names(base_name, dims):
+    """Generate expanded array element names for given dimensions."""
+    if not dims:
+        yield base_name
+    else:
+        for i in range(dims[0]):
+            for rest in _expand_array_names("%s[%d]" % (base_name, i), dims[1:]):
+                yield rest
+
+
 def parse_struct_definition(file_content):
-    """Parses C++ struct definition from a string, including bit fields, preserving field order."""
+    """Parses C++ struct definition from a string, including bit fields and arrays."""
     struct_match = re.search(r"struct\s+(\w+)\s*\{([^}]+)\};", file_content, re.DOTALL)
     if not struct_match:
         return None, None
@@ -49,7 +59,13 @@ def parse_struct_definition(file_content):
             if "*" in clean_type:
                 members.append(("pointer", name))
             elif clean_type in TYPE_INFO:
-                members.append((clean_type, name))
+                dims = [int(n) for n in re.findall(r"\[(\d+)\]", name)]
+                base_name = re.sub(r"\[\d+\]", "", name)
+                if dims:
+                    for full_name in _expand_array_names(base_name, dims):
+                        members.append((clean_type, full_name))
+                else:
+                    members.append((clean_type, name))
     return struct_name, members
 
 def calculate_layout(members):
