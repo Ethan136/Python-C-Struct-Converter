@@ -45,6 +45,7 @@ class TestStructView(unittest.TestCase):
         self.root.withdraw()  # 不顯示主視窗
         # MagicMock 預設不會自動模擬 dict 行為，需 patch
         self.presenter = MagicMock()
+        self.presenter.is_auto_cache_clear_enabled.return_value = True
         # 修正 compute_member_layout 回傳真 layout
         def compute_member_layout(members, total_size):
             from model.struct_model import StructModel
@@ -1090,6 +1091,49 @@ class TestStructView(unittest.TestCase):
         # 降級驗證：確認 name_entry widget 存在且可見
         self.assertTrue(name_entry.winfo_exists())
         # 註：headless/CI 下 focus_get 可能不穩定，僅驗證 widget 存在
+
+    def test_debug_tab_auto_refresh_behavior(self):
+        import tkinter as tk
+        from unittest.mock import MagicMock, patch
+        from view.struct_view import StructView
+        root = tk.Tk()
+        presenter = MagicMock()
+        presenter.get_cache_stats.return_value = (1, 1)
+        presenter.get_last_layout_time.return_value = 0.1
+        view = StructView(presenter=presenter)
+        view._create_debug_tab()
+        # patch after/after_cancel 觀察 timer
+        with patch.object(view, 'after', wraps=view.after) as mock_after, \
+             patch.object(view, 'after_cancel', wraps=view.after_cancel) as mock_after_cancel, \
+             patch.object(view, 'refresh_debug_info', wraps=view.refresh_debug_info) as mock_refresh:
+            # 預設啟用自動 refresh
+            view._debug_auto_refresh_interval.set(0.01)  # 10ms
+            view._start_debug_auto_refresh()
+            self.assertTrue(view._debug_auto_refresh_enabled.get())
+            # 應該有 after 被呼叫
+            mock_after.assert_called()
+            # 模擬 callback 觸發
+            cb = view._debug_auto_refresh_callback
+            cb()
+            # refresh_debug_info 應被呼叫一次（callback）
+            self.assertEqual(mock_refresh.call_count, 1)
+            # 關閉自動 refresh
+            view._debug_auto_refresh_enabled.set(False)
+            view._on_toggle_debug_auto_refresh()
+            mock_after_cancel.assert_called()
+            # 重新啟用
+            view._debug_auto_refresh_enabled.set(True)
+            view._on_toggle_debug_auto_refresh()
+            mock_after.assert_called()
+            # interval 變更會重啟 timer
+            prev_id = view._debug_auto_refresh_id
+            view._debug_auto_refresh_interval.set(0.02)
+            view._on_debug_auto_refresh_interval_change()
+            self.assertNotEqual(view._debug_auto_refresh_id, prev_id)
+            # destroy 時會清理 timer
+            view.destroy()
+            mock_after_cancel.assert_called()
+        root.destroy()
 
 if __name__ == "__main__":
     unittest.main()

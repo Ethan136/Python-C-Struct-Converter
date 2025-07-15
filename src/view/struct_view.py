@@ -48,6 +48,11 @@ class StructView(tk.Tk):
         self.title("C Struct GUI")
         self.geometry("1200x800")
 
+        # --- 防呆：預設初始化 debug auto refresh 屬性 ---
+        self._debug_auto_refresh_id = None
+        self._debug_auto_refresh_enabled = None
+        self._debug_auto_refresh_interval = None
+
         self._create_tab_control()
         # 在手動設定Tab建立UI
         self._create_manual_struct_frame(self.tab_manual)
@@ -733,6 +738,103 @@ class StructView(tk.Tk):
         self.tab_control.add(self.debug_tab, text="Debug")
         self.debug_info_label = tk.Label(self.debug_tab, text="", anchor="w", justify="left", font=("Courier", 11))
         self.debug_info_label.pack(fill="x", padx=10, pady=10)
+
+        # 控制元件區
+        control_frame = tk.Frame(self.debug_tab)
+        control_frame.pack(fill="x", padx=10, pady=5)
+
+        # 手動清空 cache 按鈕
+        clear_btn = tk.Button(control_frame, text="手動清空 Cache", command=self._on_invalidate_cache)
+        clear_btn.grid(row=0, column=0, padx=5)
+
+        # LRU cache 容量 Spinbox
+        tk.Label(control_frame, text="LRU 容量:").grid(row=0, column=1, padx=2)
+        self.lru_size_var = tk.IntVar(value=self.presenter.get_lru_cache_size() if self.presenter else 32)
+        lru_spin = tk.Spinbox(control_frame, from_=0, to=128, width=5, textvariable=self.lru_size_var, command=self._on_set_lru_size)
+        lru_spin.grid(row=0, column=2, padx=2)
+
+        # 自動清空 Checkbox
+        val = self.presenter.is_auto_cache_clear_enabled() if self.presenter else False
+        self.auto_clear_var = tk.BooleanVar(value=bool(val))
+        auto_clear_cb = tk.Checkbutton(control_frame, text="啟用自動清空", variable=self.auto_clear_var, command=self._on_toggle_auto_clear)
+        auto_clear_cb.grid(row=0, column=3, padx=5)
+
+        # 自動清空 interval Entry
+        tk.Label(control_frame, text="Interval (秒):").grid(row=0, column=4, padx=2)
+        self.auto_clear_interval_var = tk.DoubleVar(value=1.0)
+        interval_entry = tk.Entry(control_frame, width=6, textvariable=self.auto_clear_interval_var)
+        interval_entry.grid(row=0, column=5, padx=2)
+
+        # --- 新增自動 refresh ---
+        self._debug_auto_refresh_enabled = tk.BooleanVar(value=True)
+        self._debug_auto_refresh_id = None
+        self._debug_auto_refresh_interval = tk.DoubleVar(value=1.0)
+        auto_refresh_cb = tk.Checkbutton(control_frame, text="自動 Refresh", variable=self._debug_auto_refresh_enabled, command=self._on_toggle_debug_auto_refresh)
+        auto_refresh_cb.grid(row=0, column=7, padx=5)
+        tk.Label(control_frame, text="Refresh Interval (秒):").grid(row=0, column=8, padx=2)
+        auto_refresh_interval_entry = tk.Entry(control_frame, width=6, textvariable=self._debug_auto_refresh_interval)
+        auto_refresh_interval_entry.grid(row=0, column=9, padx=2)
+        self._debug_auto_refresh_interval.trace_add("write", lambda *_: self._on_debug_auto_refresh_interval_change())
+
+        # 手動 refresh 按鈕
+        refresh_btn = tk.Button(control_frame, text="Refresh", command=self.refresh_debug_info)
+        refresh_btn.grid(row=0, column=6, padx=5)
+
+        self.refresh_debug_info()
+        self._start_debug_auto_refresh()
+
+    def _start_debug_auto_refresh(self):
+        if self._debug_auto_refresh_enabled.get():
+            interval = self._debug_auto_refresh_interval.get()
+            if interval <= 0:
+                interval = 1.0
+            self._debug_auto_refresh_id = self.after(int(interval * 1000), self._debug_auto_refresh_callback)
+
+    def _stop_debug_auto_refresh(self):
+        if self._debug_auto_refresh_id is not None:
+            self.after_cancel(self._debug_auto_refresh_id)
+            self._debug_auto_refresh_id = None
+
+    def _debug_auto_refresh_callback(self):
+        self.refresh_debug_info()
+        self._start_debug_auto_refresh()
+
+    def _on_toggle_debug_auto_refresh(self):
+        if self._debug_auto_refresh_enabled.get():
+            self._start_debug_auto_refresh()
+        else:
+            self._stop_debug_auto_refresh()
+
+    def _on_debug_auto_refresh_interval_change(self):
+        if self._debug_auto_refresh_enabled.get():
+            self._stop_debug_auto_refresh()
+            self._start_debug_auto_refresh()
+
+    def destroy(self):
+        self._stop_debug_auto_refresh()
+        super().destroy()
+
+    def _on_invalidate_cache(self):
+        if self.presenter and hasattr(self.presenter, "invalidate_cache"):
+            self.presenter.invalidate_cache()
+        self.refresh_debug_info()
+
+    def _on_set_lru_size(self):
+        if self.presenter and hasattr(self.presenter, "set_lru_cache_size"):
+            try:
+                size = int(self.lru_size_var.get())
+                self.presenter.set_lru_cache_size(size)
+            except Exception:
+                pass
+        self.refresh_debug_info()
+
+    def _on_toggle_auto_clear(self):
+        if self.presenter:
+            interval = self.auto_clear_interval_var.get()
+            if self.auto_clear_var.get():
+                self.presenter.enable_auto_cache_clear(interval)
+            else:
+                self.presenter.disable_auto_cache_clear()
         self.refresh_debug_info()
 
     def refresh_debug_info(self):
@@ -749,6 +851,11 @@ class StructView(tk.Tk):
                 text += f"\nCurrent Size: {lru.get('current_size')}"
                 text += f"\nLast Hit: {lru.get('last_hit')}"
                 text += f"\nLast Evict: {lru.get('last_evict')}"
+            # 顯示自動清空狀態
+            if hasattr(self.presenter, "is_auto_cache_clear_enabled"):
+                enabled = self.presenter.is_auto_cache_clear_enabled()
+                text += f"\nAuto Cache Clear: {'啟用' if enabled else '停用'}"
+                text += f"\nInterval: {self.auto_clear_interval_var.get()} 秒"
         else:
             text = "No presenter stats available."
         self.debug_info_label.config(text=text)
