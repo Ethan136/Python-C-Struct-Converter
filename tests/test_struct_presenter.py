@@ -151,5 +151,141 @@ class TestStructPresenter(unittest.TestCase):
         self.assertGreater(t3, 0)
         self.assertNotEqual(t1, t3)
 
+    def test_parse_manual_hex_data_success(self):
+        # Arrange
+        hex_parts = [("01", 2), ("02", 2)]
+        struct_def = {"members": [{"name": "a", "type": "char", "bit_size": 0}], "total_size": 2, "unit_size": 1}
+        self.model.set_manual_struct.return_value = None
+        self.model.calculate_manual_layout.return_value = [{"name": "a", "type": "char", "size": 1}]
+        self.model.parse_hex_data.return_value = [
+            {"name": "a", "value": 1, "hex_value": "0x1", "hex_raw": "01"}
+        ]
+        # Act
+        result = self.presenter.parse_manual_hex_data(hex_parts, struct_def, "Little Endian")
+        # Assert
+        self.assertEqual(result["type"], "ok")
+        self.assertIn("debug_lines", result)
+        self.assertIn("parsed_values", result)
+        self.assertEqual(result["parsed_values"][0]["name"], "a")
+        self.assertEqual(result["parsed_values"][0]["value"], 1)
+
+    def test_parse_manual_hex_data_hex_error(self):
+        # Arrange
+        hex_parts = [("zz", 2)]
+        struct_def = {"members": [{"name": "a", "type": "char", "bit_size": 0}], "total_size": 2, "unit_size": 1}
+        # Act
+        result = self.presenter.parse_manual_hex_data(hex_parts, struct_def, "Little Endian")
+        # Assert
+        self.assertEqual(result["type"], "error")
+        self.assertIn("無效輸入", result["message"])
+
+    def test_parse_manual_hex_data_model_error(self):
+        # Arrange
+        hex_parts = [("01", 2)]
+        struct_def = {"members": [{"name": "a", "type": "char", "bit_size": 0}], "total_size": 2, "unit_size": 1}
+        self.model.set_manual_struct.side_effect = Exception("model error")
+        # Act
+        result = self.presenter.parse_manual_hex_data(hex_parts, struct_def, "Little Endian")
+        # Assert
+        self.assertEqual(result["type"], "error")
+        self.assertIn("解析 hex 資料時發生錯誤", result["message"])
+
+    def test_parse_hex_data_success(self):
+        # Arrange
+        self.model.layout = True
+        self.model.total_size = 2
+        self.model.parse_hex_data.return_value = [
+            {"name": "a", "value": 1, "hex_value": "0x1", "hex_raw": "01"}
+        ]
+        self.view.get_hex_input_parts.return_value = [("01", 2)]
+        self.view.get_selected_endianness.return_value = "Little Endian"
+        # Act
+        result = self.presenter.parse_hex_data()
+        # Assert
+        self.assertEqual(result["type"], "ok")
+        self.assertIn("debug_lines", result)
+        self.assertIn("parsed_values", result)
+        self.assertEqual(result["parsed_values"][0]["name"], "a")
+        self.assertEqual(result["parsed_values"][0]["value"], 1)
+
+    def test_parse_hex_data_no_struct(self):
+        # Arrange
+        self.model.layout = False
+        # Act
+        result = self.presenter.parse_hex_data()
+        # Assert
+        self.assertEqual(result["type"], "error")
+        self.assertIn("尚未載入 struct", result["message"])
+
+    def test_parse_hex_data_hex_error(self):
+        # Arrange
+        self.model.layout = True
+        self.model.total_size = 2
+        self.view.get_hex_input_parts.return_value = [("zz", 2)]
+        self.view.get_selected_endianness.return_value = "Little Endian"
+        # Act
+        result = self.presenter.parse_hex_data()
+        # Assert
+        self.assertEqual(result["type"], "error")
+        self.assertIn("無效輸入", result["message"])
+
+    def test_parse_hex_data_length_error(self):
+        # Arrange
+        self.model.layout = True
+        self.model.total_size = 1
+        self.view.get_hex_input_parts.return_value = [("0102", 4)]  # 4 chars > 2
+        self.view.get_selected_endianness.return_value = "Little Endian"
+        # Act
+        result = self.presenter.parse_hex_data()
+        # Assert
+        self.assertEqual(result["type"], "error")
+        self.assertIn("超過預期總大小", result["message"])
+
+    def test_parse_hex_data_model_error(self):
+        # Arrange
+        self.model.layout = True
+        self.model.total_size = 2
+        self.model.parse_hex_data.side_effect = Exception("model error")
+        self.view.get_hex_input_parts.return_value = [("01", 2)]
+        self.view.get_selected_endianness.return_value = "Little Endian"
+        # Act
+        result = self.presenter.parse_hex_data()
+        # Assert
+        self.assertEqual(result["type"], "error")
+        self.assertIn("解析 hex 資料時發生錯誤", result["message"])
+
+    def test_browse_file_success(self):
+        from unittest.mock import patch, mock_open
+        # Arrange
+        with patch('presenter.struct_presenter.filedialog.askopenfilename', return_value='test.h'):
+            with patch('builtins.open', mock_open(read_data='struct content')):
+                self.model.load_struct_from_file.return_value = ('MyStruct', [{'name': 'a'}], 8, 4)
+                # Act
+                result = self.presenter.browse_file()
+        # Assert
+        self.assertEqual(result['type'], 'ok')
+        self.assertEqual(result['file_path'], 'test.h')
+        self.assertEqual(result['struct_name'], 'MyStruct')
+        self.assertEqual(result['layout'], [{'name': 'a'}])
+        self.assertEqual(result['total_size'], 8)
+        self.assertEqual(result['struct_align'], 4)
+        self.assertEqual(result['struct_content'], 'struct content')
+
+    def test_browse_file_cancel(self):
+        from unittest.mock import patch
+        with patch('presenter.struct_presenter.filedialog.askopenfilename', return_value=None):
+            result = self.presenter.browse_file()
+        self.assertEqual(result['type'], 'error')
+        self.assertIn('未選擇檔案', result['message'])
+
+    def test_browse_file_error(self):
+        from unittest.mock import patch, mock_open
+        with patch('presenter.struct_presenter.filedialog.askopenfilename', return_value='test.h'):
+            with patch('builtins.open', mock_open(read_data='struct content')):
+                self.model.load_struct_from_file.side_effect = Exception('parse error')
+                result = self.presenter.browse_file()
+        self.assertEqual(result['type'], 'error')
+        self.assertIn('載入檔案時發生錯誤', result['message'])
+
 if __name__ == "__main__":
     unittest.main() 

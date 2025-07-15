@@ -81,28 +81,23 @@ class StructPresenter:
             filetypes=(("Header files", "*.h"), ("All files", "*.*" ))
         )
         if not file_path:
-            return
+            return {'type': 'error', 'message': '未選擇檔案'}
 
         try:
-            # 讀取原始 struct 檔案內容，傳給 debug 區
             with open(file_path, 'r') as f:
                 struct_content = f.read()
             struct_name, layout, total_size, struct_align = self.model.load_struct_from_file(file_path)
-            self.view.show_file_path(file_path)
-            self.view.show_struct_layout(struct_name, layout, total_size, struct_align)
-            self.view.show_struct_debug(struct_content)
-            self.view.enable_parse_button()
-            self.view.clear_results()
-            
-            # Rebuild hex grid based on new struct size
-            unit_size = self.view.get_selected_unit_size()
-            self.view.rebuild_hex_grid(total_size, unit_size)
-
+            return {
+                'type': 'ok',
+                'file_path': file_path,
+                'struct_name': struct_name,
+                'layout': layout,
+                'total_size': total_size,
+                'struct_align': struct_align,
+                'struct_content': struct_content
+            }
         except Exception as e:
-            self.view.show_error(get_string("dialog_file_error"), f"An error occurred: {e}")
-            self.view.disable_parse_button()
-            self.view.clear_results()
-            self.view.rebuild_hex_grid(0, 1) # Clear hex grid
+            return {'type': 'error', 'message': f"載入檔案時發生錯誤: {e}"}
 
     def on_unit_size_change(self, *args):
         # This method is called when the unit size dropdown changes
@@ -117,13 +112,10 @@ class StructPresenter:
 
     def parse_hex_data(self):
         if not self.model.layout:
-            self.view.show_warning(get_string("dialog_no_struct"),
-                                   "Please load a struct definition file first.")
-            return
+            return {'type': 'error', 'message': '尚未載入 struct 定義檔案'}
 
         hex_parts_with_expected_len = self.view.get_hex_input_parts()
 
-        # Determine the selected endianness for converting input values to bytes
         byte_order_str = self.view.get_selected_endianness()
         byte_order_for_conversion = 'little' if byte_order_str == "Little Endian" else 'big'
 
@@ -131,37 +123,21 @@ class StructPresenter:
             hex_data, debug_lines = self._process_hex_parts(hex_parts_with_expected_len, byte_order_for_conversion)
         except HexProcessingError as e:
             title_map = {
-                "invalid_input": get_string("dialog_invalid_input"),
-                "value_too_large": get_string("dialog_value_too_large"),
-                "overflow_error": get_string("dialog_overflow_error"),
-                "conversion_error": get_string("dialog_conversion_error"),
+                "invalid_input": "無效輸入",
+                "value_too_large": "數值過大",
+                "overflow_error": "溢位錯誤",
+                "conversion_error": "轉換錯誤",
             }
-            self.view.show_error(title_map.get(e.kind, "Error"), str(e))
-            return
+            return {'type': 'error', 'message': f"{title_map.get(e.kind, '錯誤')}: {str(e)}"}
 
-        self.view.show_debug_bytes(debug_lines)
-
-        # The model's parse_hex_data will then use bytes.fromhex(hex_data) to get raw memory bytes.
-        # The model's int.from_bytes will then interpret these raw memory bytes using the selected byte_order.
-        # This ensures consistency: input value -> memory bytes (based on selected endian) -> parsed value (based on selected endian)
-
-        # The model will handle padding if hex_data is shorter than total_size * 2
-        # We only check if it's too long here
         if len(hex_data) > self.model.total_size * 2:
-            self.view.show_error(get_string("dialog_invalid_length"),
-                               f"Input data ({len(hex_data)} chars) is longer than the expected total size ({self.model.total_size * 2} chars).")
-            return
+            return {'type': 'error', 'message': f"輸入資料長度 ({len(hex_data)}) 超過預期總大小 ({self.model.total_size * 2})"}
 
         try:
-            # Pass the selected byte_order_for_conversion to the model for final interpretation
             parsed_values = self.model.parse_hex_data(hex_data, byte_order_for_conversion)
-            self.view.show_parsed_values(parsed_values, byte_order_str)
-            
-            # Show struct member debug information
-            self.view.show_struct_member_debug(parsed_values, self.model.layout)
+            return {'type': 'ok', 'debug_lines': debug_lines, 'parsed_values': parsed_values}
         except Exception as e:
-            self.view.show_error(get_string("dialog_parsing_error"),
-                               f"An error occurred during parsing: {e}")
+            return {'type': 'error', 'message': f"解析 hex 資料時發生錯誤: {e}"}
 
     def validate_manual_struct(self, struct_data):
         return self.model.validate_manual_struct(struct_data["members"], struct_data["total_size"])
@@ -177,23 +153,19 @@ class StructPresenter:
         self.view.show_exported_struct(h_content)
 
     def parse_manual_hex_data(self, hex_parts, struct_def, endian):
-        """解析 MyStruct tab 的 hex 資料並顯示結果"""
+        """解析 MyStruct tab 的 hex 資料，回傳 dict 結果，不操作 view"""
         try:
-            unit_size = self.view.get_selected_manual_unit_size()
+            unit_size = struct_def.get('unit_size')
             byte_order = 'little' if endian == "Little Endian" else 'big'
 
             hex_data, debug_lines = self._process_hex_parts(hex_parts, byte_order)
-            self.view.show_manual_debug_bytes(debug_lines)
 
             self.model.set_manual_struct(struct_def['members'], struct_def['total_size'])
             layout = self.model.calculate_manual_layout(struct_def['members'], struct_def['total_size'])
 
-            # 解析 hex 資料，統一用 parse_hex_data
             parsed_values = self.model.parse_hex_data(hex_data, byte_order, layout=layout, total_size=struct_def['total_size'])
 
-            # 呼叫 view 的顯示方法
-            self.view.show_manual_parsed_values(parsed_values, endian)
-
+            return {'type': 'ok', 'debug_lines': debug_lines, 'parsed_values': parsed_values}
         except HexProcessingError as e:
             title_map = {
                 "invalid_input": "無效輸入",
@@ -201,12 +173,9 @@ class StructPresenter:
                 "overflow_error": "溢位錯誤",
                 "conversion_error": "轉換錯誤",
             }
-            self.view.show_error(title_map.get(e.kind, "錯誤"), str(e))
-
+            return {'type': 'error', 'message': f"{title_map.get(e.kind, '錯誤')}: {str(e)}"}
         except Exception as e:
-            self.view.show_error("解析錯誤", f"解析 hex 資料時發生錯誤: {e}")
-            # 清空顯示
-            self.view.manual_member_tree.delete(*self.view.manual_member_tree.get_children())
+            return {'type': 'error', 'message': f"解析 hex 資料時發生錯誤: {e}"}
 
     def compute_member_layout(self, members, total_size):
         """計算 struct member 的 layout，回傳 layout list，含 cache 機制。"""
