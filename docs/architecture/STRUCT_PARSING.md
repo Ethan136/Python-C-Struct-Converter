@@ -232,11 +232,11 @@ The struct parsing system follows TDD principles with comprehensive test coverag
 - **TDD Workflow**: Test-first development approach for all new features
 
 ## 支援限制
-- 不支援 union、enum、typedef、nested struct、#pragma pack、__attribute__ 等 C/C++ 語法。
+ - 不支援 union、enum、typedef、#pragma pack、__attribute__ 等 C/C++ 語法。
 - 只支援單一 struct 解析，不支援多 struct 同時解析。
 - bitfield 只支援 int/unsigned int/char/unsigned char 等基本型別，不支援 pointer bitfield。
 - 手動 struct 定義目前不支援 padding，所有成員緊密排列。
-> **Note:** Manual struct mode does not support padding or advanced C features (e.g., union, nested struct, #pragma pack). All members are tightly packed.
+ > **Note:** Manual struct mode does not support padding or advanced C features (e.g., union, #pragma pack). All members are tightly packed.
 
 ## Future Enhancements
 

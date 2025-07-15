@@ -15,11 +15,12 @@ from unittest.mock import patch, mock_open
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from model.struct_model import (
-    parse_struct_definition, 
-    calculate_layout, 
-    StructModel, 
+    parse_struct_definition,
+    calculate_layout,
+    StructModel,
     TYPE_INFO
 )
+from model.struct_parser import parse_struct_definition_ast
 from tests.xml_struct_model_loader import load_struct_model_tests
 from tests.xml_struct_parse_definition_loader import load_struct_parse_definition_tests
 
@@ -331,6 +332,23 @@ class TestCalculateLayout(unittest.TestCase):
             self.assertFalse(pad["is_bitfield"])
             self.assertEqual(pad["bit_offset"], 0)
             self.assertEqual(pad["bit_size"], pad["size"] * 8)
+
+    def test_calculate_layout_nested(self):
+        content = '''
+        struct Outer {
+            int a;
+            struct Inner {
+                char b;
+                int c;
+            } inner;
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        layout, total, align = calculate_layout(sdef.members)
+        names = [item.name for item in layout]
+        self.assertEqual(names, ["a", "inner.b", "(padding)", "inner.c"])
+        self.assertEqual(total, 12)
+        self.assertEqual(align, 4)
 
 
 class TestStructModel(unittest.TestCase):

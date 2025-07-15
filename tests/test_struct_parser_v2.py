@@ -66,6 +66,26 @@ class TestParseStructDefinitionAst(unittest.TestCase):
         self.assertEqual(len(sdef.members), 2)
         self.assertIsInstance(sdef.members[0], MemberDef)
 
+    def test_nested_struct(self):
+        content = '''
+        struct Outer {
+            int a;
+            struct Inner {
+                char b;
+                int c;
+            } inner;
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        self.assertIsInstance(sdef, StructDef)
+        self.assertEqual(sdef.name, 'Outer')
+        self.assertEqual(len(sdef.members), 2)
+        inner_member = sdef.members[1]
+        self.assertIsNotNone(inner_member.nested)
+        self.assertIsInstance(inner_member.nested, StructDef)
+        self.assertEqual(inner_member.nested.name, 'Inner')
+        self.assertEqual(len(inner_member.nested.members), 2)
+
 class TestLayoutCalculatorWithMemberDef(unittest.TestCase):
     def test_layout_with_memberdef(self):
         members = [MemberDef('char', 'a'), MemberDef('int', 'b')]
