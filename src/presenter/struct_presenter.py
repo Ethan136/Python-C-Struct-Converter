@@ -6,6 +6,7 @@ from model.input_field_processor import InputFieldProcessor
 import time
 from collections import OrderedDict
 import os
+import threading
 
 
 class HexProcessingError(Exception):
@@ -32,6 +33,10 @@ class StructPresenter:
         self._last_layout_time = None
         self._last_hit_key = None  # 新增：記錄最近命中 key
         self._last_evict_key = None  # 新增：記錄最近淘汰 key
+        self._auto_cache_clear_timer = None
+        self._auto_cache_clear_enabled = False
+        self._auto_cache_clear_interval = None
+        self._auto_cache_clear_lock = threading.Lock()
         # Observer pattern: 註冊自己為 model observer
         if hasattr(self.model, "add_observer"):
             self.model.add_observer(self)
@@ -281,3 +286,36 @@ class StructPresenter:
     def get_lru_cache_size(self):
         """回傳目前 LRU cache 容量。"""
         return self._lru_cache_size
+
+    def enable_auto_cache_clear(self, interval_sec):
+        """啟用定時自動清空 cache，interval_sec 為秒數。"""
+        with self._auto_cache_clear_lock:
+            self.disable_auto_cache_clear()  # 先停用舊的 timer
+            self._auto_cache_clear_enabled = True
+            self._auto_cache_clear_interval = interval_sec
+            def _clear_and_restart():
+                with self._auto_cache_clear_lock:
+                    if not self._auto_cache_clear_enabled:
+                        return
+                    self.invalidate_cache()
+                    # 重新啟動 timer
+                    self._auto_cache_clear_timer = threading.Timer(self._auto_cache_clear_interval, _clear_and_restart)
+                    self._auto_cache_clear_timer.daemon = True
+                    self._auto_cache_clear_timer.start()
+            self._auto_cache_clear_timer = threading.Timer(self._auto_cache_clear_interval, _clear_and_restart)
+            self._auto_cache_clear_timer.daemon = True
+            self._auto_cache_clear_timer.start()
+
+    def disable_auto_cache_clear(self):
+        """停用自動清空 cache。"""
+        with self._auto_cache_clear_lock:
+            self._auto_cache_clear_enabled = False
+            if self._auto_cache_clear_timer is not None:
+                self._auto_cache_clear_timer.cancel()
+                self._auto_cache_clear_timer = None
+            self._auto_cache_clear_interval = None
+
+    def is_auto_cache_clear_enabled(self):
+        """查詢自動清空 cache 是否啟用。"""
+        with self._auto_cache_clear_lock:
+            return self._auto_cache_clear_enabled

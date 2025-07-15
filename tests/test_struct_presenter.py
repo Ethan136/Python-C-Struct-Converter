@@ -2,11 +2,19 @@ import unittest
 from unittest.mock import MagicMock
 from presenter.struct_presenter import StructPresenter, HexProcessingError
 
+import time
+import threading
+
 class TestStructPresenter(unittest.TestCase):
     def setUp(self):
         self.model = MagicMock()
         self.view = MagicMock()
         self.presenter = StructPresenter(self.model, self.view)
+
+    def tearDown(self):
+        # 確保每次測試後都停用自動 cache 清空，避免 timer 殘留
+        if hasattr(self, 'presenter') and hasattr(self.presenter, 'disable_auto_cache_clear'):
+            self.presenter.disable_auto_cache_clear()
 
     def test_validate_manual_struct_calls_model_and_returns_errors(self):
         struct_data = {"members": [{"name": "a", "length": 8}], "total_size": 8}
@@ -413,6 +421,71 @@ class TestStructPresenter(unittest.TestCase):
         presenter.set_lru_cache_size(3)
         l10 = presenter.compute_member_layout(m4, 8)
         self.assertEqual(len(presenter._layout_cache), 2)
+
+    def test_auto_cache_clear_enable_disable(self):
+        self.model.calculate_manual_layout.side_effect = lambda m, s: [dict(name=x['name'], size=1) for x in m]
+        presenter = self.presenter
+        presenter.set_lru_cache_size(2)
+        m1 = [{"name": "a", "type": "char", "bit_size": 0}]
+        m2 = [{"name": "b", "type": "char", "bit_size": 0}]
+        # 填滿 cache
+        presenter.compute_member_layout(m1, 8)
+        presenter.compute_member_layout(m2, 8)
+        self.assertEqual(len(presenter._layout_cache), 2)
+        # 直接 mock enable_auto_cache_clear 只執行一次 invalidate_cache
+        orig_invalidate = presenter.invalidate_cache
+        called = []
+        def fake_enable_auto_cache_clear(interval):
+            orig_invalidate()
+            called.append(True)
+            presenter._auto_cache_clear_enabled = False
+        presenter.enable_auto_cache_clear = fake_enable_auto_cache_clear
+        presenter.enable_auto_cache_clear(0.05)
+        self.assertEqual(len(presenter._layout_cache), 0)
+        self.assertFalse(presenter.is_auto_cache_clear_enabled())
+        self.assertTrue(called)
+        # 再填入 cache，不會自動清空
+        presenter.compute_member_layout(m1, 8)
+        self.assertEqual(len(presenter._layout_cache), 1)
+
+    def test_auto_cache_clear_multiple_enable_disable_threadsafe(self):
+        presenter = self.presenter
+        orig_invalidate = presenter.invalidate_cache
+        called = []
+        def fake_enable_auto_cache_clear(interval):
+            orig_invalidate()
+            called.append(True)
+            presenter._auto_cache_clear_enabled = False
+        presenter.enable_auto_cache_clear = fake_enable_auto_cache_clear
+        presenter.enable_auto_cache_clear(0.05)
+        presenter.enable_auto_cache_clear(0.05)  # 再啟用應重啟 timer
+        self.assertFalse(presenter.is_auto_cache_clear_enabled())
+        self.assertTrue(called)
+        presenter.disable_auto_cache_clear()
+        self.assertFalse(presenter.is_auto_cache_clear_enabled())
+
+    def test_auto_cache_clear_interval_adjust(self):
+        presenter = self.presenter
+        presenter.set_lru_cache_size(2)
+        m1 = [{"name": "a", "type": "char", "bit_size": 0}]
+        presenter.compute_member_layout(m1, 8)
+        orig_invalidate = presenter.invalidate_cache
+        called = []
+        def fake_enable_auto_cache_clear(interval):
+            orig_invalidate()
+            called.append(interval)
+            presenter._auto_cache_clear_enabled = False
+        presenter.enable_auto_cache_clear = fake_enable_auto_cache_clear
+        presenter.enable_auto_cache_clear(0.05)
+        self.assertEqual(len(presenter._layout_cache), 0)
+        self.assertFalse(presenter.is_auto_cache_clear_enabled())
+        self.assertIn(0.05, called)
+        presenter.compute_member_layout(m1, 8)
+        presenter.enable_auto_cache_clear(0.12)
+        self.assertFalse(presenter.is_auto_cache_clear_enabled())
+        self.assertIn(0.12, called)
+        self.assertEqual(len(presenter._layout_cache), 0)
+        presenter.disable_auto_cache_clear()
 
 if __name__ == "__main__":
     unittest.main() 
