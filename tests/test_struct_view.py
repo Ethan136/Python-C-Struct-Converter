@@ -43,8 +43,43 @@ class TestStructView(unittest.TestCase):
     def setUp(self):
         self.root = tk.Tk()
         self.root.withdraw()  # 不顯示主視窗
+        # MagicMock 預設不會自動模擬 dict 行為，需 patch
         self.presenter = MagicMock()
+        # 修正 compute_member_layout 回傳真 layout
+        def compute_member_layout(members, total_size):
+            from model.struct_model import StructModel
+            return StructModel().calculate_manual_layout(members, total_size)
+        self.presenter.compute_member_layout.side_effect = compute_member_layout
+        # 修正 calculate_remaining_space 回傳 (bits, bytes)
+        def calculate_remaining_space(members, total_size):
+            from model.struct_model import StructModel
+            model = StructModel()
+            used_bits = model.calculate_used_bits(members)
+            total_bits = total_size * 8
+            remaining_bits = max(0, total_bits - used_bits)
+            remaining_bytes = remaining_bits // 8
+            return (remaining_bits, remaining_bytes)
+        self.presenter.calculate_remaining_space.side_effect = calculate_remaining_space
+        # last_struct_data 必須為 dict
+        self.presenter.last_struct_data = {}
+        # on_manual_struct_change 必須設 last_struct_data 並回傳 dict
+        def on_manual_struct_change(struct_data):
+            self.presenter.last_struct_data = struct_data
+            return {"errors": []}
+        self.presenter.on_manual_struct_change.side_effect = on_manual_struct_change
+        # on_export_manual_struct 必須回傳 dict
+        self.presenter.on_export_manual_struct.return_value = {"h_content": "struct ManualStruct { ... }"}
+        # get_cache_stats/get_last_layout_time for debug tab
+        self.presenter.get_cache_stats.return_value = (5, 3)
+        self.presenter.get_last_layout_time.return_value = 0.0123
+        # 關鍵：model 必須為真實 StructModel，避免 MagicMock 污染
+        from model.struct_model import StructModel
+        self.presenter.model = StructModel()
         self.view = StructView(presenter=self.presenter)
+        # 若有 debug_tab 測試，需初始化
+        if hasattr(self, "_testMethodName") and "debug_tab" in self._testMethodName:
+            if not hasattr(self.view, "debug_tab"):
+                self.view._create_debug_tab()
         self.view.update()  # 初始化UI
 
     def tearDown(self):
@@ -270,6 +305,11 @@ class TestStructView(unittest.TestCase):
         for idx, (entry, box_len) in enumerate(self.view.manual_hex_entries):
             entry.delete(0, "end")
             entry.insert(0, "12".zfill(box_len))
+        # presenter 需有 parse_manual_hex_data 並回傳 dict
+        class DebugPresenter:
+            def parse_manual_hex_data(self, hex_parts, struct_def, endian):
+                return {"type": "ok", "parsed_values": [], "debug_lines": [f"hex_parts: {hex_parts}"]}
+        self.view.presenter = DebugPresenter()
         # 點擊解析
         self.view._on_parse_manual_hex()
         # 檢查 debug 區有正確顯示 hex_parts
@@ -283,15 +323,15 @@ class TestStructView(unittest.TestCase):
             def __init__(self, view):
                 self.view = view
             def parse_manual_hex_data(self, hex_parts, struct_def, endian):
-                # 假設 struct 有一個 int 欄位，hex_parts = [("01020304", 8)]
-                # 解析 hex 並顯示在 manual_member_tree
                 value = int(hex_parts[0][0], 16)
-                self.view.manual_member_tree.delete(*self.view.manual_member_tree.get_children())
-                self.view.manual_member_tree.insert("", "end", values=(struct_def["members"][0]["name"], str(value), hex(value), hex_parts[0][0]))
+                parsed = [{"name": struct_def["members"][0]["name"], "value": str(value), "hex_value": hex(value), "hex_raw": hex_parts[0][0]}]
+                self.view.show_manual_parsed_values(parsed, endian)
                 self.view.manual_debug_text.config(state="normal")
                 self.view.manual_debug_text.delete("1.0", "end")
                 self.view.manual_debug_text.insert("1.0", f"value: {value}")
                 self.view.manual_debug_text.config(state="disabled")
+                self.view.update()
+                return {"type": "ok", "parsed_values": parsed, "debug_lines": [f"value: {value}"]}
         # 切換到 manual struct tab
         self.view.tab_control.select(self.view.tab_manual)
         # 設定 struct: 一個 int 欄位
@@ -321,9 +361,7 @@ class TestStructView(unittest.TestCase):
             def __init__(self, view):
                 self.view = view
             def parse_manual_hex_data(self, hex_parts, struct_def, endian):
-                # struct: int(4 bytes), char(1), short(2)
                 hex_str = ''.join([h[0] for h in hex_parts])
-                # 4+1+2=7 bytes, 例如: 01020304 61 0b0c (int=0x01020304, char='a'=0x61, short=0x0b0c)
                 b = bytes.fromhex(hex_str)
                 if endian == 'Little Endian':
                     int_val = int.from_bytes(b[0:4], 'little')
@@ -333,10 +371,14 @@ class TestStructView(unittest.TestCase):
                     int_val = int.from_bytes(b[0:4], 'big')
                     char_val = chr(b[4])
                     short_val = int.from_bytes(b[5:7], 'big')
-                self.view.manual_member_tree.delete(*self.view.manual_member_tree.get_children())
-                self.view.manual_member_tree.insert("", "end", values=(struct_def["members"][0]["name"], str(int_val), hex(int_val), hex_str[0:8]))
-                self.view.manual_member_tree.insert("", "end", values=(struct_def["members"][1]["name"], char_val, hex(ord(char_val)), hex_str[8:10]))
-                self.view.manual_member_tree.insert("", "end", values=(struct_def["members"][2]["name"], str(short_val), hex(short_val), hex_str[10:14]))
+                parsed = [
+                    {"name": struct_def["members"][0]["name"], "value": str(int_val), "hex_value": hex(int_val), "hex_raw": hex_str[0:8]},
+                    {"name": struct_def["members"][1]["name"], "value": char_val, "hex_value": hex(ord(char_val)), "hex_raw": hex_str[8:10]},
+                    {"name": struct_def["members"][2]["name"], "value": str(short_val), "hex_value": hex(short_val), "hex_raw": hex_str[10:14]}
+                ]
+                self.view.show_manual_parsed_values(parsed, endian)
+                self.view.update()
+                return {"type": "ok", "parsed_values": parsed, "debug_lines": [f"int_val: {int_val}"]}
         # 切換到 manual struct tab
         self.view.tab_control.select(self.view.tab_manual)
         # 設定 struct: int, char, short
@@ -391,14 +433,12 @@ class TestStructView(unittest.TestCase):
         self.assertTrue(scrollbars, "MyStruct tab 應該有 scrollbar")
 
     def test_manual_struct_hex_parse_real_model(self):
-        # 使用真實 presenter/model 串接
         from model.struct_model import StructModel
         class RealPresenter:
             def __init__(self, view):
                 self.view = view
                 self.model = StructModel()
             def parse_manual_hex_data(self, hex_parts, struct_def, endian):
-                # 將 hex_parts 組成 bytes
                 hex_str = ''.join([h[0].zfill(h[1]) for h in hex_parts])
                 b = bytes.fromhex(hex_str)
                 layout = self.model.calculate_manual_layout(struct_def['members'], struct_def['total_size'])
@@ -414,11 +454,11 @@ class TestStructView(unittest.TestCase):
                         value = int.from_bytes(val_bytes, 'little')
                     else:
                         value = int.from_bytes(val_bytes, 'big')
-                    results.append((m['name'], value, hex(value), val_bytes.hex()))
+                    results.append({"name": m['name'], "value": str(value), "hex_value": hex(value), "hex_raw": val_bytes.hex()})
                     offset += size
-                self.view.manual_member_tree.delete(*self.view.manual_member_tree.get_children())
-                for r in results:
-                    self.view.manual_member_tree.insert('', 'end', values=r)
+                self.view.show_manual_parsed_values(results, endian)
+                self.view.update()
+                return {"type": "ok", "parsed_values": results, "debug_lines": [f"results: {results}"]}
         # 切換到 manual struct tab
         self.view.tab_control.select(self.view.tab_manual)
         # 設定 struct: int, char, short
@@ -449,7 +489,6 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(self.view.manual_member_tree.item(items[1], "values")[0], "b")
         self.assertEqual(self.view.manual_member_tree.item(items[1], "values")[1], str(int("61", 16)))
         self.assertEqual(self.view.manual_member_tree.item(items[2], "values")[0], "c")
-        # 直接用 layout offset/size 取 bytes 驗證
         c_layout = [m for m in layout if m['name'] == 'c'][0]
         c_bytes = b[c_layout['offset']:c_layout['offset']+c_layout['size']]
         expected_short = int.from_bytes(c_bytes, 'little')
@@ -475,6 +514,7 @@ class TestStructView(unittest.TestCase):
                 if hasattr(self.view, 'show_manual_parsed_values'):
                     self.view.show_manual_parsed_values(parsed_values, endian)
                     self.display_called = True
+                return {"type": "ok", "parsed_values": parsed_values, "debug_lines": []}
         
         # 切換到 manual struct tab
         self.view.tab_control.select(self.view.tab_manual)
@@ -967,6 +1007,35 @@ class TestStructView(unittest.TestCase):
         self.presenter.invalidate_cache.reset_mock()
         self.view._reset_manual_struct()
         self.presenter.invalidate_cache.assert_called_once()
+
+    def test_debug_tab_shows_presenter_cache_stats_and_layout_time(self):
+        import tkinter as tk
+        from unittest.mock import MagicMock
+        from view.struct_view import StructView
+        root = tk.Tk()
+        presenter = MagicMock()
+        presenter.get_cache_stats.return_value = (5, 3)
+        presenter.get_last_layout_time.return_value = 0.0123
+        view = StructView(presenter=presenter)
+        # 顯式初始化 debug_tab
+        view._create_debug_tab()
+        # 初始顯示正確
+        view.refresh_debug_info()
+        debug_text = view.debug_info_label.cget("text")
+        assert "Cache Hit: 5" in debug_text
+        assert "Cache Miss: 3" in debug_text
+        assert "Last Layout Time: 0.0123" in debug_text
+        # 修改 presenter 狀態再刷新
+        presenter.get_cache_stats.return_value = (7, 4)
+        presenter.get_last_layout_time.return_value = 0.0456
+        view.refresh_debug_info()
+        debug_text2 = view.debug_info_label.cget("text")
+        assert "Cache Hit: 7" in debug_text2
+        assert "Cache Miss: 4" in debug_text2
+        assert "Last Layout Time: 0.0456" in debug_text2
+        # Debug tab 不影響主流程
+        assert view.presenter is presenter
+        root.destroy()
 
 if __name__ == "__main__":
     unittest.main()

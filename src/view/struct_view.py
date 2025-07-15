@@ -707,3 +707,19 @@ class StructView(tk.Tk):
         if self.presenter and hasattr(self.presenter, "get_cache_stats"):
             return self.presenter.get_cache_stats()
         return (None, None)
+
+    def _create_debug_tab(self):
+        self.debug_tab = ttk.Frame(self.tab_control)
+        self.tab_control.add(self.debug_tab, text="Debug")
+        self.debug_info_label = tk.Label(self.debug_tab, text="", anchor="w", justify="left", font=("Courier", 11))
+        self.debug_info_label.pack(fill="x", padx=10, pady=10)
+        self.refresh_debug_info()
+
+    def refresh_debug_info(self):
+        if self.presenter and hasattr(self.presenter, "get_cache_stats") and hasattr(self.presenter, "get_last_layout_time"):
+            hit, miss = self.presenter.get_cache_stats()
+            last_time = self.presenter.get_last_layout_time()
+            text = f"Cache Hit: {hit}\nCache Miss: {miss}\nLast Layout Time: {last_time}"
+        else:
+            text = "No presenter stats available."
+        self.debug_info_label.config(text=text)
