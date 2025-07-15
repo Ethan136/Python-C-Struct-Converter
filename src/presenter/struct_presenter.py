@@ -18,9 +18,13 @@ class StructPresenter:
         self.view = view # This will be set by main.py after view is instantiated
         self.input_processor = InputFieldProcessor()
         self._layout_cache = {}  # (members_key, total_size) -> layout
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     def invalidate_cache(self):
         self._layout_cache.clear()
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     def _make_cache_key(self, members, total_size):
         key = tuple(sorted((m['name'], m['type'], m.get('bit_size', 0)) for m in members))
@@ -202,10 +206,20 @@ class StructPresenter:
         """計算 struct member 的 layout，回傳 layout list，含 cache 機制。"""
         cache_key = self._make_cache_key(members, total_size)
         if cache_key in self._layout_cache:
+            self._cache_hits += 1
             return self._layout_cache[cache_key]
         layout = self.model.calculate_manual_layout(members, total_size)
         self._layout_cache[cache_key] = layout
+        self._cache_misses += 1
         return layout
+
+    def get_cache_stats(self):
+        """回傳 (hit, miss) 統計。"""
+        return self._cache_hits, self._cache_misses
+
+    def reset_cache_stats(self):
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     def calculate_remaining_space(self, members, total_size):
         """計算剩餘可用空間（bits, bytes）。"""

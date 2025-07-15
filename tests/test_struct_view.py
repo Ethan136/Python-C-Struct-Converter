@@ -2,6 +2,7 @@ import os
 import unittest
 import tkinter as tk
 import pytest
+from unittest.mock import MagicMock
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests"
@@ -38,7 +39,7 @@ class TestStructView(unittest.TestCase):
     def setUp(self):
         self.root = tk.Tk()
         self.root.withdraw()  # 不顯示主視窗
-        self.presenter = PresenterStub()
+        self.presenter = MagicMock()
         self.view = StructView(presenter=self.presenter)
         self.view.update()  # 初始化UI
 
@@ -912,6 +913,53 @@ class TestStructView(unittest.TestCase):
         self.view.tab_control.select(self.view.tab_manual)
         manual_scrollbars = [w for w in self.view.tab_manual.winfo_children() if isinstance(w, tk.Scrollbar)]
         self.assertTrue(manual_scrollbars, "MyStruct tab 應有主 scrollbar")
+
+    def test_cache_invalidation_triggers(self):
+        # 測試所有應觸發 invalidate_cache 的 GUI 操作
+        self.view.members = [
+            {"name": "a", "type": "int", "bit_size": 0},
+            {"name": "b", "type": "int", "bit_size": 0},
+        ]
+        self.view._render_member_table()
+        # 新增
+        self.presenter.invalidate_cache.reset_mock()
+        self.view._add_member()
+        self.presenter.invalidate_cache.assert_called_once()
+        # 刪除
+        self.presenter.invalidate_cache.reset_mock()
+        self.view._delete_member(0)
+        self.presenter.invalidate_cache.assert_called_once()
+        # 名稱修改
+        self.presenter.invalidate_cache.reset_mock()
+        var = tk.StringVar(value="c")
+        self.view._update_member_name(0, var)
+        self.presenter.invalidate_cache.assert_called_once()
+        # 型別修改
+        self.presenter.invalidate_cache.reset_mock()
+        var = tk.StringVar(value="long long")
+        self.view._update_member_type(0, var)
+        self.presenter.invalidate_cache.assert_called_once()
+        # bit size 修改
+        self.presenter.invalidate_cache.reset_mock()
+        var = tk.StringVar(value="8")
+        self.view._update_member_bit(0, var)
+        self.presenter.invalidate_cache.assert_called_once()
+        # 上移
+        self.presenter.invalidate_cache.reset_mock()
+        self.view._move_member_up(1)
+        self.presenter.invalidate_cache.assert_called_once()
+        # 下移
+        self.presenter.invalidate_cache.reset_mock()
+        self.view._move_member_down(0)
+        self.presenter.invalidate_cache.assert_called_once()
+        # 複製
+        self.presenter.invalidate_cache.reset_mock()
+        self.view._copy_member(0)
+        self.presenter.invalidate_cache.assert_called_once()
+        # 重設
+        self.presenter.invalidate_cache.reset_mock()
+        self.view._reset_manual_struct()
+        self.presenter.invalidate_cache.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()

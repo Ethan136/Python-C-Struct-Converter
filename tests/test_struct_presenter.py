@@ -74,5 +74,32 @@ class TestStructPresenter(unittest.TestCase):
             self.presenter.compute_member_layout(m, 128)
         self.assertEqual(call_count, 1)  # 只計算一次
 
+    def test_layout_cache_stats(self):
+        self.model.calculate_manual_layout.side_effect = lambda m, s: [dict(name=x['name'], size=1) for x in m]
+        m1 = [{"name": "a", "type": "char", "bit_size": 0}]
+        m2 = [{"name": "a", "type": "char", "bit_size": 0}, {"name": "b", "type": "int", "bit_size": 0}]
+        # First call: miss
+        self.presenter.compute_member_layout(m1, 8)
+        hits, misses = self.presenter.get_cache_stats()
+        self.assertEqual((hits, misses), (0, 1))
+        # Second call: hit
+        self.presenter.compute_member_layout(m1, 8)
+        hits, misses = self.presenter.get_cache_stats()
+        self.assertEqual((hits, misses), (1, 1))
+        # Third call: new key, miss
+        self.presenter.compute_member_layout(m2, 8)
+        hits, misses = self.presenter.get_cache_stats()
+        self.assertEqual((hits, misses), (1, 2))
+        # Invalidate cache resets stats
+        self.presenter.invalidate_cache()
+        hits, misses = self.presenter.get_cache_stats()
+        self.assertEqual((hits, misses), (0, 0))
+        # Test reset_cache_stats
+        self.presenter.compute_member_layout(m1, 8)
+        self.presenter.compute_member_layout(m1, 8)
+        self.presenter.reset_cache_stats()
+        hits, misses = self.presenter.get_cache_stats()
+        self.assertEqual((hits, misses), (0, 0))
+
 if __name__ == "__main__":
     unittest.main() 
