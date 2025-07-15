@@ -12,17 +12,35 @@
 ## 3. 待修改項目
 1. **Parser 層**
    - 新增 `parse_union_definition`、`parse_union_definition_v2` 及 `parse_union_definition_ast`，流程與 struct 版本相同但使用 `keyword="union"`。
+       - 位置：`src/model/struct_parser.py`，於現有 `parse_struct_definition` 系列函式附近新增。
+       - 可複製 `parse_struct_definition`、`parse_struct_definition_v2`、`parse_struct_definition_ast` 的實作並將 `_extract_struct_body` 的 `keyword` 參數改為 "union"，回傳 `UnionDef` 物件。
    - 更新 `parse_c_definition`、`parse_c_definition_ast`：偵測開頭關鍵字回傳 `('union', name, members)` 或對應的 `UnionDef`。
+       - 於 `src/model/struct_parser.py` 修改 `parse_c_definition`(約184行) 及 `parse_c_definition_ast`(約196行)。
+       - 透過 `re.match("\s*(struct|union)\s+")` 判斷宣告類型後，分別呼叫 `parse_struct_definition*` 或 `parse_union_definition*`。
    - 確認 `_extract_struct_body` 已支援 `keyword` 參數並供兩種宣告共用。
-   - 調整 `src/model/__init__.py` 將新函式與 `UnionDef` 列入 `__all__`。
+       - `_extract_struct_body` 已包含 `keyword` 參數，目前定義於約118行，兩種宣告共用此函式即可。
+
+       - 在 `src/model/__init__.py` 的 `__all__` 列表加入 `parse_union_definition`, `parse_union_definition_v2`, `parse_union_definition_ast`, 以及 `UnionDef`。
+
 2. **Layout 計算**
    - `calculate_layout` 增加 `kind` 或 `calculator_cls` 判斷，根據解析結果選用 `StructLayoutCalculator` 或 `UnionLayoutCalculator`。
-   - `StructModel.load_struct_from_file` 透過 `parse_c_definition_ast` 取得類型後，呼叫對應 calculator 並保存 `struct_name`、`kind`、`layout` 等資訊。
+       - 在 `src/model/struct_model.py` 的 `calculate_layout` 函式加入 `kind` 參數，
+         預設為 `None`，若值為 "union" 則改用 `UnionLayoutCalculator`。
+       - `StructModel.load_struct_from_file` 需先呼叫 `parse_c_definition_ast` 確認回傳型別，
+         再依照 `StructDef` 或 `UnionDef` 使用對應 calculator 並記錄 `self.kind`。
+
 3. **Hex 資料解析**
    - `parse_hex_data` 流程不需特別調整，因為 union 成員皆位於 offset=0，只需依照計算好的 layout 讀取即可。
+       - 主要程式碼位於 `StructModel.parse_hex_data` (約60行)。因 layout 結構相同，無需因 union 額外調整。
+
+
 4. **文件與測試**
    - 更新 `docs/architecture/STRUCT_PARSING.md` 與 `examples/README.md`，移除「不支援 union」的描述並加入範例。
    - README 需新增 union 支援說明。
+
+       - 移除 `STRUCT_PARSING.md` 第 7 行與 132~133 行關於不支援 union 的敘述，並補充 union 佈局規則。
+       - `examples/README.md` 第 10 行刪除不支援 union 的描述，改以簡短說明支援 union 範例檔。
+       - `README.md` Features 與說明部分需新增 union 功能介紹。
 
 ## 4. TDD 流程與新增測試
 1. **解析相關測試**
