@@ -336,33 +336,97 @@ class UnionLayoutCalculator(BaseLayoutCalculator):
     def calculate(self, members: List[Union[Tuple[str, str], dict]]):
         max_size = 0
         for member in members:
-            if isinstance(member, tuple):
-                mtype, mname = member
-            elif isinstance(member, dict):
-                mtype = member["type"]
-                mname = member["name"]
-            elif hasattr(member, "type"):
-                mtype = member.type
-                mname = member.name
-            else:
-                raise ValueError(f"Invalid member format: {member}")
+            mtype = self._get_attr(member, "type")
+            mname = self._get_attr(member, "name")
+            array_dims = self._get_attr(member, "array_dims") or []
+            nested = self._get_attr(member, "nested")
 
-            size, alignment = self._get_type_size_and_align(mtype)
+            if nested is not None:
+                from .struct_parser import UnionDef
+                if isinstance(nested, UnionDef):
+                    calc = UnionLayoutCalculator(pack_alignment=self.pack_alignment)
+                else:
+                    calc = StructLayoutCalculator(pack_alignment=self.pack_alignment)
+                nested_layout, nested_size, nested_align = calc.calculate(nested.members)
+                if nested_align > self.max_alignment:
+                    self.max_alignment = nested_align
+
+                if array_dims:
+                    total_elems = 1
+                    for d in array_dims:
+                        total_elems *= d
+                    index_ranges = [range(d) for d in array_dims]
+                    for idx_tuple in itertools.product(*index_ranges):
+                        idx_str = "".join(f"[{i}]" for i in idx_tuple)
+                        for item in nested_layout:
+                            new_name = (
+                                f"{mname}{idx_str}.{item.name}" if item.name else item.name
+                            )
+                            self.layout.append(
+                                LayoutItem(
+                                    name=new_name,
+                                    type=item.type,
+                                    size=item.size,
+                                    offset=item.offset,
+                                    is_bitfield=item.is_bitfield,
+                                    bit_offset=item.bit_offset,
+                                    bit_size=item.bit_size,
+                                    array_dims=item.array_dims,
+                                )
+                            )
+                else:
+                    for item in nested_layout:
+                        new_name = f"{mname}.{item.name}" if item.name else item.name
+                        self.layout.append(
+                            LayoutItem(
+                                name=new_name,
+                                type=item.type,
+                                size=item.size,
+                                offset=item.offset,
+                                is_bitfield=item.is_bitfield,
+                                bit_offset=item.bit_offset,
+                                bit_size=item.bit_size,
+                                array_dims=item.array_dims,
+                            )
+                        )
+                size = nested_size
+                alignment = nested_align
+            elif array_dims:
+                elem_size, alignment = self._get_type_size_and_align(mtype)
+                total_elems = 1
+                for d in array_dims:
+                    total_elems *= d
+                size = elem_size * total_elems
+                self.layout.append(
+                    LayoutItem(
+                        name=mname,
+                        type=mtype,
+                        size=size,
+                        offset=0,
+                        is_bitfield=False,
+                        bit_offset=0,
+                        bit_size=size * 8,
+                        array_dims=array_dims,
+                    )
+                )
+            else:
+                size, alignment = self._get_type_size_and_align(mtype)
+                self.layout.append(
+                    LayoutItem(
+                        name=mname,
+                        type=mtype,
+                        size=size,
+                        offset=0,
+                        is_bitfield=False,
+                        bit_offset=0,
+                        bit_size=size * 8,
+                    )
+                )
+
             if alignment > self.max_alignment:
                 self.max_alignment = alignment
             if size > max_size:
                 max_size = size
-            self.layout.append(
-                LayoutItem(
-                    name=mname,
-                    type=mtype,
-                    size=size,
-                    offset=0,
-                    is_bitfield=False,
-                    bit_offset=0,
-                    bit_size=size * 8,
-                )
-            )
 
         self.current_offset = max_size
         self._add_final_padding()
