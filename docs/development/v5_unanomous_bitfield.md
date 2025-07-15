@@ -8,10 +8,10 @@
 ## 現況檢查
 1. `MemberDef.name` 及 `LayoutItem.name` 已為 `Optional[str]`【F:src/model/struct_parser.py†L10-L23】【F:src/model/layout.py†L25-L40】，預留匿名欄位可能性。
 2. `_parse_bitfield_declaration` 的 regex `r"(.+?)\s+([\w\[\]]+)\s*:\s*(\d+)$"` 限制必須有名稱【F:src/model/struct_parser.py†L50-L66】。
-3. `parse_member_line_v2` 依賴上述函式，若解析失敗則回傳 `None`，因此匿名 bitfield 現階段被忽略。
+3. `parse_member_line_v2` 依賴上述函式，在 `parse_member_line_v2` 建立 `MemberDef` 時假設 `name` 必定存在【F:src/model/struct_parser.py†L101-L114】，若解析失敗則回傳 `None`，因此匿名 bitfield 會被忽略。
 4. `LayoutCalculator._add_bitfield_to_layout` 已註解日後可接受 `name=None`【F:src/model/layout.py†L287-L301】。
 5. `parse_hex_data` 在組合結果時直接使用 `item['name']`，若值為 `None` 仍可處理，但 GUI 尚未顯示此狀態【F:src/model/struct_model.py†L93-L138】。
-6. 測試檔 `tests/test_struct_parser_utils.py` 已對匿名 bitfield 標示 `xfail`【F:tests/test_struct_parser_utils.py†L19-L23】，代表功能未實作。
+6. 測試檔 `tests/test_struct_parser_utils.py` 已對匿名 bitfield 標示 `xfail`【F:tests/test_struct_parser_utils.py†L20-L26】，代表功能未實作。
 
 ## TDD 實作步驟
 以下流程每一步皆遵循 **Red → Green → Refactor**：先撰寫或啟用測試，確認失敗後再實作使其通過。

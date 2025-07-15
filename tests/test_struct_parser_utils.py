@@ -17,7 +17,6 @@ class TestParseMemberLine(unittest.TestCase):
         self.assertTrue(result['is_bitfield'])
         self.assertEqual(result['bit_size'], 3)
 
-    @pytest.mark.xfail(reason="anonymous bitfields not yet supported")
     def test_anonymous_bitfield_member(self):
         result = parse_member_line('int : 3')
         self.assertIsInstance(result, dict)

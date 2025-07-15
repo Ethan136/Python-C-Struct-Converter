@@ -41,6 +41,13 @@ class TestParseMemberLineV2(unittest.TestCase):
         self.assertEqual(m.name, 'flag')
         self.assertEqual(m.bit_size, 3)
 
+    def test_parse_anonymous_bitfield_v2(self):
+        m = parse_member_line_v2('int : 5')
+        self.assertTrue(m.is_bitfield)
+        self.assertEqual(m.type, 'int')
+        self.assertIsNone(m.name)
+        self.assertEqual(m.bit_size, 5)
+
 class TestParseStructDefinitionV2(unittest.TestCase):
     def test_simple_struct(self):
         content = '''
@@ -185,6 +192,21 @@ class TestParseStructDefinitionAst(unittest.TestCase):
         self.assertIsNotNone(anon.nested)
         self.assertIsInstance(anon.nested, UnionDef)
         self.assertEqual(len(anon.nested.members), 2)
+
+    def test_struct_with_anonymous_bitfield(self):
+        content = '''
+        struct Bf {
+            int a : 3;
+            int : 5;
+            int b : 4;
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        self.assertIsInstance(sdef, StructDef)
+        self.assertEqual(len(sdef.members), 3)
+        self.assertIsNone(sdef.members[1].name)
+        self.assertTrue(sdef.members[1].is_bitfield)
+        self.assertEqual(sdef.members[1].bit_size, 5)
 
     def test_nested_struct_multi_dim_array(self):
         content = '''

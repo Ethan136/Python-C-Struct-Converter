@@ -49,7 +49,7 @@ def _extract_array_dims(name_token):
 
 def _parse_bitfield_declaration(line: str):
     """Parse a bit field declaration and return a member dict or ``None``."""
-    match = re.match(r"(.+?)\s+([\w\[\]]+)\s*:\s*(\d+)$", line)
+    match = re.match(r"(.+?)\s+(?:([\w\[\]]+)\s*)?:\s*(\d+)$", line)
     if not match:
         return None
     type_str, name_token, bits = match.groups()
@@ -58,7 +58,10 @@ def _parse_bitfield_declaration(line: str):
         return None  # pointer bitfields not supported
     if clean_type not in TYPE_INFO:
         return None
-    name, dims = _extract_array_dims(name_token)
+    name = None
+    dims = []
+    if name_token:
+        name, dims = _extract_array_dims(name_token)
     member = {
         "type": clean_type,
         "name": name,
