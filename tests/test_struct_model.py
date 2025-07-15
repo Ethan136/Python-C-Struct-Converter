@@ -952,5 +952,18 @@ class TestStructModelXMLDriven(unittest.TestCase):
                         self.assertEqual(str(found['value']), str(expect['value']))
 
 
+class TestParseHexDataArray(unittest.TestCase):
+    """Verify parse_hex_data handles array layouts."""
+
+    def test_parse_hex_data_array(self):
+        model = StructModel()
+        members = [{"type": "int", "name": "arr", "array_dims": [3, 2]}]
+        model.layout, model.total_size, model.struct_align = calculate_layout(members)
+        hex_data = "".join(f"{i:08x}" for i in range(6))
+        result = model.parse_hex_data(hex_data, "big")
+        arr_entry = next(item for item in result if item["name"] == "arr")
+        self.assertEqual(arr_entry["value"], list(range(6)))
+
+
 if __name__ == "__main__":
     unittest.main() 
