@@ -319,6 +319,22 @@ class TestCalculateLayout(unittest.TestCase):
         self.assertEqual(total_size, 4)
         self.assertEqual(max_alignment, 4)
 
+    def test_anonymous_bitfield_layout(self):
+        members = [
+            {"type": "int", "name": "a", "is_bitfield": True, "bit_size": 3},
+            {"type": "int", "name": None, "is_bitfield": True, "bit_size": 5},
+            {"type": "int", "name": "b", "is_bitfield": True, "bit_size": 4},
+        ]
+        layout, total_size, max_alignment = calculate_layout(members)
+        self.assertEqual(len(layout), 3)
+        self.assertIsNone(layout[1]["name"])
+        self.assertEqual(layout[1]["bit_offset"], 3)
+        for item in layout:
+            self.assertEqual(item["offset"], 0)
+            self.assertEqual(item["size"], 4)
+        self.assertEqual(total_size, 4)
+        self.assertEqual(max_alignment, 4)
+
     def test_padding_layout_fields(self):
         """Test that padding and final padding have correct bitfield-related fields."""
         members = [("char", "a"), ("int", "b"), ("char", "c")]
@@ -630,6 +646,27 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(result[0]["value"], "1")
         self.assertEqual(result[1]["name"], "value2")
         self.assertEqual(result[1]["value"], "2")
+
+    def test_parse_hex_data_with_anonymous_bitfield(self):
+        content = '''
+        struct Bf {
+            int a : 3;
+            int : 5;
+            int b : 4;
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        layout, total, _ = calculate_layout(sdef.members)
+        self.model.layout = layout
+        self.model.total_size = total
+        hex_data = "01050000"  # little endian value with a=1, b=5
+        result = self.model.parse_hex_data(hex_data, "little")
+        self.assertEqual(result[0]["name"], "a")
+        self.assertEqual(result[0]["value"], "1")
+        self.assertIsNone(result[1]["name"])
+        self.assertEqual(result[1]["value"], "0")
+        self.assertEqual(result[2]["name"], "b")
+        self.assertEqual(result[2]["value"], "5")
     
     def test_struct_a_with_8byte_hex_units(self):
         """Test struct A { char s; long long val; } with 8-byte hex units."""
