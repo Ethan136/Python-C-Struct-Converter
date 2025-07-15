@@ -11,6 +11,12 @@
 3. `StructModel` 與現有測試均假設所有成員在同一層級。
 4. 文件與測試 (`tests/README.md`、`STRUCT_PARSING.md`) 皆標示不支援 nested struct。
 
+## 主要修改模組
+- `src/model/struct_parser.py`：遞迴解析巢狀 `struct`，於 `MemberDef.nested` 儲存 `StructDef` 物件。
+- `src/model/layout.py`：`StructLayoutCalculator._process_regular_member` 需能展開內嵌成員並處理對齊。
+- `src/model/struct_model.py`：`parse_hex_data` 在讀取 layout 時支援以 `.` 分隔的欄位名稱。
+- 測試與範例檔需新增 nested struct 用的 `.h` 檔案。
+
 ## TDD 實作規劃
 以下步驟皆遵循 **Red → Green → Refactor** 流程。
 
@@ -50,6 +56,12 @@
 2. **實作支援**：
    - `StructModel.parse_hex_data` 在處理 layout 時本身已依序讀取展開後的欄位，若 layout 計算正確，此處僅需確保欄位名稱包含 `.` 時仍可正確處理。
 3. **重跑測試**，確認解析結果正確。
+
+## 新增/調整的測試檔案
+- `tests/data/test_nested_struct.h`：範例巢狀結構檔案供單元測試載入。
+- `tests/test_struct_parser_v2.py`：新增 nested struct 解析測試案例。
+- `tests/test_struct_model.py`：新增 layout 計算測試 `test_calculate_layout_nested`。
+- `tests/test_struct_model_integration.py`：新增 `test_parse_hex_data_nested` 驗證整合流程。
 
 ### 4. 文件與限制
 1. 更新 `docs/architecture/STRUCT_PARSING.md` 與 `tests/README.md`，描述 nested struct 支援範圍及限制：
