@@ -350,6 +350,34 @@ class TestCalculateLayout(unittest.TestCase):
         self.assertEqual(total, 12)
         self.assertEqual(align, 4)
 
+    def test_calculate_layout_nested_array(self):
+        content = '''
+        struct Outer {
+            int a;
+            struct Inner {
+                char b;
+                int c;
+            } inner_arr[2];
+        };
+        '''
+        sdef = parse_struct_definition_ast(content)
+        layout, total, align = calculate_layout(sdef.members)
+        names = [item.name for item in layout]
+        self.assertEqual(
+            names,
+            [
+                "a",
+                "inner_arr[0].b",
+                "(padding)",
+                "inner_arr[0].c",
+                "inner_arr[1].b",
+                "(padding)",
+                "inner_arr[1].c",
+            ],
+        )
+        self.assertEqual(total, 20)
+        self.assertEqual(align, 4)
+
 
 class TestStructModel(unittest.TestCase):
     """Test cases for StructModel class."""

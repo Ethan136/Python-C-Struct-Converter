@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import List, Tuple, Union, Optional
+import itertools
 from abc import ABC, abstractmethod
 
 
@@ -175,24 +176,53 @@ class StructLayoutCalculator(BaseLayoutCalculator):
             if nested_align > self.max_alignment:
                 self.max_alignment = nested_align
             self._add_padding_if_needed(nested_align)
-            for item in nested_layout:
-                if item.type == "padding":
-                    new_name = item.name
-                else:
-                    new_name = f"{member_name}.{item.name}" if item.name else item.name
-                self.layout.append(
-                    LayoutItem(
-                        name=new_name,
-                        type=item.type,
-                        size=item.size,
-                        offset=self.current_offset + item.offset,
-                        is_bitfield=item.is_bitfield,
-                        bit_offset=item.bit_offset,
-                        bit_size=item.bit_size,
-                        array_dims=item.array_dims,
+
+            if array_dims:
+                total_elems = 1
+                for d in array_dims:
+                    total_elems *= d
+                index_ranges = [range(d) for d in array_dims]
+                for idx, idx_tuple in enumerate(itertools.product(*index_ranges)):
+                    base_offset = self.current_offset + idx * nested_size
+                    idx_str = "".join(f"[{i}]" for i in idx_tuple)
+                    for item in nested_layout:
+                        if item.type == "padding":
+                            new_name = item.name
+                        else:
+                            prefix = f"{member_name}{idx_str}"
+                            new_name = f"{prefix}.{item.name}" if item.name else item.name
+                        self.layout.append(
+                            LayoutItem(
+                                name=new_name,
+                                type=item.type,
+                                size=item.size,
+                                offset=base_offset + item.offset,
+                                is_bitfield=item.is_bitfield,
+                                bit_offset=item.bit_offset,
+                                bit_size=item.bit_size,
+                                array_dims=item.array_dims,
+                            )
+                        )
+                self.current_offset += nested_size * total_elems
+            else:
+                for item in nested_layout:
+                    if item.type == "padding":
+                        new_name = item.name
+                    else:
+                        new_name = f"{member_name}.{item.name}" if item.name else item.name
+                    self.layout.append(
+                        LayoutItem(
+                            name=new_name,
+                            type=item.type,
+                            size=item.size,
+                            offset=self.current_offset + item.offset,
+                            is_bitfield=item.is_bitfield,
+                            bit_offset=item.bit_offset,
+                            bit_size=item.bit_size,
+                            array_dims=item.array_dims,
+                        )
                     )
-                )
-            self.current_offset += nested_size
+                self.current_offset += nested_size
             return
 
         if array_dims:

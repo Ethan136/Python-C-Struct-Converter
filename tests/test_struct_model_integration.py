@@ -246,6 +246,42 @@ class TestStructModel(unittest.TestCase):
             self.assertEqual(values, ['1', '65', '2'])
         finally:
             os.unlink(file_path)
+
+    def test_parse_hex_data_nested_array(self):
+        """Test parsing hex data for nested struct arrays."""
+        content = '''
+        struct Outer {
+            int a;
+            struct Inner {
+                char b;
+                int c;
+            } inner_arr[2];
+        };
+        '''
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.h') as f:
+            f.write(content)
+            file_path = f.name
+        try:
+            self.model.load_struct_from_file(file_path)
+            hex_data = '0100000041000000020000004200000003000000'
+            result = self.model.parse_hex_data(hex_data, 'little')
+            names = [item['name'] for item in result]
+            self.assertEqual(
+                names,
+                [
+                    'a',
+                    'inner_arr[0].b',
+                    '(padding)',
+                    'inner_arr[0].c',
+                    'inner_arr[1].b',
+                    '(padding)',
+                    'inner_arr[1].c',
+                ],
+            )
+            values = [item['value'] for item in result if item['name'] != '(padding)']
+            self.assertEqual(values, ['1', '65', '2', '66', '3'])
+        finally:
+            os.unlink(file_path)
     
     def test_parse_hex_data_padding(self):
         """Test parsing hex data with padding."""

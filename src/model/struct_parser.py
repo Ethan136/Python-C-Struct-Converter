@@ -118,8 +118,14 @@ def parse_member_line_v2(line: str) -> Optional[MemberDef]:
         struct_def = parse_struct_definition_ast(line + ";")
         if struct_def:
             after = line[line.rfind("}") + 1 :].strip()
-            member_name = after.split()[0] if after else None
-            return MemberDef(type="struct", name=member_name, nested=struct_def)
+            after = after.rstrip(";")
+            name, dims = _extract_array_dims(after) if after else (None, [])
+            return MemberDef(
+                type="struct",
+                name=name,
+                array_dims=dims,
+                nested=struct_def,
+            )
     return None
 
 
