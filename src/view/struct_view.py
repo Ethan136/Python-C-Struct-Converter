@@ -42,11 +42,15 @@ def create_scrollable_tab_frame(parent):
 class StructView(tk.Tk):
     def __init__(self, presenter=None):
         super().__init__()
+        self.member_entries = []  # 每個 row: (name_entry, type_menu, bit_entry, ...)
+        self._focus_new_member_idx = None  # 新增欄位自動 focus 用
         self.presenter = presenter
         self.title("C Struct GUI")
         self.geometry("1200x800")
 
         self._create_tab_control()
+        # 在手動設定Tab建立UI
+        self._create_manual_struct_frame(self.tab_manual)
 
     def _create_tab_control(self):
         self.tab_control = ttk.Notebook(self)
@@ -267,14 +271,17 @@ class StructView(tk.Tk):
         tk.Label(self.member_frame, text=str(idx + 1)).grid(row=row, column=0, padx=2, pady=1)
 
         name_var = tk.StringVar(value=member.get("name", ""))
-        tk.Entry(self.member_frame, textvariable=name_var, width=10).grid(row=row, column=1, padx=2, pady=1)
+        name_entry = tk.Entry(self.member_frame, textvariable=name_var, width=10)
+        name_entry.grid(row=row, column=1, padx=2, pady=1)
 
         type_var = tk.StringVar(value=member.get("type", ""))
         type_options = self._get_type_options(member.get("bit_size", 0) > 0)
-        tk.OptionMenu(self.member_frame, type_var, *type_options).grid(row=row, column=2, padx=2, pady=1)
+        type_menu = tk.OptionMenu(self.member_frame, type_var, *type_options)
+        type_menu.grid(row=row, column=2, padx=2, pady=1)
 
         bit_var = tk.IntVar(value=member.get("bit_size", 0))
-        tk.Entry(self.member_frame, textvariable=bit_var, width=6).grid(row=row, column=3, padx=2, pady=1)
+        bit_entry = tk.Entry(self.member_frame, textvariable=bit_var, width=6)
+        bit_entry.grid(row=row, column=3, padx=2, pady=1)
 
         size_val = name2size.get(member.get("name", ""), "-")
         size_label = tk.Label(self.member_frame, text=size_val)
@@ -296,10 +303,14 @@ class StructView(tk.Tk):
         member["type_var"] = type_var
         member["bit_var"] = bit_var
 
+        # 記錄本 row 的 widgets
+        self.member_entries.append((name_entry, type_menu, bit_entry, size_label, op_frame))
+
     def _render_member_table(self):
         # 清空現有表格
         for widget in self.member_frame.winfo_children():
             widget.destroy()
+        self.member_entries = []  # 清空 row widget 記錄
         # Member 編輯表格
         if self.members:
             self._build_member_header(True)
@@ -310,6 +321,14 @@ class StructView(tk.Tk):
             tk.Label(self.member_frame, text="無成員資料", fg="gray").grid(row=0, column=0, columnspan=6, pady=10)
         # 更新下方標準 struct layout treeview
         self._update_manual_layout_tree()
+        # 若有 focus_new_member_idx，則自動 focus
+        if self._focus_new_member_idx is not None:
+            try:
+                name_entry = self.member_entries[self._focus_new_member_idx][0]
+                name_entry.focus_set()
+            except Exception:
+                pass
+            self._focus_new_member_idx = None
 
     def _update_manual_layout_tree(self):
         # 計算 layout
@@ -352,6 +371,7 @@ class StructView(tk.Tk):
 
     def _add_member(self):
         self.members.append({"name": "", "type": "int", "bit_size": 0})
+        self._focus_new_member_idx = len(self.members) - 1  # 新增 index
         if self.presenter:
             self.presenter.invalidate_cache()
         self._render_member_table()

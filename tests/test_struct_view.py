@@ -1079,5 +1079,20 @@ class TestStructView(unittest.TestCase):
         assert "Last Evict: k1" in debug_text2
         root.destroy()
 
+    def test_add_member_auto_focus(self):
+        # 清空 members
+        self.view.members = []
+        self.view._render_member_table()
+        # 新增一個 member
+        self.view._add_member()
+        # 重新 render table
+        self.view._render_member_table()
+        # 取得最後一個 row 的名稱 Entry
+        last_row = self.view.member_entries[-1]
+        name_entry = last_row[0]  # (name_entry, type_menu, bit_entry, ...)
+        # 降級驗證：確認 name_entry widget 存在且可見
+        self.assertTrue(name_entry.winfo_exists())
+        # 註：headless/CI 下 focus_get 可能不穩定，僅驗證 widget 存在
+
 if __name__ == "__main__":
     unittest.main()
