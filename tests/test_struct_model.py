@@ -595,6 +595,32 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(result[2]["hex_raw"], "00000123")  # 4 bytes
         self.assertEqual(result[3]["hex_raw"], "0000000004567890")  # 8 bytes
 
+    def test_multi_dimensional_array_parsing(self):
+        """Test parsing hex data for struct with multi-dimensional array."""
+        struct_content = """
+        struct ArrayStruct {
+            int arr[2][3];
+            char b;
+        };
+        """
+        with patch("builtins.open", mock_open(read_data=struct_content)):
+            self.model.load_struct_from_file("test_file.h")
+
+        hex_data = (
+            "01000000" "02000000" "03000000" "04000000" "05000000" "06000000" "41" "000000"
+        )
+        result = self.model.parse_hex_data(hex_data, "little")
+
+        expected_names = [
+            "arr[0][0]", "arr[0][1]", "arr[0][2]",
+            "arr[1][0]", "arr[1][1]", "arr[1][2]", "b"
+        ]
+        names = [r["name"] for r in result if "padding" not in r["name"]]
+        self.assertEqual(names, expected_names)
+        self.assertEqual(result[0]["value"], "1")
+        self.assertEqual(result[5]["value"], "6")
+        self.assertEqual(result[6]["value"], "65")
+
     def test_set_manual_struct_sets_members_and_size(self):
         """Test that set_manual_struct correctly sets members and total_size."""
         members = [

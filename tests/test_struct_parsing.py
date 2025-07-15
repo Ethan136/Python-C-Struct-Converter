@@ -72,6 +72,23 @@ class TestParseStructDefinition(unittest.TestCase):
         self.assertEqual(len(members), 2)
         self.assertEqual(members[0], ("pointer", "ptr"))
         self.assertEqual(members[1], ("pointer", "str"))
+
+    def test_struct_with_multi_dimensional_array(self):
+        """Test parsing struct with multi-dimensional array."""
+        content = """
+        struct ArrayStruct {
+            int arr[2][3];
+            char b;
+        };
+        """
+        struct_name, members = parse_struct_definition(content)
+        self.assertEqual(struct_name, "ArrayStruct")
+        expected_names = [
+            "arr[0][0]", "arr[0][1]", "arr[0][2]",
+            "arr[1][0]", "arr[1][1]", "arr[1][2]", "b"
+        ]
+        parsed_names = [m[1] if isinstance(m, tuple) else m.get("name") for m in members]
+        self.assertEqual(parsed_names, expected_names)
     
     def test_struct_with_unsigned_types(self):
         """Test parsing struct with unsigned types."""
@@ -197,6 +214,19 @@ class TestLayoutCalculator(unittest.TestCase):
         non_bf = [item for item in layout if not item.get("is_bitfield") and item["type"] != "padding"]
         self.assertEqual(len(non_bf), 1)
         self.assertEqual(non_bf[0]["name"], "c")
+
+    def test_multi_dimensional_array_layout(self):
+        """Test layout calculation for struct with multi-dimensional array."""
+        members = [("int", f"arr[{i}][{j}]") for i in range(2) for j in range(3)]
+        members.append(("char", "b"))
+        layout, total_size, alignment = self.calculator.calculate(members)
+
+        self.assertEqual(total_size, 28)
+        self.assertEqual(alignment, 4)
+        offsets = [item["offset"] for item in layout if item["type"] != "padding"]
+        self.assertEqual(offsets[:6], [0, 4, 8, 12, 16, 20])
+        self.assertEqual(layout[-2]["name"], "b")
+        self.assertEqual(layout[-2]["offset"], 24)
 
 class TestLayoutItemDataclass(unittest.TestCase):
     """Ensure calculate_layout returns LayoutItem objects."""
