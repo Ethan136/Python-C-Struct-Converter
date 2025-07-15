@@ -434,3 +434,32 @@ last_time = presenter.get_last_layout_time()
 ---
 
 > 建議依上述順序逐步 TDD 實作，確保分層、彈性、可維護性同步提升。 
+
+## v4.2+ UI/邏輯分離與 Observer Pattern 重構開發流程（2024/07）
+
+### 1. Presenter public 方法回傳純資料（低風險）
+- 移除所有 `self.view.xxx` 呼叫，改為 return dict/list 結果。
+- 先從純資料方法（如 layout/解析）著手，逐步推廣至所有 public 方法。
+- TDD：mock View 驗證 Presenter 回傳資料正確。
+
+### 2. 統一錯誤/狀態回傳格式
+- Presenter 所有 public 方法遇到錯誤時，return 統一格式（如 `{type: 'error', message: ...}`）。
+- View 根據 type 決定顯示/彈窗/狀態。
+- TDD：異常情境下 View 能正確顯示錯誤。
+
+### 3. View callback 統一只處理顯示
+- View 只根據 Presenter 回傳資料決定 UI 呈現，不再負責邏輯判斷。
+- 減少 View 內部 if/else，提升可維護性。
+
+### 4. Observer pattern 實作（中風險）
+- Presenter 提供 observer 註冊/通知介面，View 註冊自身為 observer。
+- members/size 變動時，Presenter 自動通知 observer，View 被動更新。
+- TDD：模擬多種變動情境，驗證 observer 通知與 cache 失效正確。
+
+### 5. 多視窗/多 Presenter 支援（高風險/進階）
+- 若有多個 View/Presenter 實例，確保 observer 註冊/通知機制正確。
+- TDD：多 observer 註冊、移除、通知流程。
+
+---
+
+> 建議依上述順序逐步 TDD 實作，每步驟皆有明確測試與驗證指標，確保分層、彈性、可維護性同步提升。 
