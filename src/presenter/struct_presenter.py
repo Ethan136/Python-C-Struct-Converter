@@ -24,6 +24,8 @@ class StructPresenter:
         self._cache_hits = 0
         self._cache_misses = 0
         self._last_layout_time = None
+        self._last_hit_key = None  # 新增：記錄最近命中 key
+        self._last_evict_key = None  # 新增：記錄最近淘汰 key
         # Observer pattern: 註冊自己為 model observer
         if hasattr(self.model, "add_observer"):
             self.model.add_observer(self)
@@ -199,6 +201,7 @@ class StructPresenter:
             self._cache_hits += 1
             # LRU: move to end
             self._layout_cache.move_to_end(cache_key)
+            self._last_hit_key = cache_key  # 新增
             print(f"[DEBUG] cache hit: {cache_key}")
             return self._layout_cache[cache_key]
         try:
@@ -214,6 +217,7 @@ class StructPresenter:
             self._layout_cache.move_to_end(cache_key)
             if len(self._layout_cache) > self._lru_cache_size:
                 evicted = self._layout_cache.popitem(last=False)
+                self._last_evict_key = evicted[0]  # 新增
                 print(f"[DEBUG] evicted: {evicted[0]}")
         self._cache_misses += 1
         print(f"[DEBUG] cache keys after: {list(self._layout_cache.keys())}")
@@ -238,3 +242,16 @@ class StructPresenter:
         remaining_bits = max(0, total_bits - used_bits)
         remaining_bytes = remaining_bits // 8
         return remaining_bits, remaining_bytes
+
+    def get_cache_keys(self):
+        """回傳目前 LRU cache 的所有 key（list）。"""
+        return list(self._layout_cache.keys())
+
+    def get_lru_state(self):
+        """回傳 LRU cache 狀態 dict，包含 capacity, current_size, last_hit, last_evict。"""
+        return {
+            "capacity": self._lru_cache_size,
+            "current_size": len(self._layout_cache),
+            "last_hit": self._last_hit_key,
+            "last_evict": self._last_evict_key
+        }

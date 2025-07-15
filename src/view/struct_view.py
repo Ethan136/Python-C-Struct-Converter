@@ -720,6 +720,15 @@ class StructView(tk.Tk):
             hit, miss = self.presenter.get_cache_stats()
             last_time = self.presenter.get_last_layout_time()
             text = f"Cache Hit: {hit}\nCache Miss: {miss}\nLast Layout Time: {last_time}"
+            # 額外顯示 LRU cache 狀態
+            if hasattr(self.presenter, "get_cache_keys") and hasattr(self.presenter, "get_lru_state"):
+                keys = self.presenter.get_cache_keys()
+                lru = self.presenter.get_lru_state()
+                text += f"\nCache Keys: {keys}"
+                text += f"\nLRU Capacity: {lru.get('capacity')}"
+                text += f"\nCurrent Size: {lru.get('current_size')}"
+                text += f"\nLast Hit: {lru.get('last_hit')}"
+                text += f"\nLast Evict: {lru.get('last_evict')}"
         else:
             text = "No presenter stats available."
         self.debug_info_label.config(text=text)

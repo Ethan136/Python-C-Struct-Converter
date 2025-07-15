@@ -1037,5 +1037,47 @@ class TestStructView(unittest.TestCase):
         assert view.presenter is presenter
         root.destroy()
 
+    def test_debug_tab_shows_lru_cache_state(self):
+        import tkinter as tk
+        from unittest.mock import MagicMock
+        from view.struct_view import StructView
+        root = tk.Tk()
+        presenter = MagicMock()
+        presenter.get_cache_stats.return_value = (10, 2)
+        presenter.get_last_layout_time.return_value = 0.005
+        # 模擬 LRU cache 狀態
+        presenter.get_cache_keys.return_value = ["k1", "k2", "k3"]
+        presenter.get_lru_state.return_value = {
+            "capacity": 3,
+            "current_size": 3,
+            "last_hit": "k2",
+            "last_evict": "k0"
+        }
+        view = StructView(presenter=presenter)
+        view._create_debug_tab()
+        # 擴充 debug tab 顯示 LRU 狀態
+        # 假設 view 有 refresh_debug_info() 會顯示 cache keys/lru 狀態
+        view.refresh_debug_info()
+        debug_text = view.debug_info_label.cget("text")
+        assert "Cache Keys: ['k1', 'k2', 'k3']" in debug_text
+        assert "LRU Capacity: 3" in debug_text
+        assert "Current Size: 3" in debug_text
+        assert "Last Hit: k2" in debug_text
+        assert "Last Evict: k0" in debug_text
+        # 狀態變動再刷新
+        presenter.get_cache_keys.return_value = ["k2", "k3", "k4"]
+        presenter.get_lru_state.return_value = {
+            "capacity": 3,
+            "current_size": 3,
+            "last_hit": "k4",
+            "last_evict": "k1"
+        }
+        view.refresh_debug_info()
+        debug_text2 = view.debug_info_label.cget("text")
+        assert "Cache Keys: ['k2', 'k3', 'k4']" in debug_text2
+        assert "Last Hit: k4" in debug_text2
+        assert "Last Evict: k1" in debug_text2
+        root.destroy()
+
 if __name__ == "__main__":
     unittest.main()
