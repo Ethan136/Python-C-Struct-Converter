@@ -349,6 +349,34 @@ def test_large_struct_performance():
 
 > 本文件已展開所有細節主題，包含 cache 算法、流程圖、異常分支、效能分級、測試規範、CI/CD 報告與文件同步機制，確保開發流程高效、可追蹤、可維護。 
 
+## v4.1 Presenter 快取與效能統計（2024/07）
+
+### Cache 統計介面
+- `get_cache_stats()`：回傳 (hit, miss) 統計，供效能分析與測試。
+- `reset_cache_stats()`：重設統計。
+- TDD 覆蓋：hit/miss 行為、reset、異常情境（空、極大、格式錯誤）皆有自動化測試。
+
+### Layout 計算效能 hook
+- `get_last_layout_time()`：回傳最近一次 layout 計算（非 cache）所花秒數（float）。
+- 僅在 cache miss 時更新，cache hit 不變。
+- TDD 覆蓋：cache miss/hit 時效能統計正確，所有測試通過。
+
+### 介面範例
+```python
+presenter = StructPresenter(model)
+layout = presenter.compute_member_layout(members, total_size)
+hits, misses = presenter.get_cache_stats()
+last_time = presenter.get_last_layout_time()
+```
+
+### 測試覆蓋
+- `tests/test_struct_presenter.py`：
+  - cache hit/miss 統計
+  - cache 行為異常/極端 case
+  - layout 計算效能 hook
+- `tests/test_struct_view.py`：
+  - GUI 所有操作觸發 cache 失效
+
 ## 八、進階優化主題與 TDD 執行順序（2024/07）
 
 ### 1. Cache hit/miss 統計與 log（最小改動）
