@@ -348,3 +348,39 @@ def test_large_struct_performance():
 ---
 
 > 本文件已展開所有細節主題，包含 cache 算法、流程圖、異常分支、效能分級、測試規範、CI/CD 報告與文件同步機制，確保開發流程高效、可追蹤、可維護。 
+
+## 八、進階優化主題與 TDD 執行順序（2024/07）
+
+### 1. Cache hit/miss 統計與 log（最小改動）
+- 目標：在 presenter 加入 cache hit/miss 統計，log 到 console 或測試報告。
+- TDD 測試：驗證 cache hit/miss 次數與預期一致。
+- 效益：可量化 cache 效能，便於回歸監控。
+
+### 2. Presenter/View cache 介面 docstring/註解補強
+- 目標：所有 cache 相關方法（如 invalidate_cache、compute_member_layout）皆有明確 docstring/註解。
+- TDD 測試：可用 doctest 或人工 review 驗證。
+- 效益：提升維護性與 mock/stub 一致性。
+
+### 3. Exception/Edge Case 測試
+- 目標：補充異常與極端 struct/bitfield 測試，確保 cache 不被污染。
+- TDD 測試：members 欄位缺失、型別錯誤、極大 struct、極端 bitfield 組合等。
+- 效益：提升健壯性。
+
+### 4. UI/邏輯分離（Presenter 回傳純資料，View 負責顯示）
+- 目標：Presenter 不直接依賴 Tkinter 物件，回傳純資料，View 負責顯示。
+- TDD 測試：mock View 驗證 presenter 回傳資料正確。
+- 效益：提升可測性、可維護性。
+
+### 5. Observer pattern/自動 cache 失效（進階）
+- 目標：用 observer/callback pattern 讓 presenter 自動監控 members/size 變動，減少 view 重複呼叫。
+- TDD 測試：模擬多種變動情境，驗證 cache 自動失效。
+- 效益：減少耦合，提升彈性。
+
+### 6. Cache 清理策略（如 LRU，最大改動）
+- 目標：實作 LRU cache 或定期清理，避免記憶體佔用過高。
+- TDD 測試：大量 struct 操作下 cache 不會無限增長。
+- 效益：提升大專案可擴展性。
+
+---
+
+> 建議依上述順序逐步 TDD 實作，每步驟皆有明確測試與驗證指標，確保效能、正確性與可維護性同步提升。 
