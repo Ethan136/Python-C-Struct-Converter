@@ -126,6 +126,18 @@ def parse_member_line_v2(line: str) -> Optional[MemberDef]:
                 array_dims=dims,
                 nested=struct_def,
             )
+    if line.startswith("union") and "{" in line and "}" in line:
+        union_def = parse_union_definition_ast(line + ";")
+        if union_def:
+            after = line[line.rfind("}") + 1 :].strip()
+            after = after.rstrip(";")
+            name, dims = _extract_array_dims(after) if after else (None, [])
+            return MemberDef(
+                type="union",
+                name=name,
+                array_dims=dims,
+                nested=union_def,
+            )
     return None
 
 
