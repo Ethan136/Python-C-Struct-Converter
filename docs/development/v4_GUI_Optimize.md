@@ -556,3 +556,38 @@ last_time = presenter.get_last_layout_time()
    - 測試：多視圖/多 observer 測試。
 
 > 每步驟皆以 TDD 驅動，先設計/補齊對應單元測試與整合測試，確保每次 commit 都可回溯、驗證。 
+
+# 進階 LRU Cache 策略與自動清空規劃
+
+本節補充 v4 GUI 優化的進階 LRU cache 策略與自動清空設計，包含動態容量調整、定時自動清空、整合測試等，確保 cache 行為靈活且可監控。
+
+## 1. 動態 LRU Cache 容量調整
+- Presenter 層新增 `set_lru_cache_size(size: int)`，可於執行時動態調整 cache 容量。
+- 當容量變小時，會自動淘汰最舊 cache 項目，確保不超過新容量。
+- 支援 `get_lru_cache_size()` 查詢目前容量。
+- 可由 config、環境變數或 UI 設定 cache 容量。
+- **測試規劃**：  
+  - 設定容量變小時，cache 自動淘汰。
+  - 設定容量變大時，cache 不丟失現有項目。
+  - 設定容量為 0 時，cache 不儲存任何項目。
+  - 多次動態調整容量，cache 行為正確。
+
+## 2. 定時自動清空 Cache
+- Presenter 層新增 `enable_auto_cache_clear(interval_sec: int)`，可定時自動清空 cache。
+- 新增 `disable_auto_cache_clear()` 停用自動清空，`is_auto_cache_clear_enabled()` 查詢狀態。
+- Timer thread-safe，避免重複啟動或殭屍 timer。
+- 可由 UI/Debug tab 控制啟用/停用與顯示狀態。
+- **測試規劃**：  
+  - 啟用自動清空後，cache 會定時被清空。
+  - 停用自動清空後，cache 不再自動清空。
+  - 多次啟用/停用，狀態正確且不殭屍。
+  - thread-safe 行為驗證。
+
+## 3. 整合與回歸測試
+- Presenter 層整合 cache 行為、容量調整、自動清空、observer pattern。
+- Debug tab 顯示 cache 容量與自動清空狀態，可選擇加 UI 控制。
+- **測試規劃**：  
+  - 動態調整容量與自動清空同時作用時，cache 行為正確。
+  - Debug tab 顯示資訊正確。
+
+--- 
