@@ -578,16 +578,32 @@ last_time = presenter.get_last_layout_time()
 - Timer thread-safe，避免重複啟動或殭屍 timer。
 - 可由 UI/Debug tab 控制啟用/停用與顯示狀態。
 - **測試規劃**：  
-  - 啟用自動清空後，cache 會定時被清空。
-  - 停用自動清空後，cache 不再自動清空。
-  - 多次啟用/停用，狀態正確且不殭屍。
-  - thread-safe 行為驗證。
 
-## 3. 整合與回歸測試
-- Presenter 層整合 cache 行為、容量調整、自動清空、observer pattern。
-- Debug tab 顯示 cache 容量與自動清空狀態，可選擇加 UI 控制。
-- **測試規劃**：  
-  - 動態調整容量與自動清空同時作用時，cache 行為正確。
-  - Debug tab 顯示資訊正確。
 
---- 
+## 移除 MyStruct Tab Debug Bytes 區塊
+
+### 1. 需求概述
+- 簡化介面，僅在載入 `.h` 檔或 Debug Tab 顯示 Debug Bytes
+- MyStruct 頁面不再建立 `manual_debug_text`
+
+### 2. 影響檔案
+- `src/view/struct_view.py`：移除 `manual_debug_frame`、`manual_debug_text` 與相關方法
+- `tests/test_struct_view.py`：刪除或調整所有存取 `manual_debug_text` 的測試
+- `tests/README.md` 等文件同步更新描述
+
+### 3. TDD 流程
+1. **修改測試**：
+   - 移除 `test_manual_struct_hex_input_and_parse_debug` 等驗證 Debug Bytes 的斷言
+   - 新增 `test_manual_struct_no_debug_widget` 確認 `StructView` 未建立 `manual_debug_text`
+2. **調整程式碼**：
+   - 刪除建立 Debug Bytes 區塊的 UI 代碼
+   - 移除 `show_manual_debug_bytes` 及 `_on_parse_manual_hex` 內對此欄位的使用
+   - 版面改回單欄顯示，必要時更新 grid 計算
+3. **回歸測試**：
+   - 執行 `run_all_tests.py` 確認所有測試通過
+   - 手動檢查 Debug Tab 仍能顯示 debug bytes
+
+### 4. 提交順序
+1. 調整/新增測試
+2. 更新 `StructView` 程式碼
+3. 更新相關文件
