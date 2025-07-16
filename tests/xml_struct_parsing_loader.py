@@ -1,4 +1,3 @@
-import xml.etree.ElementTree as ET
 from tests.base_xml_test_loader import BaseXMLTestLoader
 
 class StructParsingXMLTestLoader(BaseXMLTestLoader):
