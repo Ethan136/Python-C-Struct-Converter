@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<struct_model_integration_tests>
+    <test_case name="load_struct_valid" description="Load struct from file">
+        <struct_definition><![CDATA[
+            struct TestStruct {
+                char a;
+                int b;
+                long long c;
+            };
+        ]]></struct_definition>
+        <expected_total_size>16</expected_total_size>
+        <expected_struct_align>8</expected_struct_align>
+        <expected_layout_len>4</expected_layout_len>
+    </test_case>
+    <test_case name="load_struct_invalid" description="Invalid struct raises error">
+        <struct_definition><![CDATA[This is not a struct definition]]></struct_definition>
+        <expected_exception>ValueError</expected_exception>
+    </test_case>
+    <test_case name="parse_hex_simple" description="Parse simple hex data" endianness="little">
+        <struct_definition><![CDATA[
+            struct SimpleStruct {
+                char a;
+                int b;
+            };
+        ]]></struct_definition>
+        <input_data><hex>1200000001000000</hex></input_data>
+        <expected_results>
+            <member name="a" value="18" hex_raw="12"/>
+            <member name="(padding)" value="-" hex_raw="000000"/>
+            <member name="b" value="1" hex_raw="01000000"/>
+        </expected_results>
+    </test_case>
+    <test_case name="parse_hex_big_endian" description="Parse big endian data" endianness="big">
+        <struct_definition><![CDATA[
+            struct EndianStruct {
+                char a;
+                int b;
+            };
+        ]]></struct_definition>
+        <input_data><hex>12345678</hex></input_data>
+        <expected_results>
+            <member name="a" value="0" hex_raw="00"/>
+            <member name="(padding)" value="-" hex_raw="000000"/>
+            <member name="b" value="305419896" hex_raw="12345678"/>
+        </expected_results>
+    </test_case>
+    <test_case name="parse_hex_bitfields" description="Parse bitfield struct" endianness="little">
+        <struct_definition><![CDATA[
+            struct BitFieldStruct {
+                int a : 1;
+                int b : 2;
+                char c;
+            };
+        ]]></struct_definition>
+        <input_data><hex>07000000ff000000</hex></input_data>
+        <expected_results>
+            <member name="a" value="1" hex_raw="07000000"/>
+            <member name="b" value="3" hex_raw="07000000"/>
+            <member name="c" value="255" hex_raw="ff"/>
+            <member name="(final padding)" value="-" hex_raw="000000"/>
+        </expected_results>
+    </test_case>
+    <test_case name="parse_hex_bool_true" description="Parse boolean true" endianness="little">
+        <struct_definition><![CDATA[
+            struct BoolStruct {
+                bool flag;
+            };
+        ]]></struct_definition>
+        <input_data><hex>01</hex></input_data>
+        <expected_results>
+            <member name="flag" value="True" hex_raw="01"/>
+        </expected_results>
+    </test_case>
+    <test_case name="parse_hex_bool_false" description="Parse boolean false" endianness="little">
+        <struct_definition><![CDATA[
+            struct BoolStruct {
+                bool flag;
+            };
+        ]]></struct_definition>
+        <input_data><hex>00</hex></input_data>
+        <expected_results>
+            <member name="flag" value="False" hex_raw="00"/>
+        </expected_results>
+    </test_case>
+    <test_case name="parse_hex_pointer" description="Parse pointer value" endianness="little">
+        <struct_definition><![CDATA[
+            struct PointerStruct {
+                int* ptr;
+            };
+        ]]></struct_definition>
+        <input_data><hex>123456789ABCDEF0</hex></input_data>
+        <expected_results>
+            <member name="ptr" value="17356517385562371090" hex_raw="123456789abcdef0"/>
+        </expected_results>
+    </test_case>
+    <test_case name="parse_hex_padding" description="Parse with padding" endianness="little">
+        <struct_definition><![CDATA[
+            struct PaddingStruct {
+                char a;
+                int b;
+            };
+        ]]></struct_definition>
+        <input_data><hex>12345678</hex></input_data>
+        <expected_results>
+            <member name="a" value="0" hex_raw="00"/>
+            <member name="(padding)" value="-" hex_raw="000000"/>
+            <member name="b" value="2018915346" hex_raw="12345678"/>
+        </expected_results>
+    </test_case>
+    <test_case name="parse_hex_short_input" description="Parse short hex input padded" endianness="little">
+        <struct_definition><![CDATA[
+            struct ShortStruct {
+                int a;
+                long long b;
+            };
+        ]]></struct_definition>
+        <input_data><hex>12000000000000003400000000000000</hex></input_data>
+        <expected_results>
+            <member name="a" value="18" hex_raw="12000000"/>
+            <member name="(padding)" value="-" hex_raw="00000000"/>
+            <member name="b" value="52" hex_raw="3400000000000000"/>
+        </expected_results>
+    </test_case>
+</struct_model_integration_tests>
