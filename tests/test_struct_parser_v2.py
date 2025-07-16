@@ -15,29 +15,26 @@ from model.struct_parser import (
     StructDef,
 )
 from model.layout import LayoutCalculator
+from tests.xml_struct_parser_v2_loader import load_struct_parser_v2_tests
 
 class TestParseMemberLineV2(unittest.TestCase):
-    def test_regular_member(self):
-        m = parse_member_line_v2('int value')
-        self.assertIsInstance(m, MemberDef)
-        self.assertEqual(m.type, 'int')
-        self.assertEqual(m.name, 'value')
-        self.assertFalse(m.is_bitfield)
-        self.assertEqual(m.array_dims, [])
-        self.assertIsNone(m.nested)
+    @classmethod
+    def setUpClass(cls):
+        config_path = os.path.join(os.path.dirname(__file__), 'data',
+                                   'test_struct_parser_v2_config.xml')
+        cls.cases = load_struct_parser_v2_tests(config_path)
 
-    def test_pointer_member(self):
-        m = parse_member_line_v2('char* ptr')
-        self.assertEqual(m.type, 'pointer')
-        self.assertEqual(m.name, 'ptr')
-        self.assertFalse(m.is_bitfield)
-
-    def test_bitfield_member(self):
-        m = parse_member_line_v2('unsigned int flag : 3')
-        self.assertTrue(m.is_bitfield)
-        self.assertEqual(m.type, 'unsigned int')
-        self.assertEqual(m.name, 'flag')
-        self.assertEqual(m.bit_size, 3)
+    def test_member_cases(self):
+        for case in self.cases:
+            with self.subTest(name=case['name']):
+                m = parse_member_line_v2(case['line'])
+                self.assertIsInstance(m, MemberDef)
+                self.assertEqual(m.type, case['expected']['type'])
+                self.assertEqual(m.name, case['expected']['name'])
+                if 'is_bitfield' in case['expected']:
+                    self.assertEqual(m.is_bitfield, case['expected']['is_bitfield'])
+                if 'bit_size' in case['expected']:
+                    self.assertEqual(m.bit_size, case['expected']['bit_size'])
 
 class TestParseStructDefinitionV2(unittest.TestCase):
     def test_simple_struct(self):

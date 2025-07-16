@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<struct_parser_utils_tests>
+    <parse_member_line_cases>
+        <case name="regular_member">
+            <line>int value</line>
+            <expected return_type="tuple" type="int" name="value"/>
+        </case>
+        <case name="pointer_member">
+            <line>char* ptr</line>
+            <expected return_type="tuple" type="pointer" name="ptr"/>
+        </case>
+        <case name="bitfield_member">
+            <line>int flag : 3</line>
+            <expected return_type="dict" type="int" name="flag" is_bitfield="true" bit_size="3"/>
+        </case>
+        <case name="anonymous_bitfield_member" xfail="true">
+            <line>int : 3</line>
+            <expected return_type="dict" type="int" name="" is_bitfield="true" bit_size="3"/>
+        </case>
+        <case name="array_member_dims">
+            <line>short data[4][2]</line>
+            <expected return_type="dict" type="short" name="data" array_dims="4,2"/>
+        </case>
+    </parse_member_line_cases>
+    <extract_struct_body_cases>
+        <case name="simple_body_extraction">
+            <content><![CDATA[
+        struct Simple {
+            int a;
+            char b;
+        };
+            ]]></content>
+            <expected_name>Simple</expected_name>
+            <expected_contains>
+                <line>int a;</line>
+                <line>char b;</line>
+            </expected_contains>
+        </case>
+    </extract_struct_body_cases>
+</struct_parser_utils_tests>

@@ -142,6 +142,16 @@ Tests for GUI view functionality with TDD approach.
   - Tests validation state display
   - Tests edge cases (empty struct, full struct, partial fill)
 
+### `test_struct_parser_v2.py`
+Tests for `parse_member_line_v2` and related helpers.
+- Cases are loaded from `tests/data/test_struct_parser_v2_config.xml`
+- Loader: `tests.xml_struct_parser_v2_loader`
+
+### `test_struct_parser_utils.py`
+Utility tests for parser helper functions.
+- Cases are loaded from `tests/data/test_struct_parser_utils_config.xml`
+- Loader: `tests.xml_struct_parser_utils_loader`
+
 ### `test_config_parser.py`
 
 **DEPRECATED**: 此檔案已被 XML loader 標準化方案取代，未來可安全移除。
