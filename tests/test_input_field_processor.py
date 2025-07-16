@@ -68,5 +68,21 @@ class TestInputFieldProcessorXMLDriven(unittest.TestCase):
                     result = self.processor.process_input_field(subcase['input'], subcase['byte_size'], subcase['endianness'])
                     self.assertEqual(result.hex(), subcase['expected'].lower())
 
+    def test_pad_hex_input(self):
+        for case in self.test_data:
+            extra = case.get('extra_tests', {})
+            for subcase in extra.get('pad_hex_input', []):
+                with self.subTest(input=subcase['input'], byte_size=subcase['byte_size']):
+                    result = self.processor.pad_hex_input(subcase['input'], subcase['byte_size'])
+                    self.assertEqual(result, subcase['expected'].lower())
+
+    def test_convert_to_raw_bytes(self):
+        for case in self.test_data:
+            extra = case.get('extra_tests', {})
+            for subcase in extra.get('convert_to_raw_bytes', []):
+                with self.subTest(padded_hex=subcase['padded_hex'], byte_size=subcase['byte_size'], endianness=subcase['endianness']):
+                    result = self.processor.convert_to_raw_bytes(subcase['padded_hex'], subcase['byte_size'], subcase['endianness'])
+                    self.assertEqual(result.hex(), subcase['expected'].lower())
+
 if __name__ == '__main__':
     unittest.main() 

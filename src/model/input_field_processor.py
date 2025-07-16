@@ -12,25 +12,68 @@ Example Usage:
 """
 
 class InputFieldProcessor:
-    """
-    Processes user input field values for struct parsing.
-    
-    支援機制：
-    1. 自動左補零（如 4 bytes 欄位 '12' -> '00000012'）
-    2. 依據 byte_size 及 endianness 產生原始 bytes
-    3. 支援 1/4/8 bytes 欄位，big/little endian
-    4. 空字串自動視為 0
-    5. 超過欄位大小會拋出 OverflowError
+    """Process user input field values for struct parsing.
 
-    Methods:
-        process_input_field(input_value, byte_size, endianness):
-            將 input_value（hex 字串）補零並轉換為 bytes
-        is_supported_field_size(byte_size):
-            檢查是否為支援的欄位大小（1, 4, 8）
+    The processor provides the following helpers:
+    1. ``pad_hex_input`` - automatically left pads hex strings.
+    2. ``convert_to_raw_bytes`` - converts padded hex to bytes with
+       the specified endianness.
+    3. ``process_input_field`` - combines the above two steps.
+
+    It supports the common byte sizes ``1``, ``4`` and ``8`` and the
+    endianness values ``"little"`` and ``"big"``.
     """
     def __init__(self):
         self.supported_byte_sizes = {1, 4, 8}
         self.supported_endianness = {'little', 'big'}
+
+    def pad_hex_input(self, input_value, byte_size):
+        """Return ``input_value`` left padded with zeros for ``byte_size``.
+
+        Parameters
+        ----------
+        input_value: str
+            User provided hex string. May be empty.
+        byte_size: int
+            Target byte size. Must be positive.
+
+        Returns
+        -------
+        str
+            The padded hex string in lowercase.
+        """
+        if byte_size <= 0:
+            raise ValueError(f"Byte size must be positive, got: {byte_size}")
+
+        if not input_value:
+            return "0" * (byte_size * 2)
+
+        input_value = input_value.lower()
+        required_chars = byte_size * 2
+        return input_value.zfill(required_chars)
+
+    def convert_to_raw_bytes(self, padded_hex, byte_size, endianness):
+        """Convert ``padded_hex`` to bytes using ``endianness``."""
+        if endianness not in self.supported_endianness:
+            raise ValueError(
+                f"Unsupported endianness: {endianness}. Supported values: {self.supported_endianness}"
+            )
+        if byte_size <= 0:
+            raise ValueError(f"Byte size must be positive, got: {byte_size}")
+        expected_length = byte_size * 2
+        if len(padded_hex) != expected_length:
+            raise ValueError(
+                f"Hex string length mismatch: expected {expected_length} characters, got {len(padded_hex)}"
+            )
+        try:
+            int_value = int(padded_hex, 16)
+            return int_value.to_bytes(byte_size, byteorder=endianness)
+        except ValueError as e:
+            raise ValueError(f"Invalid hex string '{padded_hex}': {e}")
+        except OverflowError as e:
+            raise OverflowError(
+                f"Hex value '{padded_hex}' is too large for {byte_size} bytes: {e}"
+            )
 
     def process_input_field(self, input_value, byte_size, endianness):
         """
@@ -49,15 +92,8 @@ class InputFieldProcessor:
             >>> processor.process_input_field('12', 4, 'little')
             b'\x12\x00\x00\x00'
         """
-        if byte_size <= 0:
-            raise ValueError(f"Byte size must be positive, got: {byte_size}")
-        if endianness not in self.supported_endianness:
-            raise ValueError(f"Unsupported endianness: {endianness}")
-        value = int(input_value, 16) if input_value else 0
-        try:
-            return value.to_bytes(byte_size, endianness)
-        except OverflowError as e:
-            raise OverflowError(f"Value {value} too large for {byte_size} bytes: {e}")
+        padded = self.pad_hex_input(input_value, byte_size)
+        return self.convert_to_raw_bytes(padded, byte_size, endianness)
     
     def is_supported_field_size(self, byte_size):
         """
