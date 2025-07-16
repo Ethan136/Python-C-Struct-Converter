@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<struct_parser_v2_tests>
+    <test_case name="regular_member">
+        <line>int value</line>
+        <expected type="int" name="value" is_bitfield="false"/>
+    </test_case>
+    <test_case name="pointer_member">
+        <line>char* ptr</line>
+        <expected type="pointer" name="ptr" is_bitfield="false"/>
+    </test_case>
+    <test_case name="bitfield_member">
+        <line>unsigned int flag : 3</line>
+        <expected type="unsigned int" name="flag" is_bitfield="true" bit_size="3"/>
+    </test_case>
+</struct_parser_v2_tests>

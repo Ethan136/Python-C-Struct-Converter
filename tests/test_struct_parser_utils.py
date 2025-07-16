@@ -1,51 +1,49 @@
 import unittest
 import pytest
+import os
 from model.struct_parser import parse_member_line, _extract_struct_body
+from tests.xml_struct_parser_utils_loader import load_struct_parser_utils_tests
 
 class TestParseMemberLine(unittest.TestCase):
-    def test_regular_member(self):
-        self.assertEqual(parse_member_line('int value'), ('int', 'value'))
+    @classmethod
+    def setUpClass(cls):
+        config_path = os.path.join(
+            os.path.dirname(__file__), 'data', 'test_struct_parser_utils_config.xml'
+        )
+        cls.member_cases, cls.body_cases = load_struct_parser_utils_tests(config_path)
 
-    def test_pointer_member(self):
-        self.assertEqual(parse_member_line('char* ptr'), ('pointer', 'ptr'))
-
-    def test_bitfield_member(self):
-        result = parse_member_line('int flag : 3')
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result['type'], 'int')
-        self.assertEqual(result['name'], 'flag')
-        self.assertTrue(result['is_bitfield'])
-        self.assertEqual(result['bit_size'], 3)
-
-    @pytest.mark.xfail(reason="anonymous bitfields not yet supported")
-    def test_anonymous_bitfield_member(self):
-        result = parse_member_line('int : 3')
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result['type'], 'int')
-        self.assertIsNone(result['name'])
-        self.assertTrue(result['is_bitfield'])
-        self.assertEqual(result['bit_size'], 3)
-
-    def test_array_member_dims(self):
-        result = parse_member_line('short data[4][2]')
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result['type'], 'short')
-        self.assertEqual(result['name'], 'data')
-        self.assertEqual(result.get('array_dims'), [4, 2])
+    def test_member_cases(self):
+        for case in self.member_cases:
+            with self.subTest(name=case['name']):
+                if case['xfail']:
+                    pytest.xfail('expected failure')
+                result = parse_member_line(case['line'])
+                if case['return_type'] == 'tuple':
+                    self.assertEqual(result, (case['expected']['type'], case['expected']['name']))
+                else:
+                    self.assertIsInstance(result, dict)
+                    for key, val in case['expected'].items():
+                        if key == 'array_dims':
+                            self.assertEqual(result.get(key), val)
+                        else:
+                            self.assertEqual(result.get(key), val)
 
 
 class TestExtractStructBody(unittest.TestCase):
-    def test_simple_body_extraction(self):
-        content = """
-        struct Simple {
-            int a;
-            char b;
-        };
-        """
-        name, body = _extract_struct_body(content)
-        self.assertEqual(name, "Simple")
-        self.assertIn("int a;", body)
-        self.assertIn("char b;", body)
+    @classmethod
+    def setUpClass(cls):
+        config_path = os.path.join(
+            os.path.dirname(__file__), 'data', 'test_struct_parser_utils_config.xml'
+        )
+        cls.member_cases, cls.body_cases = load_struct_parser_utils_tests(config_path)
+
+    def test_extract_cases(self):
+        for case in self.body_cases:
+            with self.subTest(name=case['name']):
+                name, body = _extract_struct_body(case['content'])
+                self.assertEqual(name, case['expected_name'])
+                for line in case['expected_contains']:
+                    self.assertIn(line, body)
 
 if __name__ == '__main__':
     unittest.main()
