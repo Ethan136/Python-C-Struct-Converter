@@ -80,8 +80,8 @@
 ## 五、2024/06/XX 進度紀錄：XML 驅動測試全面遷移與 legacy 移除
 
 ### 1. 測試全面 XML 化
-- 所有核心、例外、單元測試（input conversion, field processor, struct parsing）皆已改為 XML 驅動格式。
-- 僅 GUI、static data、mocking 測試維持 hardcoded，並於文件註明原因。
+- 大多數核心與例外測試（input conversion、field processor、struct parsing 等）皆已改為 XML 驅動格式。
+- GUI 及部分輔助/GUI 相關測試仍以程式碼硬寫，並於文件註明原因。
 - 測試 XML schema 統一，所有 loader 皆繼承 BaseXMLTestLoader，便於擴充與維護。
 
 ### 2. Legacy code/data format 移除
