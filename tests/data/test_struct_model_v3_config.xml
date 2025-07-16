@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<struct_model_v3_tests>
+    <test_case name="regular_types" description="calculate bits for regular types">
+        <members>
+            <member name="a" type="char" bit_size="0"/>
+            <member name="b" type="int" bit_size="0"/>
+            <member name="c" type="long long" bit_size="0"/>
+        </members>
+        <total_size>16</total_size>
+        <expected_bits>104</expected_bits>
+    </test_case>
+    <test_case name="bitfields" description="calculate bits for bitfield group">
+        <members>
+            <member name="a" type="unsigned int" bit_size="4"/>
+            <member name="b" type="unsigned int" bit_size="8"/>
+            <member name="c" type="int" bit_size="0"/>
+        </members>
+        <total_size>8</total_size>
+        <expected_bits>64</expected_bits>
+    </test_case>
+    <test_case name="export_struct" description="export struct to C code">
+        <members>
+            <member name="user_id" type="unsigned long long" bit_size="0"/>
+            <member name="status" type="unsigned int" bit_size="4"/>
+            <member name="name" type="char" bit_size="0"/>
+        </members>
+        <total_size>16</total_size>
+        <expected_bits>104</expected_bits>
+        <expected_export_contains>
+            <line>struct TestStruct</line>
+            <line>unsigned long long user_id;</line>
+            <line>unsigned int status : 4;</line>
+            <line>char name;</line>
+            <line>// total size: 16 bytes</line>
+        </expected_export_contains>
+    </test_case>
+</struct_model_v3_tests>
