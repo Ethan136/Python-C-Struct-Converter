@@ -162,6 +162,18 @@ Tests for XML configuration parsing.
 - Tests configuration validation
 - Tests test case extraction from XML
 
+### `test_layout_refactor.py`
+Simple layout alias checks. Currently hard-coded; could convert to XML if more scenarios arise.
+
+### `test_pack_alignment_placeholder.py`
+Pack_alignment placeholder test. Currently hard-coded; could convert to XML if more scenarios arise.
+
+### `test_presenter_refactor.py`
+Presenter utility tests. Currently hard-coded; could convert to XML if more scenarios arise.
+
+### `test_union_preparation.py`
+Union helper tests. Currently hard-coded; could convert to XML if more scenarios arise.
+
 ## 核心功能測試 (Core Function Testing)
 
 ### 概述
