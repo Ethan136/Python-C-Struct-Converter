@@ -13,31 +13,24 @@ import shutil
 VENV_PYTHON = os.path.join(os.path.dirname(__file__), '.venv', 'bin', 'python')
 
 
-def run_pytest(args, desc, use_xvfb=False):
-    print(f"\n==== {desc} ====")
+def run_pytest(args, timeout=15):
+    import subprocess
+    # 確保每個 test function 都有 15 秒 timeout
+    if '--timeout=15' not in args:
+        args = ['--timeout=15'] + args
     cmd = [VENV_PYTHON, "-m", "pytest"] + args
-    if use_xvfb:
-        if shutil.which("xvfb-run") is None:
-            print("[警告] headless 環境下未偵測到 xvfb-run，請安裝 Xvfb (Linux: sudo apt install xvfb, macOS: brew install xquartz)")
-            print("將直接執行 pytest，可能會 skip GUI 測試...")
-        else:
-            cmd = ["xvfb-run", "-a"] + cmd
-    result = subprocess.run(
-        cmd,
-        check=False,
-        capture_output=True,
-        text=True
-    )
-    if result.returncode == 0:
-        return 0
-    # fallback 條件
-    if "No module named pytest" in (result.stderr or ""):
-        print("pytest 未安裝，fallback 用 unittest 執行...")
-        return run_unittest(args, desc)
-    # 其他 pytest 失敗直接顯示
-    print(result.stdout)
-    print(result.stderr)
-    return result.returncode
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout  # 單一 pytest 子程序 timeout（可設高一點）
+        )
+        return result
+    except subprocess.TimeoutExpired as e:
+        print(f"[Timeout] pytest 執行超過 {timeout} 秒：{cmd}")
+        return subprocess.CompletedProcess(cmd, returncode=1, stdout='', stderr=str(e))
 
 def iter_test_cases(suite):
     # 遞迴展開 TestSuite，產生所有 TestCase
@@ -73,21 +66,14 @@ def main():
         "--ignore=tests/test_struct_view.py",
         "--ignore=packing/test_executable.py",
     ]
-    use_xvfb = not os.environ.get("DISPLAY")
-    non_gui_result = run_pytest(
-        non_gui_args,
-        "Step 1: 執行非 GUI 測試",
-        use_xvfb=use_xvfb,
-    )
+    non_gui_result = run_pytest(non_gui_args)
 
     # Step 2: 執行 GUI 測試
     gui_args = ["tests/test_struct_view.py"]
-    # 若無 DISPLAY，則用 xvfb-run 包裝
-    use_xvfb = not os.environ.get("DISPLAY")
-    gui_result = run_pytest(gui_args, "Step 2: 執行 GUI 測試", use_xvfb=use_xvfb)
+    gui_result = run_pytest(gui_args)
 
     print("\n==== 測試結果彙總 ====")
-    if non_gui_result == 0 and gui_result == 0:
+    if non_gui_result.returncode == 0 and gui_result.returncode == 0:
         print("✅ 所有測試通過")
         sys.exit(0)
     else:
