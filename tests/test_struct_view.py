@@ -296,9 +296,7 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(struct_data["total_size"], 0)
 
 
-    def test_manual_struct_no_debug_widget(self):
-        """StructView 不應建立 manual_debug_text 欄位"""
-        self.assertFalse(hasattr(self.view, "manual_debug_text"))
+    # 已移除 test_manual_struct_no_debug_widget（現行設計 manual tab 會有 debug widget）
 
     def test_manual_struct_hex_parse_shows_member_value(self):
         # 模擬 presenter 支援解析
