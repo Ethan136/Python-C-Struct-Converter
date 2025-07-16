@@ -70,6 +70,7 @@ Tests for core struct parsing functionality without GUI.
 
 ### `test_struct_model.py` *(大幅擴充)*
 Tests for core struct model functionality with comprehensive coverage.
+Most parsing, layout, hex parsing and complex example cases are now loaded from `tests/data/test_struct_model_config.xml`.
 - **Bitfield Support Tests**:
   - Tests bitfield parsing from C++ struct definitions
   - Tests bitfield layout calculation with storage units

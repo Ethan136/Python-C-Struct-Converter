@@ -41,6 +41,19 @@
             <member type="unsigned long" name="value2"/>
         </expected_members>
     </test_case>
+    <test_case name="struct_with_whitespace">
+        <struct_definition><![CDATA[
+            struct WhitespaceStruct {
+                int value1;
+                char value2;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>WhitespaceStruct</expected_struct_name>
+        <expected_members>
+            <member type="int" name="value1"/>
+            <member type="char" name="value2"/>
+        </expected_members>
+    </test_case>
     <test_case name="struct_with_bitfields">
         <struct_definition><![CDATA[
             struct BitFieldStruct {

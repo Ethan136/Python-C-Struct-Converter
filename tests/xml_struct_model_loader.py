@@ -12,6 +12,14 @@ class StructModelXMLTestLoader(BaseXMLTestLoader):
             if hex_elem is not None and hex_elem.text:
                 input_hex = hex_elem.text.strip()
         data['input_hex'] = input_hex
+        # 對 expected member 轉型
+        numeric_keys = {'offset', 'size', 'bit_size', 'bit_offset'}
+        for entry in data.get('expected', []):
+            for key in list(entry.keys()):
+                if key in numeric_keys:
+                    entry[key] = int(entry[key])
+                elif key == 'is_bitfield':
+                    entry[key] = entry[key].lower() == 'true'
         return data
 
     def parse_extra(self, case):
