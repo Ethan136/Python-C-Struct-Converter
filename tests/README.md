@@ -110,6 +110,11 @@ Tests for manual struct definition integration functionality.
 - Tests integration between manual and file-based struct loading
 - *Cases sourced from `tests/data/manual_struct_test_config.xml`*
 
+### `test_struct_model_v3.py` *(XML 驅動)*
+Tests for StructModel V3 helper methods. Cases are loaded from `tests/data/test_struct_model_v3_config.xml`.
+- Tests bit usage calculation for different member lists
+- Tests exported header snippets
+
 ### `test_gui_input_validation.py`
 Tests for GUI input validation and length limiting.
 - Tests hex character validation
@@ -349,6 +354,7 @@ python run_tests.py --test test_input_conversion
 ### 測試結果
 - 支援 array 格式的 XML 測試已通過。
 - 你可以自由設計任何 1/4/8 byte、任意格數、任意數值的自動化測試。
+- StructModel V3 測試案例定義在 `tests/data/test_struct_model_v3_config.xml`，可依此格式擴充。
 
 ## Running Tests
 

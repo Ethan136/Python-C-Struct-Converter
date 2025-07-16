@@ -3,9 +3,10 @@ import sys
 import os
 
 # 添加專案根目錄到 Python 路徑
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from model.struct_model import StructModel
+from tests.xml_struct_model_v3_loader import load_struct_model_v3_tests
 
 class TestStructModelV3(unittest.TestCase):
     """測試 V3 版本的 StructModel 新功能"""
@@ -54,36 +55,6 @@ class TestStructModelV3(unittest.TestCase):
         self.assertEqual(result[0]["type"], "int")
         self.assertEqual(result[0]["name"], "b")
     
-    def test_calculate_used_bits_regular_types(self):
-        """測試使用空間計算 - 普通型別"""
-        members = [
-            {"name": "a", "type": "char", "bit_size": 0},      # 1 byte = 8 bits
-            {"name": "b", "type": "int", "bit_size": 0},       # 4 bytes = 32 bits
-            {"name": "c", "type": "long long", "bit_size": 0}  # 8 bytes = 64 bits
-        ]
-        used_bits = self.model.calculate_used_bits(members)
-        self.assertEqual(used_bits, 8 + 32 + 64)  # 104 bits
-    
-    def test_calculate_used_bits_bitfields(self):
-        """測試使用空間計算 - bitfield"""
-        members = [
-            {"name": "a", "type": "unsigned int", "bit_size": 4},  # 4 bits
-            {"name": "b", "type": "unsigned int", "bit_size": 8},  # 8 bits
-            {"name": "c", "type": "int", "bit_size": 0}            # 4 bytes = 32 bits
-        ]
-        used_bits = self.model.calculate_used_bits(members)
-        self.assertEqual(used_bits, 32 + 32)  # bitfield group + int
-    
-    def test_calculate_used_bits_mixed_types(self):
-        """測試使用空間計算 - 混合型別"""
-        members = [
-            {"name": "a", "type": "char", "bit_size": 0},           # 8 bits
-            {"name": "b", "type": "unsigned int", "bit_size": 12},  # 12 bits
-            {"name": "c", "type": "double", "bit_size": 0}          # 64 bits
-        ]
-        used_bits = self.model.calculate_used_bits(members)
-        self.assertEqual(used_bits, 8 + 32 + 64)  # char + bitfield storage unit + double
-    
     def test_calculate_used_bits_skip_invalid_type(self):
         """測試計算時跳過無效型別"""
         members = [
@@ -97,17 +68,6 @@ class TestStructModelV3(unittest.TestCase):
     # 已移除 test_backward_compatibility_legacy_format
     # 已移除 test_backward_compatibility_legacy_bitfield
     # 已移除 test_backward_compatibility_legacy_byte_sizes
-    
-    def test_validate_manual_struct_v3_format(self):
-        """測試 V3 格式的驗證"""
-        members = [
-            {"name": "a", "type": "int", "bit_size": 0},
-            {"name": "b", "type": "unsigned int", "bit_size": 4}
-        ]
-        total_size = 8  # 4 bytes (int) + 4 bits = 4.5 bytes, 向上取整為 8 bytes
-        
-        errors = self.model.validate_manual_struct(members, total_size)
-        self.assertEqual(len(errors), 0)  # 應該沒有錯誤
     
     def test_validate_manual_struct_invalid_type(self):
         """測試無效型別的驗證"""
@@ -153,27 +113,30 @@ class TestStructModelV3(unittest.TestCase):
         errors = self.model.validate_manual_struct(members, total_size)
         self.assertGreater(len(errors), 0)
         self.assertTrue(any("bit_size 需為 0 或正整數" in error for error in errors))
-    
-    def test_export_manual_struct_to_h_v3_format(self):
-        """測試 V3 格式的匯出功能"""
-        members = [
-            {"name": "user_id", "type": "unsigned long long", "bit_size": 0},
-            {"name": "status", "type": "unsigned int", "bit_size": 4},
-            {"name": "name", "type": "char", "bit_size": 0}
-        ]
-        total_size = 16
-        
-        # 設定 manual_struct
-        self.model.manual_struct = {"members": members, "total_size": total_size}
-        
-        result = self.model.export_manual_struct_to_h("TestStruct")
-        
-        # 檢查匯出內容
-        self.assertIn("struct TestStruct", result)
-        self.assertIn("unsigned long long user_id;", result)
-        self.assertIn("unsigned int status : 4;", result)
-        self.assertIn("char name;", result)
-        self.assertIn("// total size: 16 bytes", result)
 
+
+class TestStructModelV3XMLDriven(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        config_file = os.path.join(os.path.dirname(__file__), 'data', 'test_struct_model_v3_config.xml')
+        cls.cases = load_struct_model_v3_tests(config_file)
+        cls.model = StructModel()
+
+    def test_struct_model_v3_cases(self):
+        for case in self.cases:
+            with self.subTest(name=case['name']):
+                members = case['members']
+                total_size = case['total_size']
+                errors = self.model.validate_manual_struct(members, total_size)
+                self.assertEqual(len(errors), 0)
+                if case['expected_bits'] is not None:
+                    used_bits = self.model.calculate_used_bits(members)
+                    self.assertEqual(used_bits, case['expected_bits'])
+                if case['expected_export_contains']:
+                    self.model.manual_struct = {'members': members, 'total_size': total_size}
+                    h = self.model.export_manual_struct_to_h('TestStruct')
+                    for line in case['expected_export_contains']:
+                        self.assertIn(line, h)
+    
 if __name__ == "__main__":
     unittest.main() 
