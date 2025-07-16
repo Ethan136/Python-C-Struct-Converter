@@ -31,6 +31,8 @@ Tests for the input conversion mechanism.
 Tests for the InputFieldProcessor module.
 - Tests hex input padding functionality
 - Tests raw byte conversion with endianness
+- `pad_hex_input` cases are XML-driven
+- `convert_to_raw_bytes` cases are XML-driven
 - Tests complete input processing pipeline
 - Tests error handling and edge cases
 - Tests supported field size validation
@@ -46,7 +48,7 @@ Tests for struct parsing and layout calculation.
 - Tests bitfield layout calculation
 
 ### `test_struct_model_integration.py` *(新增)*
-Tests for StructModel integration functionality.
+Tests for StructModel integration functionality. Most cases are loaded from `tests/data/test_struct_model_integration_config.xml`.
 - Tests StructModel initialization and state management
 - Tests struct loading from files
 - Tests hex data parsing with various scenarios
