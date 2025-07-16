@@ -192,11 +192,6 @@ class StructView(tk.Tk):
         manual_member_frame.pack(fill="x", padx=2, pady=2)
         self.manual_member_tree = create_member_treeview(manual_member_frame)
 
-        # debug bytes 顯示區
-        manual_debug_frame = tk.LabelFrame(scrollable_frame, text="Debug Bytes")
-        manual_debug_frame.pack(fill="x", padx=2, pady=2)
-        self.manual_debug_text = tk.Text(manual_debug_frame, height=4, width=100)
-        self.manual_debug_text.pack(fill="x")
 
         # 標準 struct layout Treeview（與 H 檔 tab 一致）
         layout_frame = tk.LabelFrame(scrollable_frame, text="Struct Layout (標準顯示)")
@@ -576,9 +571,6 @@ class StructView(tk.Tk):
     def show_debug_bytes(self, debug_lines):
         self._show_debug_text(self.debug_text, debug_lines)
 
-    def show_manual_debug_bytes(self, debug_lines):
-        """顯示 MyStruct tab 的 debug bytes，與 file tab 的 show_debug_bytes 一致"""
-        self._show_debug_text(self.manual_debug_text, debug_lines)
 
     def show_struct_member_debug(self, parsed_values, layout):
         # 顯示 struct layout 與欄位對應
@@ -718,14 +710,10 @@ class StructView(tk.Tk):
             result = self.presenter.parse_manual_hex_data(hex_parts, struct_def, self.manual_endian_var.get())
             if result['type'] == 'ok':
                 self.show_manual_parsed_values(result['parsed_values'])
-                self.show_manual_debug_bytes(result['debug_lines'])
             else:
                 self.show_error('解析錯誤', result['message'])
         else:
-            self.manual_debug_text.config(state="normal")
-            self.manual_debug_text.delete("1.0", tk.END)
-            self.manual_debug_text.insert("1.0", f"hex_parts: {hex_parts}\n(需由 presenter/model 實作解析)")
-            self.manual_debug_text.config(state="disabled")
+            pass  # presenter/model 尚未實作解析
 
     def get_presenter_cache_stats(self):
         """取得 Presenter 的 layout cache hit/miss 統計（for debug/perf 分析用）"""

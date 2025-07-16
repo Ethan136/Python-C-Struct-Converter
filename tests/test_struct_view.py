@@ -295,28 +295,10 @@ class TestStructView(unittest.TestCase):
         struct_data = self.view.get_manual_struct_definition()
         self.assertEqual(struct_data["total_size"], 0)
 
-    def test_manual_struct_hex_input_and_parse_debug(self):
-        # 切換到 manual struct tab
-        self.view.tab_control.select(self.view.tab_manual)
-        # 設定 struct size 與 unit size
-        self.view.size_var.set(8)
-        self.view.manual_unit_size_var.set("4 Bytes")
-        self.view._rebuild_manual_hex_grid()
-        # 輸入 hex raw data
-        for idx, (entry, box_len) in enumerate(self.view.manual_hex_entries):
-            entry.delete(0, "end")
-            entry.insert(0, "12".zfill(box_len))
-        # presenter 需有 parse_manual_hex_data 並回傳 dict
-        class DebugPresenter:
-            def parse_manual_hex_data(self, hex_parts, struct_def, endian):
-                return {"type": "ok", "parsed_values": [], "debug_lines": [f"hex_parts: {hex_parts}"]}
-        self.view.presenter = DebugPresenter()
-        # 點擊解析
-        self.view._on_parse_manual_hex()
-        # 檢查 debug 區有正確顯示 hex_parts
-        debug_text = self.view.manual_debug_text.get("1.0", "end")
-        self.assertIn("hex_parts", debug_text)
-        self.assertIn("12", debug_text)
+
+    def test_manual_struct_no_debug_widget(self):
+        """StructView 不應建立 manual_debug_text 欄位"""
+        self.assertFalse(hasattr(self.view, "manual_debug_text"))
 
     def test_manual_struct_hex_parse_shows_member_value(self):
         # 模擬 presenter 支援解析
@@ -327,10 +309,6 @@ class TestStructView(unittest.TestCase):
                 value = int(hex_parts[0][0], 16)
                 parsed = [{"name": struct_def["members"][0]["name"], "value": str(value), "hex_value": hex(value), "hex_raw": hex_parts[0][0]}]
                 self.view.show_manual_parsed_values(parsed, endian)
-                self.view.manual_debug_text.config(state="normal")
-                self.view.manual_debug_text.delete("1.0", "end")
-                self.view.manual_debug_text.insert("1.0", f"value: {value}")
-                self.view.manual_debug_text.config(state="disabled")
                 self.view.update()
                 return {"type": "ok", "parsed_values": parsed, "debug_lines": [f"value: {value}"]}
         # 切換到 manual struct tab
@@ -722,9 +700,7 @@ class TestStructView(unittest.TestCase):
         items = self.view.manual_member_tree.get_children()
         self.assertEqual(len(items), 3, "應該有 3 個解析結果")
         
-        # 檢查 debug 資訊
-        debug_text = self.view.manual_debug_text.get("1.0", "end")
-        print(f"Debug text: {debug_text}")
+
         
         # 檢查實際的解析結果
         for i, item in enumerate(items):
@@ -844,9 +820,7 @@ class TestStructView(unittest.TestCase):
         items = self.view.manual_member_tree.get_children()
         self.assertEqual(len(items), 12, "應該有 12 個解析結果（包含 padding）")
         
-        # 檢查 debug 資訊
-        debug_text = self.view.manual_debug_text.get("1.0", "end")
-        print(f"Debug text: {debug_text}")
+
         
         # 檢查實際的解析結果
         for i, item in enumerate(items):
@@ -914,10 +888,7 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(values_g[0], "g", "欄位名稱應該是 'g'")
         self.assertEqual(values_g[1], str(int("100f0e0d0c0b0a09", 16)), "pointer g 的值應該是 0x100f0e0d0c0b0a09")
         
-        # 驗證 debug 資訊
-        self.assertIn("Box 1 (1 bytes): 41", debug_text, "debug 應該顯示第一個 box 的 bytes")
-        self.assertIn("Box 40 (1 bytes): 10", debug_text, "debug 應該顯示最後一個 box 的 bytes")
-        self.assertEqual(debug_text.count("Box "), 40, "debug 應該顯示 40 個 box 的資訊")
+
         
         # 測試 Big Endian
         self.view.manual_endian_var.set("Big Endian")
