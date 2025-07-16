@@ -18,6 +18,7 @@ def run_pytest(args, timeout=15):
     # 確保每個 test function 都有 15 秒 timeout
     if '--timeout=15' not in args:
         args = ['--timeout=15'] + args
+    # 強制載入 pytest_timeout plugin
     cmd = [VENV_PYTHON, "-m", "pytest"] + args
     try:
         result = subprocess.run(
@@ -72,6 +73,21 @@ def main():
     gui_args = ["tests/test_struct_view.py"]
     gui_result = run_pytest(gui_args)
 
+    # 確保 faillog 資料夾存在
+    faillog_dir = os.path.join("tests", "faillog")
+    os.makedirs(faillog_dir, exist_ok=True)
+    debuglog_path = os.path.join(faillog_dir, "latest_fail.log")
+    if non_gui_result.returncode != 0 or gui_result.returncode != 0:
+        with open(debuglog_path, "w", encoding="utf-8") as f:
+            f.write("==== Non-GUI 測試 stdout ====" + "\n")
+            f.write(non_gui_result.stdout or "<empty>" + "\n")
+            f.write("==== Non-GUI 測試 stderr ====" + "\n")
+            f.write(non_gui_result.stderr or "<empty>" + "\n")
+            f.write("==== GUI 測試 stdout ====" + "\n")
+            f.write(gui_result.stdout or "<empty>" + "\n")
+            f.write("==== GUI 測試 stderr ====" + "\n")
+            f.write(gui_result.stderr or "<empty>" + "\n")
+        print(f"❌ 有測試失敗，詳細錯誤已輸出到 {debuglog_path}")
     print("\n==== 測試結果彙總 ====")
     if non_gui_result.returncode == 0 and gui_result.returncode == 0:
         print("✅ 所有測試通過")
