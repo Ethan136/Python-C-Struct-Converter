@@ -591,7 +591,17 @@ last_time = presenter.get_last_layout_time()
 - `tests/test_struct_view.py`：刪除或調整所有存取 `manual_debug_text` 的測試
 - `tests/README.md` 等文件同步更新描述
 
-### 3. TDD 流程
+### 3. 需調整的程式與測試位置
+- `src/view/struct_view.py`
+  - 刪除 `_create_manual_debug_frame` 區塊中 `manual_debug_text` 相關程式碼
+  - 移除 `show_manual_debug_bytes` 方法
+  - `_on_parse_manual_hex` 不再呼叫 `show_manual_debug_bytes`
+- `tests/test_struct_view.py`
+  - 移除 `test_manual_struct_hex_input_and_parse_debug`
+  - 移除所有 `manual_debug_text` 存取斷言
+  - 新增 `test_manual_struct_no_debug_widget` 驗證 `StructView` 不含 `manual_debug_text`
+
+### 4. TDD 流程
 1. **修改測試**：
    - 移除 `test_manual_struct_hex_input_and_parse_debug` 等驗證 Debug Bytes 的斷言
    - 新增 `test_manual_struct_no_debug_widget` 確認 `StructView` 未建立 `manual_debug_text`
@@ -603,7 +613,7 @@ last_time = presenter.get_last_layout_time()
    - 執行 `run_all_tests.py` 確認所有測試通過
    - 手動檢查 Debug Tab 仍能顯示 debug bytes
 
-### 4. 提交順序
+### 5. 提交順序
 1. 調整/新增測試
 2. 更新 `StructView` 程式碼
 3. 更新相關文件
