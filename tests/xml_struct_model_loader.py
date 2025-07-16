@@ -15,8 +15,21 @@ class StructModelXMLTestLoader(BaseXMLTestLoader):
         return data
 
     def parse_extra(self, case):
-        # 若未來有特殊欄位可在此擴充，目前無特殊欄位
-        return {}
+        extra = {}
+        # optional numeric expectations
+        ets = case.find('expected_total_size')
+        if ets is not None and ets.text:
+            extra['expected_total_size'] = int(ets.text.strip())
+        esa = case.find('expected_struct_align')
+        if esa is not None and esa.text:
+            extra['expected_struct_align'] = int(esa.text.strip())
+        ell = case.find('expected_layout_len')
+        if ell is not None and ell.text:
+            extra['expected_layout_len'] = int(ell.text.strip())
+        exc = case.find('expected_exception')
+        if exc is not None and exc.text:
+            extra['expected_exception'] = exc.text.strip()
+        return extra
 
 def load_struct_model_tests(xml_path):
     return StructModelXMLTestLoader(xml_path).cases 
