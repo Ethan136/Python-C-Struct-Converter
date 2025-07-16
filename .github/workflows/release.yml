@@ -1,4 +1,4 @@
-name: Release Windows Executable
+name: Release Executables
 
 on:
   push:
@@ -6,44 +6,86 @@ on:
       - 'v*'
 
 jobs:
-  build-and-release:
+  test-and-build-windows:
     runs-on: windows-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: Create executable with PyInstaller
-      run: |
-        pyinstaller CppStructParser.spec
-        
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
-        
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/CppStructParser.exe
-        asset_name: CppStructParser-Windows.exe
-        asset_content_type: application/octet-stream 
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - name: Run all tests
+        run: python run_all_tests.py
+      - name: Build Windows executable
+        run: pyinstaller CppStructParser.spec
+      - name: Test Windows executable
+        run: python packing/executable_tester.py --target windows
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CppStructParser-Windows
+          path: dist/CppStructParser.exe
+
+  test-and-build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - name: Run all tests
+        run: python run_all_tests.py
+      - name: Build macOS executable
+        run: pyinstaller packing/CppStructParser-macos.spec
+      - name: Test macOS executable
+        run: python packing/executable_tester.py --target macos
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CppStructParser-macOS
+          path: dist/CppStructParser
+
+  release:
+    needs: [test-and-build-windows, test-and-build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: CppStructParser-Windows
+          path: ./dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: CppStructParser-macOS
+          path: ./dist
+      - uses: actions/checkout@v4
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: Upload Windows Executable
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/CppStructParser.exe
+          asset_name: CppStructParser-Windows.exe
+          asset_content_type: application/octet-stream
+      - name: Upload macOS Executable
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/CppStructParser
+          asset_name: CppStructParser-macOS
+          asset_content_type: application/octet-stream 
