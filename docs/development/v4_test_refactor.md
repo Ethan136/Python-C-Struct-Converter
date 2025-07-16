@@ -35,3 +35,9 @@
     - `test_load_struct_from_file_invalid` (例外處理)
     - `test_is_supported_field_size` (API 邊界)
     - `test_struct_view.py` 中的 UI 事件觸發測試 (GUI 行為)
+
+## 4. 進度紀錄
+
+- `test_input_field_processor.py` 已全面使用 `test_input_field_processor_config.xml`，其中 `pad_hex_input` 與 `convert_to_raw_bytes` 測試皆改為 XML 驅動。
+- `test_struct_model_integration.py` 的多數案例現已由 `test_struct_model_integration_config.xml` 載入。
+- 仍維持 hardcode 的僅剩行為與例外處理相關測試，例如上列三項。
