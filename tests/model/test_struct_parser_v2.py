@@ -7,20 +7,20 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(project_root, 'src'))
 sys.path.insert(0, project_root)
 
-from model.struct_parser import (
+from src.model.struct_parser import (
     parse_member_line_v2,
     parse_struct_definition_v2,
     parse_struct_definition_ast,
     MemberDef,
     StructDef,
 )
-from model.layout import LayoutCalculator
-from tests.xml_struct_parser_v2_loader import load_struct_parser_v2_tests
+from src.model.layout import LayoutCalculator
+from tests.data_driven.xml_struct_parser_v2_loader import load_struct_parser_v2_tests
 
 class TestParseMemberLineV2(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        config_path = os.path.join(os.path.dirname(__file__), 'data',
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data',
                                    'test_struct_parser_v2_config.xml')
         cls.cases = load_struct_parser_v2_tests(config_path)
 

@@ -1,12 +1,12 @@
 import unittest
 import os
-from model.struct_model import StructModel
-from tests.xml_manual_struct_loader import load_manual_struct_tests
+from src.model.struct_model import StructModel
+from tests.data_driven.xml_manual_struct_loader import load_manual_struct_tests
 
 class TestManualStructIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        config_file = os.path.join(os.path.dirname(__file__), 'data', 'manual_struct_test_config.xml')
+        config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'manual_struct_test_config.xml')
         cls.xml_cases = load_manual_struct_tests(config_file)
 
     def setUp(self):

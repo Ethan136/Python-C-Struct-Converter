@@ -70,7 +70,7 @@ def main():
     non_gui_result = run_pytest(non_gui_args)
 
     # Step 2: 執行 GUI 測試
-    gui_args = ["tests/test_struct_view.py"]
+    gui_args = ["tests/view/test_struct_view.py"]
     gui_result = run_pytest(gui_args)
 
     # 確保 faillog 資料夾存在

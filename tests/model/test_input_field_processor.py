@@ -5,15 +5,15 @@ import os
 # Add src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from model.input_field_processor import InputFieldProcessor
-from tests.xml_input_field_processor_loader import load_input_field_processor_tests, load_input_field_processor_error_tests
+from src.model.input_field_processor import InputFieldProcessor
+from tests.data_driven.xml_input_field_processor_loader import load_input_field_processor_tests, load_input_field_processor_error_tests
 
 class TestInputFieldProcessor(unittest.TestCase):
     """Test cases for InputFieldProcessor module"""
     @classmethod
     def setUpClass(cls):
         # 載入異常測資
-        error_file_path = os.path.join(os.path.dirname(__file__), 'data', 'test_input_field_processor_error_config.xml')
+        error_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_input_field_processor_error_config.xml')
         cls.error_cases = load_input_field_processor_error_tests(error_file_path)
 
     def setUp(self):
@@ -49,7 +49,7 @@ class TestInputFieldProcessorXMLDriven(unittest.TestCase):
     def setUpClass(cls):
         cls.processor = InputFieldProcessor()
         cls.test_data = load_input_field_processor_tests(
-            os.path.join(os.path.dirname(__file__), 'data', 'test_input_field_processor_config.xml')
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_input_field_processor_config.xml')
         )
 
     def test_process_input_field(self):

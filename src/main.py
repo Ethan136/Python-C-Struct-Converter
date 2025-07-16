@@ -12,7 +12,7 @@ else:
 from model import StructModel
 from view import StructView
 from presenter import StructPresenter
-from config import load_ui_strings
+from src.config import load_ui_strings
 
 
 def main():

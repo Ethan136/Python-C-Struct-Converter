@@ -1,4 +1,4 @@
-from tests.base_xml_test_loader import BaseXMLTestLoader
+from tests.data_driven.base_xml_test_loader import BaseXMLTestLoader
 
 class StructParsingXMLTestLoader(BaseXMLTestLoader):
     """Load struct parsing and layout test cases from XML."""

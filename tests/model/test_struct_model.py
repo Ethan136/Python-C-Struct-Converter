@@ -14,21 +14,21 @@ from unittest.mock import patch, mock_open
 # Add src to path to import the model
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from model.struct_model import (
+from src.model.struct_model import (
     parse_struct_definition, 
     calculate_layout, 
     StructModel, 
     TYPE_INFO
 )
-from tests.xml_struct_model_loader import load_struct_model_tests
-from tests.xml_struct_parse_definition_loader import load_struct_parse_definition_tests
+from tests.data_driven.xml_struct_model_loader import load_struct_model_tests
+from tests.data_driven.xml_struct_parse_definition_loader import load_struct_parse_definition_tests
 
 
 class TestParseStructDefinition(unittest.TestCase):
     """Test cases for parse_struct_definition function."""
     @classmethod
     def setUpClass(cls):
-        config_file = os.path.join(os.path.dirname(__file__), 'data', 'test_struct_parse_definition_config.xml')
+        config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_struct_parse_definition_config.xml')
         cls.xml_cases = load_struct_parse_definition_tests(config_file)
 
     def test_xml_struct_parse_definition(self):
@@ -342,7 +342,7 @@ class TestCombinedExampleStruct(unittest.TestCase):
             char*     g;
         };
         '''
-        from model.struct_model import parse_struct_definition, calculate_layout
+        from src.model.struct_model import parse_struct_definition, calculate_layout
         struct_name, members = parse_struct_definition(struct_content)
         self.assertEqual(struct_name, "CombinedExample")
         # 檢查欄位順序與型別
@@ -410,7 +410,7 @@ class TestStructModelXMLDriven(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.test_data = load_struct_model_tests(
-            os.path.join(os.path.dirname(__file__), 'data', 'test_struct_model_config.xml')
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_struct_model_config.xml')
         )
 
     def test_struct_model_cases(self):

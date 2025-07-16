@@ -4,9 +4,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 import unittest
 import tempfile
-from model.input_field_processor import InputFieldProcessor
-from model.struct_model import StructModel
-from tests.xml_input_conversion_loader import load_input_conversion_tests, load_input_conversion_error_tests
+from src.model.input_field_processor import InputFieldProcessor
+from src.model.struct_model import StructModel
+from tests.data_driven.xml_input_conversion_loader import load_input_conversion_tests, load_input_conversion_error_tests
 
 class TestInputConversion(unittest.TestCase):
     """Test cases for input conversion mechanism"""
@@ -14,10 +14,10 @@ class TestInputConversion(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # 載入 XML 驅動測資
-        config_file_path = os.path.join(os.path.dirname(__file__), 'data', 'test_input_conversion_config.xml')
+        config_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_input_conversion_config.xml')
         cls.xml_cases = load_input_conversion_tests(config_file_path)
         # 載入異常測資
-        error_file_path = os.path.join(os.path.dirname(__file__), 'data', 'test_input_conversion_error_config.xml')
+        error_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_input_conversion_error_config.xml')
         cls.error_cases = load_input_conversion_error_tests(error_file_path)
 
     def setUp(self):

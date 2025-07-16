@@ -4,15 +4,15 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from model.struct_model import parse_struct_definition, calculate_layout
-from model.layout import LayoutItem
-from tests.xml_struct_parsing_loader import load_struct_parsing_tests
+from src.model.struct_model import parse_struct_definition, calculate_layout
+from src.model.layout import LayoutItem
+from tests.data_driven.xml_struct_parsing_loader import load_struct_parsing_tests
 
 
 class TestStructParsing(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        xml_path = os.path.join(os.path.dirname(__file__), 'data', 'test_struct_parsing_config.xml')
+        xml_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_struct_parsing_config.xml')
         cls.cases = load_struct_parsing_tests(xml_path)
 
     def test_struct_parsing_cases(self):

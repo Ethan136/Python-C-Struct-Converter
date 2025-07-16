@@ -4,7 +4,7 @@
 佈局結果以 :class:`model.layout.LayoutItem` dataclass 表示，可同時以屬性或
 字典介面存取欄位資訊。
 """
-from model.input_field_processor import InputFieldProcessor
+from src.model.input_field_processor import InputFieldProcessor
 from .layout import LayoutCalculator, LayoutItem, TYPE_INFO
 from .struct_parser import parse_struct_definition, parse_member_line
 

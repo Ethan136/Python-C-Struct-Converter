@@ -1,5 +1,5 @@
 import xml.etree.ElementTree as ET
-from tests.base_xml_test_loader import BaseXMLTestLoader
+from tests.data_driven.base_xml_test_loader import BaseXMLTestLoader
 
 class StructModelXMLTestLoader(BaseXMLTestLoader):
     def parse_common_fields(self, case):

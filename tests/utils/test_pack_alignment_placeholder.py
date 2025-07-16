@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from model.layout import LayoutCalculator
+from src.model.layout import LayoutCalculator
 
 class TestPackAlignmentPlaceholder(unittest.TestCase):
     def test_pack_alignment_no_effect(self):

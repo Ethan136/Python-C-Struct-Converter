@@ -6,9 +6,9 @@ import xml.etree.ElementTree as ET
 # Add src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from model.struct_model import StructModel
-from model.input_field_processor import InputFieldProcessor
-from tests.base_xml_test_loader import BaseXMLTestLoader
+from src.model.struct_model import StructModel
+from src.model.input_field_processor import InputFieldProcessor
+from tests.data_driven.base_xml_test_loader import BaseXMLTestLoader
 
 class TestStructParsingCore(unittest.TestCase):
     """Test cases for core struct parsing functionality without GUI"""
@@ -16,7 +16,7 @@ class TestStructParsingCore(unittest.TestCase):
     def setUpClass(cls):
         cls.model = StructModel()
         cls.input_processor = InputFieldProcessor()
-        cls.test_data_dir = os.path.join(os.path.dirname(__file__), 'data')
+        cls.test_data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
         cls.config_file = os.path.join(cls.test_data_dir, 'struct_parsing_test_config.xml')
         cls.loader = BaseXMLTestLoader(cls.config_file)
         cls.cases = cls.loader.cases

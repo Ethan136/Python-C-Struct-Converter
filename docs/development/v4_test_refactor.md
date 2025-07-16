@@ -28,6 +28,39 @@
     6.  **移除舊測試**：刪除 `test_struct_model.py` 中對應的 hardcode 測試。
     7.  **重複**：逐步遷移其他適合的測試案例。
 
+## 2.3. 測試 code 分資料夾管理建議（2024/07 補充）
+
+- 隨著測試數量與複雜度提升，建議將測試 code 依主題/模組分資料夾管理，提升可維護性與可讀性。
+- **建議分法**：
+    - `tests/model/`：
+        - **分類原則**：涵蓋 Model 層核心邏輯、資料結構、演算法、資料驗證等。
+        - **範例**：struct_model、input_field_processor、layout、parser、bitfield、padding、manual struct、integration（僅 model 層）。
+    - `tests/view/`：
+        - **分類原則**：涵蓋 GUI 行為、Tkinter 互動、View 層元件初始化、UI 驗證等。
+        - **範例**：struct_view、struct_view_refactor、struct_view_padding、GUI 互動、tab 切換、debug tab、剩餘空間顯示。
+    - `tests/presenter/`：
+        - **分類原則**：涵蓋 Presenter 層事件流、狀態管理、View-Model 溝通、錯誤處理等。
+        - **範例**：struct_presenter、presenter refactor、cache 行為、layout 計算快取。
+    - `tests/integration/`：
+        - **分類原則**：跨層整合測試，驗證多層協作、端到端流程。
+        - **範例**：struct_model_integration、manual_struct_integration、全流程驗證。
+    - `tests/data_driven/`：
+        - **分類原則**：所有 XML loader、XML 驅動測試、資料驅動測試類別。
+        - **範例**：xml_manual_struct_loader、xml_input_conversion_loader、xml_struct_model_loader、base_xml_test_loader、所有 XML 驅動測試類別。
+    - `tests/utils/`：
+        - **分類原則**：小型工具、alias、placeholder、union、mock、測試輔助函式等。
+        - **範例**：layout_refactor、pack_alignment_placeholder、presenter_refactor、union_preparation、mock presenter/model。
+    - `tests/data/`：
+        - **分類原則**：所有測試用 XML、.h、mock 檔案。
+        - **範例**：test_struct_model_config.xml、test_input_conversion_config.xml、test_struct_parsing_test_config.xml、example.h。
+- **遷移步驟建議**：
+    1. 規劃好資料夾結構與命名規則。
+    2. 批次移動測試檔案，並修正 import 路徑（如 loader、mock、data 路徑）。
+    3. 確認 `__init__.py` 存在於每個子資料夾（讓 unittest/pytest 能自動發現）。
+    4. 更新 README 與 CI/CD 腳本（如有 hardcode 路徑）。
+    5. 執行一次完整測試，確保一切正常。
+- **優點**：可維護性提升、主題清晰、CI/CD 更彈性、便於擴充。
+
 ## 3. 維持 Hardcode 的測試
 
 - **原則**：對於測試「行為」、「例外處理」和「UI 互動」的案例，繼續維持 hardcode 的方式，因為這類測試難以用純資料描述，硬要 XML 化反而會降低可讀性。

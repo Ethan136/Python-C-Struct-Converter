@@ -1,9 +1,9 @@
 import unittest
 import tempfile
 import os
-from config import ui_strings
+from src.config import ui_strings
 import pytest
-from config.ui_strings import get_string, load_ui_strings
+from src.config.ui_strings import get_string, load_ui_strings
 
 SAMPLE_XML = """<strings>
     <string name='greet'>Hello</string>

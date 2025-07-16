@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
-from presenter.struct_presenter import StructPresenter, HexProcessingError
+from src.presenter.struct_presenter import StructPresenter, HexProcessingError
 
 import time
 import threading
@@ -268,7 +268,7 @@ class TestStructPresenter(unittest.TestCase):
     def test_browse_file_success(self):
         from unittest.mock import patch, mock_open
         # Arrange
-        with patch('presenter.struct_presenter.filedialog.askopenfilename', return_value='test.h'):
+        with patch('src.presenter.struct_presenter.filedialog.askopenfilename', return_value='test.h'):
             with patch('builtins.open', mock_open(read_data='struct content')):
                 self.model.load_struct_from_file.return_value = ('MyStruct', [{'name': 'a'}], 8, 4)
                 # Act
@@ -284,14 +284,14 @@ class TestStructPresenter(unittest.TestCase):
 
     def test_browse_file_cancel(self):
         from unittest.mock import patch
-        with patch('presenter.struct_presenter.filedialog.askopenfilename', return_value=None):
+        with patch('src.presenter.struct_presenter.filedialog.askopenfilename', return_value=None):
             result = self.presenter.browse_file()
         self.assertEqual(result['type'], 'error')
         self.assertIn('未選擇檔案', result['message'])
 
     def test_browse_file_error(self):
         from unittest.mock import patch, mock_open
-        with patch('presenter.struct_presenter.filedialog.askopenfilename', return_value='test.h'):
+        with patch('src.presenter.struct_presenter.filedialog.askopenfilename', return_value='test.h'):
             with patch('builtins.open', mock_open(read_data='struct content')):
                 self.model.load_struct_from_file.side_effect = Exception('parse error')
                 result = self.presenter.browse_file()
@@ -360,7 +360,7 @@ class TestStructPresenter(unittest.TestCase):
         self.assertEqual((hits, misses), (1, 4))
 
     def test_presenter_observer_invalidate_cache(self):
-        from model.struct_model import StructModel
+        from src.model.struct_model import StructModel
         model = StructModel()
         presenter = StructPresenter(model)
         presenter._layout_cache[('dummy', 1)] = [1]

@@ -1,5 +1,5 @@
 import xml.etree.ElementTree as ET
-from tests.base_xml_test_loader import BaseXMLTestLoader
+from tests.data_driven.base_xml_test_loader import BaseXMLTestLoader
 
 class InputConversionXMLTestLoader(BaseXMLTestLoader):
     def parse_cases(self):

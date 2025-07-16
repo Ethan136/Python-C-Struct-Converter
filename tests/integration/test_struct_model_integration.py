@@ -6,8 +6,8 @@ import sys
 # Add src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from model.struct_model import StructModel
-from tests.xml_struct_model_loader import load_struct_model_tests
+from src.model.struct_model import StructModel
+from tests.data_driven.xml_struct_model_loader import load_struct_model_tests
 
 
 class TestStructModel(unittest.TestCase):
@@ -58,7 +58,7 @@ class TestStructModelIntegrationXMLDriven(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         config_file = os.path.join(
-            os.path.dirname(__file__),
+            os.path.dirname(os.path.dirname(__file__)),
             'data',
             'test_struct_model_integration_config.xml',
         )

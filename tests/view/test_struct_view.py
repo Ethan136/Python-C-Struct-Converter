@@ -8,9 +8,9 @@ pytestmark = pytest.mark.skipif(
     not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests"
 )
 
-from view.struct_view import StructView
-from presenter.struct_presenter import StructPresenter
-from model.struct_model import StructModel
+from src.view.struct_view import StructView
+from src.presenter.struct_presenter import StructPresenter
+from src.model.struct_model import StructModel
 
 class PresenterStub:
     def __init__(self):
@@ -48,12 +48,12 @@ class TestStructView(unittest.TestCase):
         self.presenter.is_auto_cache_clear_enabled.return_value = True
         # 修正 compute_member_layout 回傳真 layout
         def compute_member_layout(members, total_size):
-            from model.struct_model import StructModel
+            from src.model.struct_model import StructModel
             return StructModel().calculate_manual_layout(members, total_size)
         self.presenter.compute_member_layout.side_effect = compute_member_layout
         # 修正 calculate_remaining_space 回傳 (bits, bytes)
         def calculate_remaining_space(members, total_size):
-            from model.struct_model import StructModel
+            from src.model.struct_model import StructModel
             model = StructModel()
             used_bits = model.calculate_used_bits(members)
             total_bits = total_size * 8
@@ -74,7 +74,7 @@ class TestStructView(unittest.TestCase):
         self.presenter.get_cache_stats.return_value = (5, 3)
         self.presenter.get_last_layout_time.return_value = 0.0123
         # 關鍵：model 必須為真實 StructModel，避免 MagicMock 污染
-        from model.struct_model import StructModel
+        from src.model.struct_model import StructModel
         self.presenter.model = StructModel()
         self.view = StructView(presenter=self.presenter)
         # 若有 debug_tab 測試，需初始化
@@ -265,7 +265,7 @@ class TestStructView(unittest.TestCase):
         if model:
             layout = model.calculate_manual_layout(self.view.members, 8)
         else:
-            from model.struct_model import StructModel
+            from src.model.struct_model import StructModel
             layout = StructModel().calculate_manual_layout(self.view.members, 8)
         # 驗證 C++ align/padding 行為
         self.assertEqual(layout[0]['name'], 'a')
@@ -407,7 +407,7 @@ class TestStructView(unittest.TestCase):
         self.assertTrue(scrollbars, "MyStruct tab 應該有 scrollbar")
 
     def test_manual_struct_hex_parse_real_model(self):
-        from model.struct_model import StructModel
+        from src.model.struct_model import StructModel
         class RealPresenter:
             def __init__(self, view):
                 self.view = view
@@ -559,7 +559,7 @@ class TestStructView(unittest.TestCase):
 
     def test_manual_struct_real_presenter_integration(self):
         """測試真實 presenter 與 MyStruct tab 的整合"""
-        from model.struct_model import StructModel
+        from src.model.struct_model import StructModel
         
         # 建立真實 presenter
         model = StructModel()
@@ -673,7 +673,7 @@ class TestStructView(unittest.TestCase):
     def test_debug_tab_shows_presenter_cache_stats_and_layout_time(self):
         import tkinter as tk
         from unittest.mock import MagicMock
-        from view.struct_view import StructView
+        from src.view.struct_view import StructView
         root = tk.Tk()
         presenter = MagicMock()
         presenter.get_cache_stats.return_value = (5, 3)
@@ -702,7 +702,7 @@ class TestStructView(unittest.TestCase):
     def test_debug_tab_shows_lru_cache_state(self):
         import tkinter as tk
         from unittest.mock import MagicMock
-        from view.struct_view import StructView
+        from src.view.struct_view import StructView
         root = tk.Tk()
         presenter = MagicMock()
         presenter.get_cache_stats.return_value = (10, 2)
@@ -759,7 +759,7 @@ class TestStructView(unittest.TestCase):
     def test_debug_tab_auto_refresh_behavior(self):
         import tkinter as tk
         from unittest.mock import MagicMock, patch
-        from view.struct_view import StructView
+        from src.view.struct_view import StructView
         root = tk.Tk()
         presenter = MagicMock()
         presenter.get_cache_stats.return_value = (1, 1)

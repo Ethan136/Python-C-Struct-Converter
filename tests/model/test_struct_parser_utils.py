@@ -1,14 +1,14 @@
 import unittest
 import pytest
 import os
-from model.struct_parser import parse_member_line, _extract_struct_body
-from tests.xml_struct_parser_utils_loader import load_struct_parser_utils_tests
+from src.model.struct_parser import parse_member_line, _extract_struct_body
+from tests.data_driven.xml_struct_parser_utils_loader import load_struct_parser_utils_tests
 
 class TestParseMemberLine(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         config_path = os.path.join(
-            os.path.dirname(__file__), 'data', 'test_struct_parser_utils_config.xml'
+            os.path.dirname(os.path.dirname(__file__),), 'data', 'test_struct_parser_utils_config.xml'
         )
         cls.member_cases, cls.body_cases = load_struct_parser_utils_tests(config_path)
 
@@ -33,7 +33,7 @@ class TestExtractStructBody(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         config_path = os.path.join(
-            os.path.dirname(__file__), 'data', 'test_struct_parser_utils_config.xml'
+            os.path.dirname(os.path.dirname(__file__),), 'data', 'test_struct_parser_utils_config.xml'
         )
         cls.member_cases, cls.body_cases = load_struct_parser_utils_tests(config_path)
 

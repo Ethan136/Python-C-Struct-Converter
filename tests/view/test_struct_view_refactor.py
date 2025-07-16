@@ -12,12 +12,22 @@ pytestmark = pytest.mark.skipif(
 class TestStructViewRefactor(unittest.TestCase):
 
     def setUp(self):
-        def fake_init(self, *args, **kwargs):
-            self.tk = MagicMock()
-        with patch('tkinter.Tk.__init__', fake_init):
+        # 完全 mock StructView.__init__，手動設置屬性，避免 GUI 初始化
+        with patch('src.view.struct_view.StructView.__init__', lambda self: None):
             self.view = StructView()
         self.view.presenter = MagicMock()
+        self.view.hex_grid_frame = MagicMock()
+        self.view.hex_entries = MagicMock()
+        self.view._build_hex_grid = MagicMock()
+        self.view.get_selected_unit_size = MagicMock(return_value=4)
+        self.view.manual_hex_grid_frame = MagicMock()
+        self.view.manual_hex_entries = MagicMock()
+        self.view.manual_unit_size_var = MagicMock()
+        self.view.size_var = MagicMock()
+        self.view.manual_unit_size_var.get = MagicMock(return_value="8 Bytes")
+        self.view.size_var.get = MagicMock(return_value=32)
 
+    @pytest.mark.timeout(10)
     def test_rebuild_hex_grid_calls_build_hex_grid(self):
         # 模擬 _build_hex_grid 方法
         self.view._build_hex_grid = MagicMock()
@@ -33,6 +43,7 @@ class TestStructViewRefactor(unittest.TestCase):
             self.view.hex_grid_frame, self.view.hex_entries, 16, 4
         )
 
+    @pytest.mark.timeout(10)
     def test_rebuild_manual_hex_grid_calls_build_hex_grid(self):
         # 模擬 _build_hex_grid 方法
         self.view._build_hex_grid = MagicMock()

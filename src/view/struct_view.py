@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, messagebox
-# from config import get_string
-from model.struct_model import StructModel
+# from src.config import get_string
+from src.model.struct_model import StructModel
 
 def create_member_treeview(parent):
     tree = ttk.Treeview(

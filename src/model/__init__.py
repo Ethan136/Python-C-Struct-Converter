@@ -1,8 +1,8 @@
 # Model Layer - Core Business Logic
 # Contains data structures and business logic independent of UI
 
-from model.struct_model import StructModel, parse_struct_definition, calculate_layout
-from model.struct_parser import (
+from src.model.struct_model import StructModel, parse_struct_definition, calculate_layout
+from src.model.struct_parser import (
     MemberDef,
     StructDef,
     UnionDef,
@@ -12,7 +12,7 @@ from model.struct_parser import (
     parse_c_definition,
     parse_c_definition_ast,
 )
-from model.layout import (
+from src.model.layout import (
     LayoutCalculator,
     LayoutItem,
     BaseLayoutCalculator,

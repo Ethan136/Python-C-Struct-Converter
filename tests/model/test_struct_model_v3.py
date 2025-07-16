@@ -5,8 +5,8 @@ import os
 # 添加專案根目錄到 Python 路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from model.struct_model import StructModel
-from tests.xml_struct_model_v3_loader import load_struct_model_v3_tests
+from src.model.struct_model import StructModel
+from tests.data_driven.xml_struct_model_v3_loader import load_struct_model_v3_tests
 
 class TestStructModelV3(unittest.TestCase):
     """測試 V3 版本的 StructModel 新功能"""
@@ -118,7 +118,7 @@ class TestStructModelV3(unittest.TestCase):
 class TestStructModelV3XMLDriven(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        config_file = os.path.join(os.path.dirname(__file__), 'data', 'test_struct_model_v3_config.xml')
+        config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_struct_model_v3_config.xml')
         cls.cases = load_struct_model_v3_tests(config_file)
         cls.model = StructModel()
 

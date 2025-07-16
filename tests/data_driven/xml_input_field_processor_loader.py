@@ -1,6 +1,6 @@
 import xml.etree.ElementTree as ET
 from collections import defaultdict
-from tests.base_xml_test_loader import BaseXMLTestLoader
+from tests.data_driven.base_xml_test_loader import BaseXMLTestLoader
 
 class InputFieldProcessorXMLTestLoader(BaseXMLTestLoader):
     def parse_extra(self, case):

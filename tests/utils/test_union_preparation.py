@@ -1,7 +1,7 @@
 import unittest
-from model.struct_model import calculate_layout
-from model.layout import BaseLayoutCalculator, LayoutItem
-from model.struct_parser import parse_c_definition
+from src.model.struct_model import calculate_layout
+from src.model.layout import BaseLayoutCalculator, LayoutItem
+from src.model.struct_parser import parse_c_definition
 
 class DummyCalculator(BaseLayoutCalculator):
     def calculate(self, members):

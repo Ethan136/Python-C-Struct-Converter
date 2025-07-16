@@ -5,7 +5,7 @@ import unittest
 # Add src to path to import the model
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from model.layout import BaseLayoutCalculator, StructLayoutCalculator, LayoutCalculator
+from src.model.layout import BaseLayoutCalculator, StructLayoutCalculator, LayoutCalculator
 
 class TestLayoutRefactor(unittest.TestCase):
     def test_base_class_is_abstract(self):
