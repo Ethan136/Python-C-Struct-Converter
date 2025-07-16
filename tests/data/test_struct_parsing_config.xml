@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<struct_parsing_tests>
+    <!-- Parsing tests -->
+    <test_case name="valid_struct_definition" type="parse">
+        <struct_definition><![CDATA[
+            struct TestStruct {
+                char a;
+                int b;
+                long long c;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>TestStruct</expected_struct_name>
+        <expected_members>
+            <member type="char" name="a" />
+            <member type="int" name="b" />
+            <member type="long long" name="c" />
+        </expected_members>
+    </test_case>
+
+    <test_case name="struct_with_bitfields" type="parse">
+        <struct_definition><![CDATA[
+            struct BitFieldStruct {
+                int a : 1;
+                int b : 2;
+                char c;
+                int d : 3;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>BitFieldStruct</expected_struct_name>
+        <expected_members>
+            <member type="int" name="a" is_bitfield="true" bit_size="1" />
+            <member type="int" name="b" is_bitfield="true" bit_size="2" />
+            <member type="char" name="c" />
+            <member type="int" name="d" is_bitfield="true" bit_size="3" />
+        </expected_members>
+    </test_case>
+
+    <test_case name="struct_with_pointer" type="parse">
+        <struct_definition><![CDATA[
+            struct PointerStruct {
+                int* ptr;
+                char* str;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>PointerStruct</expected_struct_name>
+        <expected_members>
+            <member type="pointer" name="ptr" />
+            <member type="pointer" name="str" />
+        </expected_members>
+    </test_case>
+
+    <test_case name="struct_with_unsigned_types" type="parse">
+        <struct_definition><![CDATA[
+            struct UnsignedStruct {
+                unsigned int a;
+                unsigned long b;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>UnsignedStruct</expected_struct_name>
+        <expected_members>
+            <member type="unsigned int" name="a" />
+            <member type="unsigned long" name="b" />
+        </expected_members>
+    </test_case>
+
+    <test_case name="struct_with_whitespace" type="parse">
+        <struct_definition><![CDATA[
+            struct WhitespaceStruct {
+                char    a;
+                int     b;
+                long long   c;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>WhitespaceStruct</expected_struct_name>
+        <expected_members>
+            <member type="char" name="a" />
+            <member type="int" name="b" />
+            <member type="long long" name="c" />
+        </expected_members>
+    </test_case>
+
+    <test_case name="struct_with_unknown_type" type="parse">
+        <struct_definition><![CDATA[
+            struct UnknownStruct {
+                char a;
+                unknown_type b;
+                int c;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>UnknownStruct</expected_struct_name>
+        <expected_members>
+            <member type="char" name="a" />
+            <member type="int" name="c" />
+        </expected_members>
+    </test_case>
+
+    <test_case name="invalid_struct_no_match" type="parse">
+        <struct_definition>This is not a struct definition</struct_definition>
+        <expect_none />
+    </test_case>
+
+    <!-- Layout calculation tests -->
+    <test_case name="simple_struct_no_padding" type="layout">
+        <struct_definition><![CDATA[
+            struct SimpleStruct {
+                char a;
+                char b;
+                char c;
+            };
+        ]]></struct_definition>
+        <expected_total_size>3</expected_total_size>
+        <expected_alignment>1</expected_alignment>
+        <expected_layout>
+            <entry name="a" offset="0" size="1" />
+            <entry name="b" offset="1" size="1" />
+            <entry name="c" offset="2" size="1" />
+        </expected_layout>
+    </test_case>
+
+    <test_case name="struct_with_padding_layout" type="layout">
+        <struct_definition><![CDATA[
+            struct PaddingStruct {
+                char a;
+                int b;
+                char c;
+            };
+        ]]></struct_definition>
+        <expected_total_size>12</expected_total_size>
+        <expected_alignment>4</expected_alignment>
+        <expected_layout>
+            <entry name="a" offset="0" size="1" />
+            <entry type="padding" size="3" />
+            <entry name="b" offset="4" size="4" />
+            <entry name="c" offset="8" size="1" />
+            <entry type="padding" size="3" />
+        </expected_layout>
+    </test_case>
+
+    <test_case name="bitfield_layout" type="layout">
+        <struct_definition><![CDATA[
+            struct BitFieldStruct {
+                int a : 1;
+                int b : 2;
+                char c;
+                int d : 3;
+            };
+        ]]></struct_definition>
+        <expected_total_size>12</expected_total_size>
+        <expected_alignment>4</expected_alignment>
+        <expected_layout>
+            <entry name="a" offset="0" size="4" bit_offset="0" bit_size="1" />
+            <entry name="b" offset="0" size="4" bit_offset="1" bit_size="2" />
+            <entry name="c" offset="4" size="1" />
+            <entry type="padding" size="3" />
+            <entry name="d" offset="8" size="4" bit_offset="0" bit_size="3" />
+        </expected_layout>
+    </test_case>
+
+    <test_case name="array_member_single_element_layout" type="layout">
+        <struct_definition><![CDATA[
+            struct ArrayStruct {
+                int arr[3][2];
+            };
+        ]]></struct_definition>
+        <expected_total_size>4</expected_total_size>
+        <expected_alignment>4</expected_alignment>
+        <expected_layout>
+            <entry name="arr" offset="0" size="4" />
+        </expected_layout>
+    </test_case>
+
+    <test_case name="layout_item_dataclass" type="layout">
+        <struct_definition><![CDATA[
+            struct DataClassStruct {
+                char a;
+                int b;
+            };
+        ]]></struct_definition>
+        <expected_total_size>8</expected_total_size>
+        <expected_alignment>4</expected_alignment>
+        <expected_layout>
+            <entry name="a" offset="0" size="1" />
+            <entry type="padding" size="3" />
+            <entry name="b" offset="4" size="4" />
+        </expected_layout>
+    </test_case>
+</struct_parsing_tests>
