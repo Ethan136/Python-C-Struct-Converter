@@ -40,4 +40,5 @@
 
 - `test_input_field_processor.py` 已全面使用 `test_input_field_processor_config.xml`，其中 `pad_hex_input` 與 `convert_to_raw_bytes` 測試皆改為 XML 驅動。
 - `test_struct_model_integration.py` 的多數案例現已由 `test_struct_model_integration_config.xml` 載入。
+- `test_struct_model.py` 大多數解析與 layout 測試也改以 XML 描述，配置檔為 `test_struct_model_config.xml`。
 - 仍維持 hardcode 的僅剩行為與例外處理相關測試，例如上列三項。
