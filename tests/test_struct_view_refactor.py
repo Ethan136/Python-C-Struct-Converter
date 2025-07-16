@@ -1,13 +1,21 @@
 
+import os
 import unittest
+import pytest
 from unittest.mock import MagicMock, patch
 from src.view.struct_view import StructView
 
+pytestmark = pytest.mark.skipif(
+    not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests"
+)
+
 class TestStructViewRefactor(unittest.TestCase):
 
-    @patch('tkinter.Tk')
-    def setUp(self, mock_tk):
-        self.view = StructView()
+    def setUp(self):
+        def fake_init(self, *args, **kwargs):
+            self.tk = MagicMock()
+        with patch('tkinter.Tk.__init__', fake_init):
+            self.view = StructView()
         self.view.presenter = MagicMock()
 
     def test_rebuild_hex_grid_calls_build_hex_grid(self):
