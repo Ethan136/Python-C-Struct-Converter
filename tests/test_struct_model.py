@@ -324,53 +324,6 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(self.model.total_size, original_total_size)
 
 
-class TestCombinedExampleStruct(unittest.TestCase):
-    """
-    測試 example.h 的 CombinedExample struct。
-    驗證 struct parser 能正確處理 bitfield、padding、pointer、混合欄位順序與 layout。
-    """
-    def test_combined_example_struct(self):
-        struct_content = '''
-        struct CombinedExample {
-            char      a;
-            int       b;
-            int       c1 : 1;
-            int       c2 : 2;
-            int       c3 : 5;
-            char      d;
-            long long e;
-            unsigned char f;
-            char*     g;
-        };
-        '''
-        from model.struct_model import parse_struct_definition, calculate_layout
-        struct_name, members = parse_struct_definition(struct_content)
-        self.assertEqual(struct_name, "CombinedExample")
-        # 檢查欄位順序與型別
-        expected = [
-            ("char", "a"),
-            ("int", "b"),
-            {"type": "int", "name": "c1", "is_bitfield": True, "bit_size": 1},
-            {"type": "int", "name": "c2", "is_bitfield": True, "bit_size": 2},
-            {"type": "int", "name": "c3", "is_bitfield": True, "bit_size": 5},
-            ("char", "d"),
-            ("long long", "e"),
-            ("unsigned char", "f"),
-            ("pointer", "g"),
-        ]
-        for m, exp in zip(members, expected):
-            if isinstance(exp, dict):
-                self.assertIsInstance(m, dict)
-                for k in exp:
-                    self.assertEqual(m[k], exp[k])
-            else:
-                self.assertEqual(m, exp)
-        # 檢查 layout 計算（只驗證欄位順序與 offset，不驗證所有 padding 細節）
-        layout, total_size, struct_align = calculate_layout(members)
-        names = [item["name"] for item in layout if item["type"] != "padding"]
-        self.assertEqual(names, ["a", "b", "c1", "c2", "c3", "d", "e", "f", "g"])
-        self.assertEqual(struct_align, 8)
-        self.assertGreaterEqual(total_size, 40)  # 依據 x86-64 ABI，應為 40 bytes
 
 
 class TestTypeInfo(unittest.TestCase):

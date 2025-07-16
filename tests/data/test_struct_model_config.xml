@@ -321,4 +321,36 @@
             <member name="(final padding)" type="padding" size="3" offset="9" is_bitfield="false" bit_offset="0" bit_size="24"/>
         </expected_results>
     </test_case>
+    <test_case name="combined_example_struct" description="Complex struct from example.h">
+        <struct_definition><![CDATA[
+            struct CombinedExample {
+                char      a;
+                int       b;
+                int       c1 : 1;
+                int       c2 : 2;
+                int       c3 : 5;
+                char      d;
+                long long e;
+                unsigned char f;
+                char*     g;
+            };
+        ]]></struct_definition>
+        <expected_total_size>40</expected_total_size>
+        <expected_struct_align>8</expected_struct_align>
+        <expected_layout_len>12</expected_layout_len>
+        <expected_results>
+            <member name="a" type="char" size="1" offset="0"/>
+            <member name="(padding)" type="padding" size="3" offset="1"/>
+            <member name="b" type="int" size="4" offset="4"/>
+            <member name="c1" type="int" size="4" offset="8" is_bitfield="true" bit_offset="0" bit_size="1"/>
+            <member name="c2" type="int" size="4" offset="8" is_bitfield="true" bit_offset="1" bit_size="2"/>
+            <member name="c3" type="int" size="4" offset="8" is_bitfield="true" bit_offset="3" bit_size="5"/>
+            <member name="d" type="char" size="1" offset="12"/>
+            <member name="(padding)" type="padding" size="3" offset="13"/>
+            <member name="e" type="long long" size="8" offset="16"/>
+            <member name="f" type="unsigned char" size="1" offset="24"/>
+            <member name="(padding)" type="padding" size="7" offset="25"/>
+            <member name="g" type="pointer" size="8" offset="32"/>
+        </expected_results>
+    </test_case>
 </struct_model_tests> 
