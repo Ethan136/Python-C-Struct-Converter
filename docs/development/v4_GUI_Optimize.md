@@ -385,7 +385,7 @@ last_time = presenter.get_last_layout_time()
 - 效益：可量化 cache 效能，便於回歸監控。
 
 ### 2. Presenter/View cache 介面 docstring/註解補強
-- 目標：所有 cache 相關方法（如 invalidate_cache、compute_member_layout）皆有明確 docstring/註解。
+- 目標：所有 cache 相關 method（如 invalidate_cache、compute_member_layout）皆有明確 docstring/註解。
 - TDD 測試：可用 doctest 或人工 review 驗證。
 - 效益：提升維護性與 mock/stub 一致性。
 
@@ -580,11 +580,11 @@ last_time = presenter.get_last_layout_time()
 - **測試規劃**：  
 
 
-## 移除 MyStruct Tab Debug Bytes 區塊
+## 移除 MyStruct Tab Debug 欄位
 
 ### 1. 需求概述
 - 簡化介面，僅在載入 `.h` 檔或 Debug Tab 顯示 Debug Bytes
-- MyStruct 頁面不再建立 `manual_debug_text`
+- MyStruct 頁面不再建立 `manual_debug_text`，視覺上僅留解析按鈕與結果
 
 ### 2. 影響檔案
 - `src/view/struct_view.py`：移除 `manual_debug_frame`、`manual_debug_text` 與相關方法
@@ -594,7 +594,7 @@ last_time = presenter.get_last_layout_time()
 ### 3. 需調整的程式與測試位置
 - `src/view/struct_view.py`
   - 刪除 `_create_manual_debug_frame` 區塊中 `manual_debug_text` 相關程式碼
-  - 移除 `show_manual_debug_bytes` 方法
+  - 移除 `show_manual_debug_bytes` 方法與相依呼叫處
   - `_on_parse_manual_hex` 不再呼叫 `show_manual_debug_bytes`
 - `tests/test_struct_view.py`
   - 移除 `test_manual_struct_hex_input_and_parse_debug`
