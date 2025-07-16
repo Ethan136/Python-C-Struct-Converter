@@ -51,7 +51,8 @@ Tests for struct parsing and layout calculation.
 - Tests LayoutCalculator class functionality
 - Tests memory layout calculation with padding
 - Tests bitfield layout calculation
-- *All test data defined in code*
+- *Cases loaded from `tests/data/test_struct_parsing_config.xml` using
+  `tests.xml_struct_parsing_loader`*
 
 ### `test_struct_model_integration.py` *(新增)*
 Tests for StructModel integration functionality. Most cases are loaded from `tests/data/test_struct_model_integration_config.xml`.
