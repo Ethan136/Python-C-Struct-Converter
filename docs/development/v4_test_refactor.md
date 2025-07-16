@@ -44,4 +44,4 @@
 - `test_struct_manual_integration.py` 與 `test_manual_struct_v3_integration.py` 共同使用 `manual_struct_test_config.xml`。
 - `test_struct_model_integration.py` 的多數案例亦由 `test_struct_model_integration_config.xml` 載入。
  - `test_struct_model.py` 現已大幅精簡，多數解析、layout、hex 相關案例均由 `test_struct_model_config.xml` 載入。
-- 目前仍有多項 hardcode 測試（如 `test_string_parser.py`、`test_struct_parsing.py`、`test_struct_parser_v2.py`、`test_layout_refactor.py`、`test_struct_presenter.py`、`test_union_preparation.py`、各 GUI 測試以及部分 sanity check），主要涵蓋例外處理與 UI 行為。
+- 目前仍有多項 hardcode 測試（如 `test_string_parser.py`、`test_struct_parser_v2.py`、`test_layout_refactor.py`、`test_pack_alignment_placeholder.py`、`test_presenter_refactor.py`、`test_struct_presenter.py`、`test_union_preparation.py`、各 GUI 測試以及部分 sanity check），主要涵蓋例外處理與 UI 行為。
