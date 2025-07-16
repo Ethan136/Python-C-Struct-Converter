@@ -39,5 +39,9 @@
 ## 4. 進度紀錄
 
 - `test_input_field_processor.py` 已全面使用 `test_input_field_processor_config.xml`，其中 `pad_hex_input` 與 `convert_to_raw_bytes` 測試皆改為 XML 驅動。
-- `test_struct_model_integration.py` 的多數案例現已由 `test_struct_model_integration_config.xml` 載入。
-- 仍維持 hardcode 的僅剩行為與例外處理相關測試，例如上列三項。
+- `test_input_conversion.py` 的主要案例改由 `test_input_conversion_config.xml` 與 `test_input_conversion_error_config.xml` 提供。
+- `test_struct_parsing_core.py` 完全讀取 `struct_parsing_test_config.xml` 執行。
+- `test_struct_manual_integration.py` 與 `test_manual_struct_v3_integration.py` 共同使用 `manual_struct_test_config.xml`。
+- `test_struct_model_integration.py` 的多數案例亦由 `test_struct_model_integration_config.xml` 載入。
+- `test_struct_model.py` 新增 `TestStructModelXMLDriven` 類別讀取 `test_struct_model_config.xml`，但仍保留大量舊有的手寫測試。
+- 目前仍有多項 hardcode 測試（如 `test_string_parser.py`、`test_struct_parsing.py`、`test_struct_parser_v2.py`、`test_layout_refactor.py`、`test_struct_presenter.py`、`test_union_preparation.py`、各 GUI 測試以及部分 sanity check），主要涵蓋例外處理與 UI 行為。

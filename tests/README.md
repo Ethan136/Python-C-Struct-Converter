@@ -14,6 +14,7 @@
 Tests for the UI string configuration system.
 - Tests XML string loading functionality
 - Tests string retrieval with fallback handling
+- *Cases embedded directly in the test file (no external XML)*
 
 ### `test_input_conversion.py`
 Tests for the input conversion mechanism.
@@ -26,6 +27,8 @@ Tests for the input conversion mechanism.
 - Tests invalid input handling
 - Tests integration with model parsing
 - **支援 XML array 格式自動化測試**
+- *Main cases loaded from `tests/data/test_input_conversion_config.xml` and
+  `test_input_conversion_error_config.xml`; a few sanity checks remain in-code*
 
 ### `test_input_field_processor.py`
 Tests for the InputFieldProcessor module.
@@ -36,6 +39,8 @@ Tests for the InputFieldProcessor module.
 - Tests complete input processing pipeline
 - Tests error handling and edge cases
 - Tests supported field size validation
+- *Loads cases from `tests/data/test_input_field_processor_config.xml`; the
+  `is_supported_field_size` check remains hard-coded*
 
 ### `test_struct_parsing.py` *(新增)*
 Tests for struct parsing and layout calculation.
@@ -46,6 +51,7 @@ Tests for struct parsing and layout calculation.
 - Tests LayoutCalculator class functionality
 - Tests memory layout calculation with padding
 - Tests bitfield layout calculation
+- *All test data defined in code*
 
 ### `test_struct_model_integration.py` *(新增)*
 Tests for StructModel integration functionality. Most cases are loaded from `tests/data/test_struct_model_integration_config.xml`.
@@ -57,6 +63,7 @@ Tests for StructModel integration functionality. Most cases are loaded from `tes
 - Tests boolean and pointer value parsing
 - Tests padding handling in parsed data
 - Tests short input handling and zero padding
+- *Behavior and error-path tests at the top of the file remain hard-coded*
 
 ### `test_struct_parsing_core.py`
 Tests for core struct parsing functionality without GUI.
@@ -67,6 +74,7 @@ Tests for core struct parsing functionality without GUI.
 - Tests mixed field sizes (char, short, int, long long)
 - Tests empty input handling
 - **支援 XML 配置檔案自動化測試**
+- *All scenarios loaded from `tests/data/struct_parsing_test_config.xml`*
 
 ### `test_struct_model.py` *(大幅擴充)*
 Tests for core struct model functionality with comprehensive coverage.
@@ -89,6 +97,9 @@ Tests for core struct model functionality with comprehensive coverage.
 - **Legacy Compatibility Tests**:
   - Tests length field to bit_size conversion
   - Tests backward compatibility with old data formats
+- *Includes an XML-driven suite (`TestStructModelXMLDriven`) using
+  `tests/data/test_struct_model_config.xml`, while many older unit tests remain
+  hard-coded*
 
 ### `test_struct_manual_integration.py` *(新增)*
 Tests for manual struct definition integration functionality.
@@ -97,6 +108,7 @@ Tests for manual struct definition integration functionality.
 - Tests real-time remaining space calculation
 - Tests struct export functionality
 - Tests integration between manual and file-based struct loading
+- *Cases sourced from `tests/data/manual_struct_test_config.xml`*
 
 ### `test_gui_input_validation.py`
 Tests for GUI input validation and length limiting.
