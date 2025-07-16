@@ -17,7 +17,8 @@
 
 ## GUI 顯示行為（2024/07 更新）
 
-- 手動 struct 設定頁面（tab）**只顯示下方標準 struct layout（ttk.Treeview）**，即時顯示所有成員、padding、offset，完全對齊 C++ 標準。
+- 手動 struct 設定頁面（tab）僅有單一 struct member value 輸入欄位，無多欄位動態編輯功能，符合早期簡單設計。
+- Debug tab 為預設顯示，所有使用者皆可在 tab bar 上看到並檢查 cache、LRU、refresh 等資訊。
 - 原本的自訂 memory layout 表格已移除。
 - 此行為已通過自動化測試驗證（見 tests/test_struct_view_padding.py）。
 

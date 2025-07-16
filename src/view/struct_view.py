@@ -42,20 +42,13 @@ def create_scrollable_tab_frame(parent):
 class StructView(tk.Tk):
     def __init__(self, presenter=None):
         super().__init__()
-        self.member_entries = []  # 每個 row: (name_entry, type_menu, bit_entry, ...)
-        self._focus_new_member_idx = None  # 新增欄位自動 focus 用
         self.presenter = presenter
         self.title("C Struct GUI")
         self.geometry("1200x800")
-
-        # --- 防呆：預設初始化 debug auto refresh 屬性 ---
         self._debug_auto_refresh_id = None
         self._debug_auto_refresh_enabled = None
         self._debug_auto_refresh_interval = None
-
         self._create_tab_control()
-        # 在手動設定Tab建立UI
-        self._create_manual_struct_frame(self.tab_manual)
 
     def _create_tab_control(self):
         self.tab_control = ttk.Notebook(self)
@@ -69,6 +62,8 @@ class StructView(tk.Tk):
         self._create_file_tab_frame(self.tab_file)
         # 在手動設定Tab建立UI
         self._create_manual_struct_frame(self.tab_manual)
+        # 顯示 Debug tab
+        self._create_debug_tab()
 
     def _create_file_tab_frame(self, parent):
         _, main_frame = create_scrollable_tab_frame(parent)
@@ -192,6 +187,11 @@ class StructView(tk.Tk):
         manual_member_frame.pack(fill="x", padx=2, pady=2)
         self.manual_member_tree = create_member_treeview(manual_member_frame)
 
+        # debug bytes 顯示區
+        manual_debug_frame = tk.LabelFrame(scrollable_frame, text="Debug Bytes")
+        manual_debug_frame.pack(fill="x", padx=2, pady=2)
+        self.manual_debug_text = tk.Text(manual_debug_frame, height=4, width=100)
+        self.manual_debug_text.pack(fill="x")
 
         # 標準 struct layout Treeview（與 H 檔 tab 一致）
         layout_frame = tk.LabelFrame(scrollable_frame, text="Struct Layout (標準顯示)")
@@ -321,14 +321,6 @@ class StructView(tk.Tk):
             tk.Label(self.member_frame, text="無成員資料", fg="gray").grid(row=0, column=0, columnspan=6, pady=10)
         # 更新下方標準 struct layout treeview
         self._update_manual_layout_tree()
-        # 若有 focus_new_member_idx，則自動 focus
-        if self._focus_new_member_idx is not None:
-            try:
-                name_entry = self.member_entries[self._focus_new_member_idx][0]
-                name_entry.focus_set()
-            except Exception:
-                pass
-            self._focus_new_member_idx = None
 
     def _update_manual_layout_tree(self):
         # 計算 layout

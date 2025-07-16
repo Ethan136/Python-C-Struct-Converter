@@ -130,7 +130,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
   - The required memory padding between members.
   - The final total size of the struct.
 - **Bitfield Support**: Full support for C/C++ bitfield members (e.g., `int a : 1;`) with proper packing and storage unit alignment.
-- **Manual Struct Definition**: Define structs directly in the GUI with byte/bit size validation and real-time remaining space display.
+- **Manual Struct Definition**: Define structs directly in the GUI with a single value input field (no dynamic multi-column editing). The manual struct tab now only provides a single struct member value input, matching the original simple design.
 - **Chunked Hexadecimal Data Input**: Allows inputting hex data in user-defined chunks (1, 4, or 8 bytes) for better readability and ease of entry.
 - **Auto-Padding Hex Input**: Automatically pads shorter hexadecimal inputs with leading zeros to match the expected chunk size (e.g., `12` in a 4-byte field becomes `00000012`).
 - **Configurable Byte Order**: Choose between Little Endian and Big Endian for data interpretation.
@@ -139,6 +139,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
 - **Unified Parsing Logic**: Both `.H file tab` and `Manual Struct tab` use the same underlying parsing engine (`parse_struct_bytes`) for consistent results and maintainable code.
 - **TDD-Driven Development**: Comprehensive test coverage with 31 automated tests covering GUI operations, parsing logic, display functionality, padding, and bitfield handling.
 - **Real-time Size Display**: Each struct member shows its actual memory size in the editing table, helping users understand memory layout.
+- **Debug Tab**: A dedicated Debug tab is always visible in the tab bar for all users. This tab allows inspection of cache, LRU, and auto-refresh status directly from the GUI, with no restrictions or hidden mode.
 
 ## Bitfield Support
 

@@ -133,7 +133,7 @@ Tests for GUI view functionality with TDD approach.
 - Tests struct layout display with bitfield info
 - **Manual Struct Definition GUI Tests**:
   - Tests tab switching between file loading and manual definition
-  - Tests dynamic member table functionality
+  - Tests single-value member input and layout display (現行僅有單一 struct member value 輸入欄位，無多欄位動態編輯)
   - Tests real-time remaining space display
   - Tests validation feedback in GUI
   - Tests export functionality triggers
@@ -285,7 +285,7 @@ python3 -m unittest tests.test_struct_model.TestStructModel.test_parse_hex_data_
 ### 概述
 測試手動 struct 定義功能，包括 GUI 介面、驗證邏輯、匯出功能等。
 
-> **Note:** Manual struct mode now fully supports C++-style alignment and padding. All members are automatically aligned and padded as in C++.
+> **Note:** Manual struct mode now only provides a single struct member value input field (no dynamic multi-column editing). All members are automatically aligned and padded as in C++.
 
 ### 測試範圍
 - **GUI 介面**: Tab 切換、成員表格、即時驗證

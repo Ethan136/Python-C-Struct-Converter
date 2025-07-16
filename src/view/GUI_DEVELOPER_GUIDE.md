@@ -8,7 +8,8 @@
 ## 主要元件結構
 - **Tab 控制**：
   - `.H檔載入` Tab：支援載入 C/C++ struct header 檔案，顯示 struct layout、hex 輸入、解析結果。
-  - `手動 struct 定義` Tab：支援手動建立 struct，動態新增/刪除成員，顯示 layout 與解析。
+  - `手動 struct 定義` Tab：僅有單一 struct member value 輸入欄位（無多欄位動態編輯），顯示 layout 與解析。
+  - `Debug` Tab：預設顯示於 tab bar，所有使用者皆可見，可檢查 cache、LRU、refresh 狀態。
 - **成員表格**：Treeview 顯示 struct 成員名稱、型別、offset、size、bitfield 等資訊。
 - **Hex 輸入區**：依 struct 大小與單位自動產生多個 Entry 欄位，支援 chunked 輸入。
 - **Debug/解析結果區**：Text/Treeview 顯示原始 bytes、解析值、layout 對應。
