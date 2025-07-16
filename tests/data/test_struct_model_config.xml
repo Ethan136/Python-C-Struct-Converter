@@ -182,4 +182,153 @@
             <member name="val" value_little="2378182078228332544" value_big="289" hex_raw="0000000000000121"/>
         </expected_results>
     </test_case>
+    <test_case name="layout_empty_struct" description="Layout calculation for empty struct">
+        <struct_definition><![CDATA[
+            struct EmptyStruct {
+            };
+        ]]></struct_definition>
+        <expected_total_size>0</expected_total_size>
+        <expected_struct_align>1</expected_struct_align>
+        <expected_layout_len>0</expected_layout_len>
+    </test_case>
+    <test_case name="layout_simple_no_padding" description="Layout calculation with no padding">
+        <struct_definition><![CDATA[
+            struct Simple {
+                char a;
+                char b;
+                char c;
+            };
+        ]]></struct_definition>
+        <expected_total_size>3</expected_total_size>
+        <expected_struct_align>1</expected_struct_align>
+        <expected_layout_len>3</expected_layout_len>
+        <expected_results>
+            <member name="a" type="char" size="1" offset="0"/>
+            <member name="b" type="char" size="1" offset="1"/>
+            <member name="c" type="char" size="1" offset="2"/>
+        </expected_results>
+    </test_case>
+    <test_case name="layout_with_padding" description="Layout calculation with internal padding">
+        <struct_definition><![CDATA[
+            struct PaddingTest {
+                char a;
+                int b;
+            };
+        ]]></struct_definition>
+        <expected_total_size>8</expected_total_size>
+        <expected_struct_align>4</expected_struct_align>
+        <expected_layout_len>3</expected_layout_len>
+        <expected_results>
+            <member name="a" type="char" size="1" offset="0"/>
+            <member name="(padding)" type="padding" size="3" offset="1" bit_offset="0" bit_size="24"/>
+            <member name="b" type="int" size="4" offset="4"/>
+        </expected_results>
+    </test_case>
+    <test_case name="layout_final_padding" description="Layout calculation with final padding">
+        <struct_definition><![CDATA[
+            struct FinalPad {
+                int a;
+                char b;
+            };
+        ]]></struct_definition>
+        <expected_total_size>8</expected_total_size>
+        <expected_struct_align>4</expected_struct_align>
+        <expected_layout_len>3</expected_layout_len>
+        <expected_results>
+            <member name="a" type="int" size="4" offset="0"/>
+            <member name="b" type="char" size="1" offset="4"/>
+            <member name="(final padding)" type="padding" size="3" offset="5" bit_offset="0" bit_size="24"/>
+        </expected_results>
+    </test_case>
+    <test_case name="layout_complex_struct" description="Layout calculation for complex struct">
+        <struct_definition><![CDATA[
+            struct Complex {
+                char a;
+                int b;
+                char c;
+                double d;
+            };
+        ]]></struct_definition>
+        <expected_total_size>24</expected_total_size>
+        <expected_struct_align>8</expected_struct_align>
+        <expected_layout_len>6</expected_layout_len>
+        <expected_results>
+            <member name="a" type="char" size="1" offset="0"/>
+            <member name="(padding)" type="padding" size="3" offset="1" bit_offset="0" bit_size="24"/>
+            <member name="b" type="int" size="4" offset="4"/>
+            <member name="c" type="char" size="1" offset="8"/>
+            <member name="(padding)" type="padding" size="7" offset="9" bit_offset="0" bit_size="56"/>
+            <member name="d" type="double" size="8" offset="16"/>
+        </expected_results>
+    </test_case>
+    <test_case name="layout_pointer_alignment" description="Layout calculation with pointer alignment">
+        <struct_definition><![CDATA[
+            struct PtrStruct {
+                char a;
+                int* ptr;
+            };
+        ]]></struct_definition>
+        <expected_total_size>16</expected_total_size>
+        <expected_struct_align>8</expected_struct_align>
+        <expected_layout_len>3</expected_layout_len>
+        <expected_results>
+            <member name="a" type="char" size="1" offset="0"/>
+            <member name="(padding)" type="padding" size="7" offset="1" bit_offset="0" bit_size="56"/>
+            <member name="ptr" type="pointer" size="8" offset="8"/>
+        </expected_results>
+    </test_case>
+    <test_case name="layout_bitfield" description="Layout calculation for bitfield struct">
+        <struct_definition><![CDATA[
+            struct Bfs {
+                int a : 1;
+                int b : 2;
+                int c : 5;
+            };
+        ]]></struct_definition>
+        <expected_total_size>4</expected_total_size>
+        <expected_struct_align>4</expected_struct_align>
+        <expected_layout_len>3</expected_layout_len>
+        <expected_results>
+            <member name="a" type="int" size="4" offset="0" is_bitfield="true" bit_offset="0" bit_size="1"/>
+            <member name="b" type="int" size="4" offset="0" is_bitfield="true" bit_offset="1" bit_size="2"/>
+            <member name="c" type="int" size="4" offset="0" is_bitfield="true" bit_offset="3" bit_size="5"/>
+        </expected_results>
+    </test_case>
+    <test_case name="layout_padding_layout_fields" description="Padding fields include bit info">
+        <struct_definition><![CDATA[
+            struct PaddingFields {
+                char a;
+                int b;
+                char c;
+            };
+        ]]></struct_definition>
+        <expected_total_size>12</expected_total_size>
+        <expected_struct_align>4</expected_struct_align>
+        <expected_layout_len>5</expected_layout_len>
+        <expected_results>
+            <member name="a" type="char" size="1" offset="0"/>
+            <member name="(padding)" type="padding" size="3" offset="1" bit_offset="0" bit_size="24"/>
+            <member name="b" type="int" size="4" offset="4"/>
+            <member name="c" type="char" size="1" offset="8"/>
+            <member name="(final padding)" type="padding" size="3" offset="9" bit_offset="0" bit_size="24"/>
+        </expected_results>
+    </test_case>
+    <test_case name="hex_raw_formatting" description="Hex raw formatting check" endianness="big">
+        <struct_definition><![CDATA[
+            struct TestStruct {
+                char a;
+                int b;
+                long long c;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>01000000000001230000000004567890</hex>
+        </input_data>
+        <expected_results>
+            <member name="a" hex_raw="01"/>
+            <member name="(padding)" hex_raw="000000"/>
+            <member name="b" hex_raw="00000123"/>
+            <member name="c" hex_raw="0000000004567890"/>
+        </expected_results>
+    </test_case>
 </struct_model_tests> 

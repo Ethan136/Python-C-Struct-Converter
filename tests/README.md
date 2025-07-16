@@ -98,8 +98,8 @@ Tests for core struct model functionality with comprehensive coverage.
   - Tests length field to bit_size conversion
   - Tests backward compatibility with old data formats
 - *Includes an XML-driven suite (`TestStructModelXMLDriven`) using
-  `tests/data/test_struct_model_config.xml`, while many older unit tests remain
-  hard-coded*
+  `tests/data/test_struct_model_config.xml`; only a few behavioral checks
+  remain hard-coded*
 
 ### `test_struct_manual_integration.py` *(新增)*
 Tests for manual struct definition integration functionality.

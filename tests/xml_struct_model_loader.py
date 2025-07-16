@@ -12,6 +12,11 @@ class StructModelXMLTestLoader(BaseXMLTestLoader):
             if hex_elem is not None and hex_elem.text:
                 input_hex = hex_elem.text.strip()
         data['input_hex'] = input_hex
+        # 將 expected_results 中的數值欄位轉為 int 方便比對
+        for member in data.get('expected', []):
+            for key in ('offset', 'size', 'bit_offset', 'bit_size'):
+                if key in member:
+                    member[key] = int(member[key])
         return data
 
     def parse_extra(self, case):
