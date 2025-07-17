@@ -298,10 +298,15 @@
                 int arr[3][2];
             };
         ]]></struct_definition>
-        <expected_total_size>4</expected_total_size>
+        <expected_total_size>24</expected_total_size>
         <expected_alignment>4</expected_alignment>
         <expected_layout>
-            <entry name="arr" offset="0" size="4" />
+            <entry name="arr[0][0]" offset="0" size="4" />
+            <entry name="arr[0][1]" offset="4" size="4" />
+            <entry name="arr[1][0]" offset="8" size="4" />
+            <entry name="arr[1][1]" offset="12" size="4" />
+            <entry name="arr[2][0]" offset="16" size="4" />
+            <entry name="arr[2][1]" offset="20" size="4" />
         </expected_layout>
     </test_case>
 
