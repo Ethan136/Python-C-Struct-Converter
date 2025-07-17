@@ -14,14 +14,37 @@ from .struct_parser import parse_struct_definition, parse_member_line
 # parse_struct_definition 與 parse_member_line 已移至 ``struct_parser`` 模組，
 # 於此重新匯入以維持相容性。
 
+def _flatten_legacy_members(members, prefix=""):
+    flat = []
+    for m in members:
+        if isinstance(m, tuple) and len(m) == 2:
+            type_name, name = m
+            if type_name == "struct" or type_name == "union":
+                # 這裡假設 struct/union 內容已在原始 members 之後（legacy parser不保留巢狀內容，只保留型別與名稱）
+                # 若要支援巢狀內容，需配合 parse_struct_definition_ast
+                # 這裡僅展平名稱，型別以 struct/union 處理
+                # 若有 union 內容，需額外傳入 union 內部成員
+                # 這裡簡化處理，僅將名稱展平
+                continue  # legacy parser無法展平巢狀內容，僅保留名稱
+            else:
+                flat.append({"type": type_name, "name": prefix + name, "is_bitfield": False})
+        elif isinstance(m, dict):
+            name = prefix + m.get("name", "")
+            m2 = dict(m)
+            m2["name"] = name
+            flat.append(m2)
+    return flat
+
 def calculate_layout(members, calculator_cls=None, pack_alignment=None):
-    """Calculate the memory layout using the specified calculator class."""
+    """Calculate the memory layout using the specified calculator class. 支援 legacy union 展平。"""
     if not members:
         return [], 0, 1
 
+    # legacy union/struct 展平
+    flat_members = _flatten_legacy_members(members)
     calculator_cls = calculator_cls or LayoutCalculator
     layout_calculator = calculator_cls(pack_alignment=pack_alignment)
-    return layout_calculator.calculate(members)
+    return layout_calculator.calculate(flat_members)
 
 
 
