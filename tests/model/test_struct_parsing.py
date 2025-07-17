@@ -69,8 +69,31 @@ class TestStructParsing(unittest.TestCase):
                         # 這裡僅驗證外層欄位型別與名稱
                         # 若需驗證 AST，建議改用 parse_struct_definition_ast 並遞迴驗證
                 else:  # layout tests
-                    _, members = parse_struct_definition(case['struct_definition'])
+                    # --- 新增：若 struct 內有 union，改用 AST 展平成員 ---
+                    struct_def = case['struct_definition']
+                    if 'union' in struct_def:
+                        from src.model.struct_parser import parse_struct_definition_ast
+                        def flatten_ast_members(ast, prefix=""):
+                            flat = []
+                            for m in ast.members:
+                                if hasattr(m, 'nested') and m.nested:
+                                    if m.type == 'union':
+                                        for um in m.nested.members:
+                                            flat.append({"type": um.type, "name": f"{m.name}.{um.name}", "is_bitfield": getattr(um, 'is_bitfield', False), "bit_size": getattr(um, 'bit_size', 0), "array_dims": getattr(um, 'array_dims', [])})
+                                    elif m.type == 'struct':
+                                        for sm in m.nested.members:
+                                            flat.append({"type": sm.type, "name": f"{m.name}.{sm.name}", "is_bitfield": getattr(sm, 'is_bitfield', False), "bit_size": getattr(sm, 'bit_size', 0), "array_dims": getattr(sm, 'array_dims', [])})
+                                else:
+                                    flat.append({"type": m.type, "name": m.name, "is_bitfield": getattr(m, 'is_bitfield', False), "bit_size": getattr(m, 'bit_size', 0), "array_dims": getattr(m, 'array_dims', [])})
+                            return flat
+                        ast = parse_struct_definition_ast(struct_def)
+                        members = flatten_ast_members(ast)
+                    else:
+                        _, members = parse_struct_definition(struct_def)
                     layout, total_size, align = calculate_layout(members)
+                    print("[DEBUG] layout result:")
+                    for item in layout:
+                        print(f"  name={getattr(item, 'name', None)}, offset={getattr(item, 'offset', None)}, size={getattr(item, 'size', None)}, type={getattr(item, 'type', None)}")
                     self.assertEqual(total_size, case['expected_total_size'])
                     self.assertEqual(align, case['expected_alignment'])
                     self.assertEqual(len(layout), len(case['expected_layout']))
