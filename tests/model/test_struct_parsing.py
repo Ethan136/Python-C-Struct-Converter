@@ -2,7 +2,7 @@ import unittest
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 from src.model.struct_model import parse_struct_definition, calculate_layout
 from src.model.layout import LayoutItem

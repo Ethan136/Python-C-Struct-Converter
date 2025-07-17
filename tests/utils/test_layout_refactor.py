@@ -3,7 +3,7 @@ import sys
 import unittest
 
 # Add src to path to import the model
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 from src.model.layout import BaseLayoutCalculator, StructLayoutCalculator, LayoutCalculator
 

@@ -3,7 +3,7 @@ import sys
 import os
 
 # 添加專案根目錄到 Python 路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 from src.model.struct_model import StructModel
 from tests.data_driven.xml_struct_model_v3_loader import load_struct_model_v3_tests
