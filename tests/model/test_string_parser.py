@@ -1,8 +1,10 @@
 import unittest
 import tempfile
 import os
-from src.config import ui_strings
+import sys
 import pytest
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+from src.config import ui_strings
 from src.config.ui_strings import get_string, load_ui_strings
 
 SAMPLE_XML = """<strings>

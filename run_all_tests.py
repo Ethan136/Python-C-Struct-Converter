@@ -2,10 +2,12 @@ import subprocess
 import sys
 import os
 # 自動設置 PYTHONPATH=src 並重啟腳本
-if "PYTHONPATH" not in os.environ or "src" not in os.environ["PYTHONPATH"]:
-    os.environ["PYTHONPATH"] = "src"
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+SRC_PATH = os.path.join(ROOT_DIR, "src")
+if "PYTHONPATH" not in os.environ or SRC_PATH not in os.environ["PYTHONPATH"]:
+    os.environ["PYTHONPATH"] = SRC_PATH
     os.execv(sys.executable, [sys.executable] + sys.argv)
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
+sys.path.insert(0, SRC_PATH)
 import unittest
 import shutil
 
@@ -16,10 +18,11 @@ PYTHON_EXECUTABLE = VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executab
 
 def run_pytest(args, timeout=15):
     import subprocess
-    # 確保每個 test function 都有 15 秒 timeout
-    if '--timeout=15' not in args:
-        args = ['--timeout=15'] + args
-    # 強制載入 pytest_timeout plugin
+    import importlib.util
+    # 若 pytest_timeout plugin 存在，添加 --timeout 參數
+    if importlib.util.find_spec("pytest_timeout") is not None:
+        if '--timeout=15' not in args:
+            args = ['--timeout=15'] + args
     cmd = [PYTHON_EXECUTABLE, "-m", "pytest"] + args
     try:
         result = subprocess.run(

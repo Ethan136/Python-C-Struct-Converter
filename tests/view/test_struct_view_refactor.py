@@ -3,6 +3,8 @@ import os
 import unittest
 import pytest
 from unittest.mock import MagicMock, patch
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 from src.view.struct_view import StructView
 
 pytestmark = pytest.mark.skipif(
