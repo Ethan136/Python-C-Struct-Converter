@@ -67,3 +67,11 @@ main
 - development/v5_nd_array.md
 - development/v5_anonymous_bitfield.md
 - development/v5_pragma_pack.md 
+
+## 7. v5 Post Test Refactor（測試重構後規劃）
+
+- 參考文件：v5_post_test_refactor.md
+- 內容聚焦於 v5 AST/TDD 重構後的測試規劃、覆蓋率提升、XML 驅動、共用驗證 helper、測試分層、平行開發測試同步等。
+- 各主題分支開發時，請依據本文件規劃 stub、TDD 流程、XML 驅動測試，並善用共用驗證 helper。
+- 測試資料建議集中於 tests/data/，驗證 helper 集中於 utils/，便於管理與複用。
+- 合併前，建議以 pytest/CI/CD 驗證全測試綠燈，確保覆蓋率與品質。 
