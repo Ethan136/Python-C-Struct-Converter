@@ -99,6 +99,28 @@
         <expect_none />
     </test_case>
 
+    <test_case name="nested_struct_basic" type="parse">
+        <struct_definition><![CDATA[
+            struct Outer {
+                struct Inner {
+                    int x;
+                    char y;
+                } a;
+                int b;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>Outer</expected_struct_name>
+        <expected_members>
+            <member type="struct" name="a">
+                <nested_members>
+                    <member type="int" name="x" />
+                    <member type="char" name="y" />
+                </nested_members>
+            </member>
+            <member type="int" name="b" />
+        </expected_members>
+    </test_case>
+
     <!-- Layout calculation tests -->
     <test_case name="simple_struct_no_padding" type="layout">
         <struct_definition><![CDATA[

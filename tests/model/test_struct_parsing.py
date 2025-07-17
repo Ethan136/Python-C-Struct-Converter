@@ -8,6 +8,26 @@ from src.model.struct_model import parse_struct_definition, calculate_layout
 from src.model.layout import LayoutItem
 from tests.data_driven.xml_struct_parsing_loader import load_struct_parsing_tests
 
+import xml.etree.ElementTree as ET
+from src.model.struct_parser import parse_struct_definition_ast
+
+
+def _assert_ast_matches_xml(member_ast, member_xml):
+    # member_ast: MemberDef
+    # member_xml: ElementTree.Element <member>
+    assert member_ast.type == member_xml.get('type')
+    assert member_ast.name == member_xml.get('name')
+    nested_xml = member_xml.find('nested_members')
+    if nested_xml is not None:
+        assert member_ast.nested is not None
+        ast_members = member_ast.nested.members
+        xml_members = list(nested_xml.findall('member'))
+        assert len(ast_members) == len(xml_members)
+        for am, xm in zip(ast_members, xml_members):
+            _assert_ast_matches_xml(am, xm)
+    else:
+        assert member_ast.nested is None
+
 
 class TestStructParsing(unittest.TestCase):
     @classmethod
@@ -35,6 +55,19 @@ class TestStructParsing(unittest.TestCase):
                             if exp.get('is_bitfield'):
                                 self.assertTrue(m.get('is_bitfield'))
                                 self.assertEqual(m['bit_size'], exp['bit_size'])
+                    # 巢狀 struct AST 驗證
+                    if case['name'] == 'nested_struct_basic':
+                        # 取得 a 欄位
+                        a_member = None
+                        for m in members:
+                            if (isinstance(m, dict) and m.get('name') == 'a') or (isinstance(m, tuple) and m[1] == 'a'):
+                                a_member = m
+                                break
+                        # parser v1 回傳 tuple/dict，parser v2 以上回傳 MemberDef
+                        # 這裡假設 parse_struct_definition 回傳 dict，nested struct 需額外驗證
+                        # 若 parser 已支援 nested，可改用 parse_struct_definition_ast 驗證
+                        # 這裡僅驗證外層欄位型別與名稱
+                        # 若需驗證 AST，建議改用 parse_struct_definition_ast 並遞迴驗證
                 else:  # layout tests
                     _, members = parse_struct_definition(case['struct_definition'])
                     layout, total_size, align = calculate_layout(members)
@@ -57,6 +90,22 @@ class TestStructParsing(unittest.TestCase):
                                 self.assertEqual(item.bit_size, exp['bit_size'])
                     if case['name'] == 'layout_item_dataclass':
                         self.assertTrue(all(isinstance(i, LayoutItem) for i in layout))
+
+
+def test_struct_ast_nested_from_xml():
+    xml_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_struct_parsing_config.xml')
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+    for case in root.findall('test_case'):
+        if case.get('name') == 'nested_struct_basic':
+            struct_def = case.find('struct_definition').text
+            expected_members = case.find('expected_members')
+            sdef = parse_struct_definition_ast(struct_def)
+            ast_members = sdef.members
+            xml_members = list(expected_members.findall('member'))
+            assert len(ast_members) == len(xml_members)
+            for am, xm in zip(ast_members, xml_members):
+                _assert_ast_matches_xml(am, xm)
 
 
 if __name__ == '__main__':

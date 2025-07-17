@@ -179,22 +179,46 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
     if not struct_name or not struct_body:
         return None
     members = []
-    # 以正則逐行解析，精確處理巢狀 struct { ... } var;
-    pattern = re.compile(r"struct\s+(\w+)\s*\{([^}]*)\}\s*(\w+)\s*;?")
     pos = 0
-    while pos < len(struct_body):
-        m = pattern.search(struct_body, pos)
-        if m and m.start() == pos:
-            nested_name = m.group(1)
-            inner_content = m.group(2)
-            var_name = m.group(3)
-            nested_struct = parse_struct_definition_ast(f"struct {nested_name} {{{inner_content}}};")
-            members.append(MemberDef(type="struct", name=var_name, nested=nested_struct))
-            pos = m.end()
-            # 跳過分號
-            if pos < len(struct_body) and struct_body[pos] == ';':
-                pos += 1
-            continue
+    length = len(struct_body)
+    while pos < length:
+        # 跳過空白與分號
+        while pos < length and struct_body[pos] in ' \n\t;':
+            pos += 1
+        if pos >= length:
+            break
+        # 嘗試解析巢狀 struct
+        if struct_body.startswith('struct', pos):
+            # 解析 struct 名稱
+            m = re.match(r'struct\s+(\w+)\s*\{', struct_body[pos:])
+            if m:
+                nested_name = m.group(1)
+                name_start = pos + m.start(1)
+                brace_start = pos + m.end(0) - 1  # '{' 的位置
+                # 尋找對應的 '}'
+                brace_count = 1
+                i = brace_start + 1
+                while i < length and brace_count > 0:
+                    if struct_body[i] == '{':
+                        brace_count += 1
+                    elif struct_body[i] == '}':
+                        brace_count -= 1
+                    i += 1
+                if brace_count != 0:
+                    break  # 括號不平衡，結束
+                inner_content = struct_body[brace_start + 1:i - 1]
+                # 跳過 '}' 後的空白
+                j = i
+                while j < length and struct_body[j] in ' \n\t':
+                    j += 1
+                # 解析變數名稱
+                var_match = re.match(r'(\w+)\s*;?', struct_body[j:])
+                if var_match:
+                    var_name = var_match.group(1)
+                    nested_struct = parse_struct_definition_ast(f"struct {nested_name} {{{inner_content}}};")
+                    members.append(MemberDef(type="struct", name=var_name, nested=nested_struct))
+                    pos = j + var_match.end(0)
+                    continue
         # 處理一般欄位
         semi = struct_body.find(';', pos)
         if semi == -1:
