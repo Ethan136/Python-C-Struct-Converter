@@ -9,8 +9,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src"
 import unittest
 import shutil
 
-# 強制使用 .venv/bin/python
+# 強制使用 .venv/bin/python，如不存在則退回當前 Python
 VENV_PYTHON = os.path.join(os.path.dirname(__file__), '.venv', 'bin', 'python')
+PYTHON_EXECUTABLE = VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executable
 
 
 def run_pytest(args, timeout=15):
@@ -19,7 +20,7 @@ def run_pytest(args, timeout=15):
     if '--timeout=15' not in args:
         args = ['--timeout=15'] + args
     # 強制載入 pytest_timeout plugin
-    cmd = [VENV_PYTHON, "-m", "pytest"] + args
+    cmd = [PYTHON_EXECUTABLE, "-m", "pytest"] + args
     try:
         result = subprocess.run(
             cmd,
