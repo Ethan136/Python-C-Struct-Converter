@@ -18,7 +18,7 @@ jobs:
       - name: Run all tests
         run: python run_all_tests.py
       - name: Build Windows executable
-        run: pyinstaller CppStructParser.spec
+        run: pyinstaller packing/CppStructParser-windows.spec
       - name: Test Windows executable
         run: python packing/executable_tester.py --target windows
       - name: Upload Windows artifact
