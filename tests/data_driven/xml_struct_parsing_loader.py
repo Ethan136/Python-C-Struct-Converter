@@ -4,6 +4,21 @@ class StructParsingXMLTestLoader(BaseXMLTestLoader):
     """Load struct parsing and layout test cases from XML."""
 
     def parse_cases(self):
+        def parse_member_elem(m):
+            member = {
+                'type': m.get('type'),
+                'name': m.get('name'),
+            }
+            if m.get('is_bitfield'):
+                member['is_bitfield'] = m.get('is_bitfield') == 'true'
+            if m.get('bit_size'):
+                member['bit_size'] = int(m.get('bit_size'))
+            if m.get('array_dims'):
+                member['array_dims'] = [int(x) for x in m.get('array_dims').split(',') if x.strip()]
+            nested_elem = m.find('nested_members')
+            if nested_elem is not None:
+                member['nested_members'] = [parse_member_elem(child) for child in nested_elem.findall('member')]
+            return member
         cases = []
         for case in self.root.findall('test_case'):
             data = {
@@ -18,17 +33,7 @@ class StructParsingXMLTestLoader(BaseXMLTestLoader):
             members_elem = case.find('expected_members')
             if members_elem is not None:
                 for m in members_elem.findall('member'):
-                    member = {
-                        'type': m.get('type'),
-                        'name': m.get('name'),
-                    }
-                    if m.get('is_bitfield'):
-                        member['is_bitfield'] = m.get('is_bitfield') == 'true'
-                    if m.get('bit_size'):
-                        member['bit_size'] = int(m.get('bit_size'))
-                    if m.get('array_dims'):
-                        member['array_dims'] = [int(x) for x in m.get('array_dims').split(',') if x.strip()]
-                    members.append(member)
+                    members.append(parse_member_elem(m))
             data['expected_members'] = members
 
             # layout expectations

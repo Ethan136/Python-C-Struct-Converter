@@ -27,9 +27,10 @@ def _flatten_legacy_members(members, prefix=""):
                 # 這裡簡化處理，僅將名稱展平
                 continue  # legacy parser無法展平巢狀內容，僅保留名稱
             else:
-                flat.append({"type": type_name, "name": prefix + name, "is_bitfield": False})
+                flat.append({"type": type_name, "name": prefix + name if name is not None else None, "is_bitfield": False})
         elif isinstance(m, dict):
-            name = prefix + m.get("name", "")
+            orig_name = m.get("name")
+            name = prefix + orig_name if orig_name is not None else None
             m2 = dict(m)
             m2["name"] = name
             flat.append(m2)
@@ -278,12 +279,18 @@ class StructModel:
         lines = [f"struct {struct_name} {{"]
         for m in members:
             type_name = m.get("type", "")
-            name = m.get("name", "")
+            name = m.get("name", None)
             bit_size = m.get("bit_size", 0)
             if bit_size > 0:
-                lines.append(f"    {type_name} {name} : {bit_size};")
+                if name is None or name == "":
+                    lines.append(f"    {type_name} : {bit_size};")
+                else:
+                    lines.append(f"    {type_name} {name} : {bit_size};")
             else:
-                lines.append(f"    {type_name} {name};")
+                if name is None or name == "":
+                    lines.append(f"    {type_name};")
+                else:
+                    lines.append(f"    {type_name} {name};")
         lines.append("};")
         lines.append(f"// total size: {total_size} bytes")
         return "\n".join(lines)
