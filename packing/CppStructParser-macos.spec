@@ -9,10 +9,7 @@ a = Analysis(
     pathex=[os.path.abspath('..'), os.path.abspath('../src')],
     binaries=[],
     datas=[
-        ('../src/config', 'config'),  # 整個 config 目錄
-        ('../src/model', 'model'),    # model 目錄
-        ('../src/view', 'view'),      # view 目錄
-        ('../src/presenter', 'presenter'),  # presenter 目錄
+        ('../src', 'src'),  # include entire src package
         ('../examples/example.h', 'examples'),
     ],
     hiddenimports=[
