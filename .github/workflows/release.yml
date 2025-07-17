@@ -51,6 +51,8 @@ jobs:
   release:
     needs: [test-and-build-windows, test-and-build-macos]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
