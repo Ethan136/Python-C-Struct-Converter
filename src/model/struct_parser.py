@@ -174,11 +174,37 @@ def parse_struct_definition_v2(file_content: str) -> Tuple[Optional[str], Option
 
 
 def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
-    """Parse a struct definition and return a :class:`StructDef` object."""
-    name, members = parse_struct_definition_v2(file_content)
-    if not name:
+    """Parse a struct definition and return a :class:`StructDef` object (遞迴支援巢狀 struct)."""
+    struct_name, struct_body = _extract_struct_body(file_content, "struct")
+    if not struct_name or not struct_body:
         return None
-    return StructDef(name=name, members=members)
+    members = []
+    # 以正則逐行解析，精確處理巢狀 struct { ... } var;
+    pattern = re.compile(r"struct\s+(\w+)\s*\{([^}]*)\}\s*(\w+)\s*;?")
+    pos = 0
+    while pos < len(struct_body):
+        m = pattern.search(struct_body, pos)
+        if m and m.start() == pos:
+            nested_name = m.group(1)
+            inner_content = m.group(2)
+            var_name = m.group(3)
+            nested_struct = parse_struct_definition_ast(f"struct {nested_name} {{{inner_content}}};")
+            members.append(MemberDef(type="struct", name=var_name, nested=nested_struct))
+            pos = m.end()
+            # 跳過分號
+            if pos < len(struct_body) and struct_body[pos] == ';':
+                pos += 1
+            continue
+        # 處理一般欄位
+        semi = struct_body.find(';', pos)
+        if semi == -1:
+            break
+        line = struct_body[pos:semi].strip()
+        parsed = parse_member_line_v2(line)
+        if parsed is not None:
+            members.append(parsed)
+        pos = semi + 1
+    return StructDef(name=struct_name, members=members)
 
 
 def parse_c_definition(file_content: str) -> Tuple[Optional[str], Optional[str], Optional[List[dict]]]:
