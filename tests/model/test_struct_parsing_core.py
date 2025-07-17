@@ -4,7 +4,7 @@ import os
 import xml.etree.ElementTree as ET
 
 # Add src directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 from src.model.struct_model import StructModel
 from src.model.input_field_processor import InputFieldProcessor

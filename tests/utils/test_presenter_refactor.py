@@ -1,6 +1,9 @@
 
 import unittest
 from unittest.mock import MagicMock
+import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 from src.presenter.struct_presenter import StructPresenter
 from src.model.struct_model import StructModel
 

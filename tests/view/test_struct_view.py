@@ -3,6 +3,8 @@ import unittest
 import tkinter as tk
 import pytest
 from unittest.mock import MagicMock
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests"

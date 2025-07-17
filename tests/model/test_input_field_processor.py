@@ -3,7 +3,7 @@ import sys
 import os
 
 # Add src directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 from src.model.input_field_processor import InputFieldProcessor
 from tests.data_driven.xml_input_field_processor_loader import load_input_field_processor_tests, load_input_field_processor_error_tests

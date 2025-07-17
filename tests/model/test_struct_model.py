@@ -12,7 +12,7 @@ import sys
 from unittest.mock import patch, mock_open
 
 # Add src to path to import the model
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 from src.model.struct_model import (
     parse_struct_definition, 

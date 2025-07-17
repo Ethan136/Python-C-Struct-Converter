@@ -1,6 +1,8 @@
 import unittest
 import pytest
 import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 from src.model.struct_parser import parse_member_line, _extract_struct_body
 from tests.data_driven.xml_struct_parser_utils_loader import load_struct_parser_utils_tests
 

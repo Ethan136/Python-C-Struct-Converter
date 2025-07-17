@@ -1,4 +1,7 @@
 import unittest
+import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 from src.model.struct_model import calculate_layout
 from src.model.layout import BaseLayoutCalculator, LayoutItem
 from src.model.struct_parser import parse_c_definition

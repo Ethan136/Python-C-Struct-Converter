@@ -1,5 +1,8 @@
 import unittest
 import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 from src.model.struct_model import StructModel
 from tests.data_driven.xml_manual_struct_loader import load_manual_struct_tests
 
