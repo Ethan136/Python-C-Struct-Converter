@@ -4,13 +4,10 @@ block_cipher = None
 
 a = Analysis(
     ['../src/main.py'],
-    pathex=[],
+    pathex=['../src'],
     binaries=[],
     datas=[
-        ('../src/config', 'config'),  # 整個 config 目錄
-        ('../src/model', 'model'),    # model 目錄
-        ('../src/view', 'view'),      # view 目錄
-        ('../src/presenter', 'presenter'),  # presenter 目錄
+        ('../src', 'src'),                 # include package root
         ('../examples/example.h', 'examples'),
     ],
     hiddenimports=[
