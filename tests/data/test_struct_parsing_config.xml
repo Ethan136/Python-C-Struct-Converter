@@ -121,6 +121,120 @@
         </expected_members>
     </test_case>
 
+    <test_case name="nested_union_basic" type="parse">
+        <struct_definition><![CDATA[
+            struct Outer {
+                union U {
+                    int x;
+                    char y;
+                } a;
+                int b;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>Outer</expected_struct_name>
+        <expected_members>
+            <member type="union" name="a">
+                <nested_members>
+                    <member type="int" name="x" />
+                    <member type="char" name="y" />
+                </nested_members>
+            </member>
+            <member type="int" name="b" />
+        </expected_members>
+    </test_case>
+    <test_case name="union_with_struct" type="parse">
+        <struct_definition><![CDATA[
+            struct S {
+                union U {
+                    struct Inner {
+                        int a;
+                        char b;
+                    } s;
+                    int x;
+                } u;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>S</expected_struct_name>
+        <expected_members>
+            <member type="union" name="u">
+                <nested_members>
+                    <member type="struct" name="s">
+                        <nested_members>
+                            <member type="int" name="a" />
+                            <member type="char" name="b" />
+                        </nested_members>
+                    </member>
+                    <member type="int" name="x" />
+                </nested_members>
+            </member>
+        </expected_members>
+    </test_case>
+    <test_case name="union_with_array" type="parse">
+        <struct_definition><![CDATA[
+            struct S {
+                union U {
+                    int arr[4];
+                    char c;
+                } u;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>S</expected_struct_name>
+        <expected_members>
+            <member type="union" name="u">
+                <nested_members>
+                    <member type="int" name="arr" array_dims="4" />
+                    <member type="char" name="c" />
+                </nested_members>
+            </member>
+        </expected_members>
+    </test_case>
+    <test_case name="union_with_bitfield" type="parse">
+        <struct_definition><![CDATA[
+            struct S {
+                union U {
+                    int a : 3;
+                    int b : 5;
+                } u;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>S</expected_struct_name>
+        <expected_members>
+            <member type="union" name="u">
+                <nested_members>
+                    <member type="int" name="a" is_bitfield="true" bit_size="3" />
+                    <member type="int" name="b" is_bitfield="true" bit_size="5" />
+                </nested_members>
+            </member>
+        </expected_members>
+    </test_case>
+    <test_case name="struct_union_mix" type="parse">
+        <struct_definition><![CDATA[
+            struct S {
+                struct Inner {
+                    int a;
+                } s;
+                union U {
+                    char c;
+                    int d;
+                } u;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>S</expected_struct_name>
+        <expected_members>
+            <member type="struct" name="s">
+                <nested_members>
+                    <member type="int" name="a" />
+                </nested_members>
+            </member>
+            <member type="union" name="u">
+                <nested_members>
+                    <member type="char" name="c" />
+                    <member type="int" name="d" />
+                </nested_members>
+            </member>
+        </expected_members>
+    </test_case>
+
     <!-- Layout calculation tests -->
     <test_case name="simple_struct_no_padding" type="layout">
         <struct_definition><![CDATA[
@@ -204,6 +318,24 @@
             <entry name="a" offset="0" size="1" />
             <entry type="padding" size="3" />
             <entry name="b" offset="4" size="4" />
+        </expected_layout>
+    </test_case>
+
+    <test_case name="union_layout_basic" type="layout">
+        <struct_definition><![CDATA[
+            struct S {
+                union U {
+                    int a;
+                    char b;
+                } u;
+            };
+        ]]></struct_definition>
+        <expected_total_size>8</expected_total_size>
+        <expected_alignment>4</expected_alignment>
+        <expected_layout>
+            <entry name="u.a" offset="0" size="4" />
+            <entry name="u.b" offset="4" size="1" />
+            <entry type="padding" size="3" offset="5" />
         </expected_layout>
     </test_case>
 </struct_parsing_tests>
