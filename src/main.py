@@ -9,9 +9,9 @@ else:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '')))
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from model import StructModel
-from view import StructView
-from presenter import StructPresenter
+from src.model import StructModel
+from src.view import StructView
+from src.presenter import StructPresenter
 from src.config import load_ui_strings
 
 
