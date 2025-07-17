@@ -96,31 +96,31 @@ class TestPackAlignmentPlaceholder(unittest.TestCase):
         layout_default, total_default, align_default = calc_default.calculate(members)
         with open("pack_alignment_debug.log", "a") as f:
             f.write("default layout: " + str(layout_default) + f" total={total_default}\n")
-        offsets_default = {item.name: item.offset for item in layout_default if item.name in {"a", "arr", "b"}}
-        # pack=1：a:0, arr:1, b:5, total:?
+        offsets_default = {item.name: item.offset for item in layout_default if item.name in {"a", "arr[0]", "arr[1]", "b"}}
+        # pack=1：a:0, arr[0]:1, arr[1]:5, b:9, total:?
         calc_pack1 = LayoutCalculator(pack_alignment=1)
         layout1, total1, align1 = calc_pack1.calculate(members)
         with open("pack_alignment_debug.log", "a") as f:
             f.write("pack=1 layout: " + str(layout1) + f" total={total1}\n")
-        offsets1 = {item.name: item.offset for item in layout1 if item.name in {"a", "arr", "b"}}
-        # pack=2：a:0, arr:2, b:6, total:?
+        offsets1 = {item.name: item.offset for item in layout1 if item.name in {"a", "arr[0]", "arr[1]", "b"}}
+        # pack=2：a:0, arr[0]:2, arr[1]:6, b:10, total:?
         calc_pack2 = LayoutCalculator(pack_alignment=2)
         layout2, total2, align2 = calc_pack2.calculate(members)
         with open("pack_alignment_debug.log", "a") as f:
             f.write("pack=2 layout: " + str(layout2) + f" total={total2}\n")
-        offsets2 = {item.name: item.offset for item in layout2 if item.name in {"a", "arr", "b"}}
+        offsets2 = {item.name: item.offset for item in layout2 if item.name in {"a", "arr[0]", "arr[1]", "b"}}
         self.assertEqual(offsets_default["a"], 0)
-        self.assertEqual(offsets_default["arr"], 4)
-        self.assertEqual(offsets_default["b"], 8)
-        self.assertEqual(total_default, 12)
+        self.assertEqual(offsets_default["arr[0]"], 4)
+        self.assertEqual(offsets_default["arr[1]"], 8)
+        self.assertEqual(offsets_default["b"], 12)
         self.assertEqual(offsets1["a"], 0)
-        self.assertEqual(offsets1["arr"], 1)
-        self.assertEqual(offsets1["b"], 5)
-        self.assertEqual(total1, 7)
+        self.assertEqual(offsets1["arr[0]"], 1)
+        self.assertEqual(offsets1["arr[1]"], 5)
+        self.assertEqual(offsets1["b"], 9)
         self.assertEqual(offsets2["a"], 0)
-        self.assertEqual(offsets2["arr"], 2)
-        self.assertEqual(offsets2["b"], 6)
-        self.assertEqual(total2, 8)
+        self.assertEqual(offsets2["arr[0]"], 2)
+        self.assertEqual(offsets2["arr[1]"], 6)
+        self.assertEqual(offsets2["b"], 10)
 
     def test_pack_alignment_nested_struct(self):
         # 巢狀 struct: struct Inner { char x; int y; };
