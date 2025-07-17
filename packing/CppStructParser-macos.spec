@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import os
+from PyInstaller.utils.hooks import Tree
 
 block_cipher = None
 
@@ -9,7 +10,7 @@ a = Analysis(
     pathex=[os.path.abspath('..'), os.path.abspath('../src')],
     binaries=[],
     datas=[
-        ('../src', 'src'),  # include entire src package
+        Tree('../src', prefix='src'),  # include entire src directory
         ('../examples/example.h', 'examples'),
     ],
     hiddenimports=[
