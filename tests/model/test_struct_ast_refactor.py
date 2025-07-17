@@ -121,7 +121,6 @@ def _flatten_member_names(sdef):
 
 # 4. 匿名 bitfield
 # TODO(v5_anonymous_bitfield): 待匿名 bitfield AST/解析支援後恢復
-@pytest.mark.skip(reason="anonymous bitfield not supported in MVP")
 @pytest.mark.parametrize("src, expect", [
     ("""
     struct S {

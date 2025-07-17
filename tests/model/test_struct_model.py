@@ -322,6 +322,70 @@ class TestStructModel(unittest.TestCase):
         self.assertEqual(self.model.layout, original_layout)
         self.assertEqual(self.model.total_size, original_total_size)
 
+    def test_anonymous_bitfield_layout(self):
+        # 測試匿名 bitfield layout 正確分配 bit offset 並出現在 layout 結果中
+        members = [
+            {"type": "int", "name": "a", "is_bitfield": True, "bit_size": 3},
+            {"type": "int", "name": None, "is_bitfield": True, "bit_size": 2},
+            {"type": "int", "name": "b", "is_bitfield": True, "bit_size": 5},
+        ]
+        total_size = 4  # int storage unit
+        layout = self.model.calculate_manual_layout(members, total_size)
+        # 應有三個 bitfield，全部 offset=0, type=int, size=4
+        self.assertEqual(layout[0]["name"], "a")
+        self.assertEqual(layout[0]["bit_offset"], 0)
+        self.assertEqual(layout[0]["bit_size"], 3)
+        self.assertEqual(layout[1]["name"], None)
+        self.assertEqual(layout[1]["bit_offset"], 3)
+        self.assertEqual(layout[1]["bit_size"], 2)
+        self.assertEqual(layout[2]["name"], "b")
+        self.assertEqual(layout[2]["bit_offset"], 5)
+        self.assertEqual(layout[2]["bit_size"], 5)
+        # 檢查 struct 總大小為 4 bytes
+        self.assertEqual(layout[0]["size"], 4)
+
+    def test_export_anonymous_bitfield_to_h(self):
+        # 匿名 bitfield 匯出 .h 時應省略名稱
+        members = [
+            {"type": "int", "name": "a", "is_bitfield": True, "bit_size": 3},
+            {"type": "int", "name": None, "is_bitfield": True, "bit_size": 2},
+            {"type": "int", "name": "b", "is_bitfield": True, "bit_size": 5},
+        ]
+        total_size = 4
+        self.model.set_manual_struct(members, total_size)
+        h_content = self.model.export_manual_struct_to_h()
+        self.assertIn("int a : 3;", h_content)
+        self.assertIn("int : 2;", h_content)  # 匿名 bitfield
+        self.assertIn("int b : 5;", h_content)
+
+    def test_parse_hex_data_with_anonymous_bitfield(self):
+        # 測試 hex 解析時，匿名 bitfield 能正確回傳 name=None 且值正確
+        # struct { int a:3; int :2; int b:5; }，假設 a=5, 匿名=3, b=17
+        # bit pattern: a=5(101), anon=3(11), b=17(10001) => 101 11 10001 = 0b1011110001 = 753
+        # 低位在前（little endian），int 4 bytes: 0x000002f1
+        members = [
+            {"type": "int", "name": "a", "is_bitfield": True, "bit_size": 3},
+            {"type": "int", "name": None, "is_bitfield": True, "bit_size": 2},
+            {"type": "int", "name": "b", "is_bitfield": True, "bit_size": 5},
+        ]
+        total_size = 4
+        layout = self.model.calculate_manual_layout(members, total_size)
+        print("layout:", layout)
+        # 0b1000111101 = 0x23d, little endian: 0x3d 0x02 0x00 0x00
+        hex_data = "3d020000"
+        # 取出 storage_int
+        member_bytes = bytes.fromhex(hex_data)
+        storage_int = int.from_bytes(member_bytes, "little")
+        print("storage_int(bin):", bin(storage_int), "storage_int(dec):", storage_int)
+        result = self.model.parse_hex_data(hex_data, "little", layout=layout, total_size=4)
+        print("result:", result)
+        self.assertEqual(result[0]["name"], "a")
+        self.assertEqual(result[0]["value"], "5")
+        self.assertEqual(result[1]["name"], None)
+        self.assertEqual(result[1]["value"], "3")
+        self.assertEqual(result[2]["name"], "b")
+        self.assertEqual(result[2]["value"], "17")
+
 
 class TestCombinedExampleStruct(unittest.TestCase):
     """

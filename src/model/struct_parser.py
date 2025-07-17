@@ -49,25 +49,41 @@ def _extract_array_dims(name_token):
 
 def _parse_bitfield_declaration(line: str):
     """Parse a bit field declaration and return a member dict or ``None``."""
+    # 支援匿名 bitfield: int : 2;
     match = re.match(r"(.+?)\s+([\w\[\]]+)\s*:\s*(\d+)$", line)
-    if not match:
-        return None
-    type_str, name_token, bits = match.groups()
-    clean_type = " ".join(type_str.strip().split())
-    if "*" in clean_type:
-        return None  # pointer bitfields not supported
-    if clean_type not in TYPE_INFO:
-        return None
-    name, dims = _extract_array_dims(name_token)
-    member = {
-        "type": clean_type,
-        "name": name,
-        "is_bitfield": True,
-        "bit_size": int(bits),
-    }
-    if dims:
-        member["array_dims"] = dims
-    return member
+    if match:
+        type_str, name_token, bits = match.groups()
+        clean_type = " ".join(type_str.strip().split())
+        if "*" in clean_type:
+            return None  # pointer bitfields not supported
+        if clean_type not in TYPE_INFO:
+            return None
+        name, dims = _extract_array_dims(name_token)
+        member = {
+            "type": clean_type,
+            "name": name,
+            "is_bitfield": True,
+            "bit_size": int(bits),
+        }
+        if dims:
+            member["array_dims"] = dims
+        return member
+    # 新增：支援匿名 bitfield（無名稱） int : 2;
+    match_anon = re.match(r"(.+?)\s*:\s*(\d+)$", line)
+    if match_anon:
+        type_str, bits = match_anon.groups()
+        clean_type = " ".join(type_str.strip().split())
+        if "*" in clean_type:
+            return None
+        if clean_type not in TYPE_INFO:
+            return None
+        return {
+            "type": clean_type,
+            "name": None,
+            "is_bitfield": True,
+            "bit_size": int(bits),
+        }
+    return None
 
 
 def parse_member_line(line):
@@ -108,7 +124,7 @@ def parse_member_line_v2(line: str) -> Optional[MemberDef]:
         return MemberDef(type=mtype, name=name)
     return MemberDef(
         type=parsed["type"],
-        name=parsed["name"],
+        name=parsed.get("name", None),
         is_bitfield=parsed.get("is_bitfield", False),
         bit_size=parsed.get("bit_size", 0),
         array_dims=parsed.get("array_dims", []),

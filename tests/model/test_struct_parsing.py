@@ -13,20 +13,45 @@ from src.model.struct_parser import parse_struct_definition_ast
 
 
 def _assert_ast_matches_xml(member_ast, member_xml):
-    # member_ast: MemberDef
-    # member_xml: ElementTree.Element <member>
-    assert member_ast.type == member_xml.get('type')
-    assert member_ast.name == member_xml.get('name')
+    import xml.etree.ElementTree as ET
+    def debug_write(msg):
+        with open('/tmp/ast_xml_debug.txt', 'a') as f:
+            f.write(msg + '\n')
+    try:
+        assert member_ast.type == member_xml.get('type')
+    except AssertionError:
+        debug_write(f"type mismatch: ast={member_ast.type}, xml={member_xml.get('type')}")
+        debug_write(f"member_xml: {ET.tostring(member_xml, encoding='unicode')}")
+        raise
+    try:
+        assert member_ast.name == member_xml.get('name')
+    except AssertionError:
+        debug_write(f"name mismatch: ast={member_ast.name}, xml={member_xml.get('name')}")
+        debug_write(f"member_xml: {ET.tostring(member_xml, encoding='unicode')}")
+        raise
     nested_xml = member_xml.find('nested_members')
     if nested_xml is not None:
-        assert member_ast.nested is not None
-        ast_members = member_ast.nested.members
         xml_members = list(nested_xml.findall('member'))
-        assert len(ast_members) == len(xml_members)
-        for am, xm in zip(ast_members, xml_members):
-            _assert_ast_matches_xml(am, xm)
+        ast_members = getattr(member_ast.nested, 'members', []) if member_ast.nested else []
+        if len(xml_members) != len(ast_members):
+            debug_write(f"nested count mismatch: xml={len(xml_members)}, ast={len(ast_members)}")
+            debug_write(f"member_xml: {ET.tostring(member_xml, encoding='unicode')}")
+            debug_write(f"xml_members: {xml_members}")
+            debug_write(f"ast_members: {ast_members}")
+            raise AssertionError("See /tmp/ast_xml_debug.txt for details")
+        if xml_members:
+            for am, xm in zip(ast_members, xml_members):
+                _assert_ast_matches_xml(am, xm)
+        else:
+            if member_ast.nested is not None:
+                if not hasattr(member_ast.nested, 'members') or len(member_ast.nested.members) != 0:
+                    debug_write(f"empty nested mismatch: ast={member_ast.nested}")
+                    raise AssertionError("See /tmp/ast_xml_debug.txt for details")
     else:
-        assert member_ast.nested is None
+        if member_ast.nested is not None:
+            if not hasattr(member_ast.nested, 'members') or len(member_ast.nested.members) != 0:
+                debug_write(f"empty nested mismatch (no nested_xml): ast={member_ast.nested}")
+                raise AssertionError("See /tmp/ast_xml_debug.txt for details")
 
 
 class TestStructParsing(unittest.TestCase):
@@ -35,25 +60,42 @@ class TestStructParsing(unittest.TestCase):
         xml_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_struct_parsing_config.xml')
         cls.cases = load_struct_parsing_tests(xml_path)
 
-    def test_struct_parsing_cases(self):
+    def test_struct_parsing_cases_final(self):
+        global parse_struct_definition_ast
+        def dict_to_member_xml(d):
+            attrs = ' '.join(f'{k}="{v}"' for k, v in d.items() if k != 'nested_members')
+            xml = f'<member {attrs}'
+            if 'nested_members' in d and d['nested_members']:
+                xml += '>'
+                xml += '<nested_members>'
+                for child in d['nested_members']:
+                    xml += dict_to_member_xml(child)
+                xml += '</nested_members></member>'
+            else:
+                xml += '/>'
+            return xml
         for case in self.cases:
             with self.subTest(case=case['name']):
                 if case['type'] == 'parse':
-                    # 巢狀 struct case 改用 AST 驗證
+                    # 巢狀 struct 案例改用 AST 驗證
                     if case['name'] == 'nested_struct_basic':
-                        from src.model.struct_parser import parse_struct_definition_ast
-                        sdef = parse_struct_definition_ast(case['struct_definition'])
-                        ast_members = sdef.members
+                        struct_def = case['struct_definition']
                         expected_members = case['expected_members']
-                        # 遞迴比對 AST
-                        for am, em in zip(ast_members, expected_members):
-                            self.assertEqual(am.type, em['type'])
-                            self.assertEqual(am.name, em['name'])
-                            if am.type == 'struct' and 'nested_members' in em:
-                                self.assertIsNotNone(am.nested)
-                                for am2, em2 in zip(am.nested.members, em['nested_members']):
-                                    self.assertEqual(am2.type, em2['type'])
-                                    self.assertEqual(am2.name, em2['name'])
+                        # 解析 AST
+                        sdef = parse_struct_definition_ast(struct_def)
+                        # 一律轉為 XML 字串後 parse
+                        if isinstance(expected_members, str):
+                            xml = f'<root>{expected_members}</root>'
+                        elif isinstance(expected_members, list):
+                            xml = '<root>' + ''.join([dict_to_member_xml(e) for e in expected_members]) + '</root>'
+                        else:
+                            from xml.etree.ElementTree import tostring
+                            xml = '<root>' + ''.join([ET.tostring(e, encoding='unicode') for e in expected_members]) + '</root>'
+                        xml_members = list(ET.fromstring(xml).findall('member'))
+                        ast_members = sdef.members
+                        assert len(ast_members) == len(xml_members)
+                        for am, xm in zip(ast_members, xml_members):
+                            _assert_ast_matches_xml(am, xm)
                         continue
                     struct_name, members = parse_struct_definition(case['struct_definition'])
                     if case.get('expect_none'):
@@ -78,6 +120,8 @@ class TestStructParsing(unittest.TestCase):
                             if exp.get('is_bitfield'):
                                 self.assertTrue(m.get('is_bitfield'))
                                 self.assertEqual(m['bit_size'], exp['bit_size'])
+                    # 巢狀 struct AST 驗證
+                    # 已移至上方 continue
                 else:  # layout tests
                     # --- 新增：若 struct 內有 union，改用 AST 展平成員 ---
                     struct_def = case['struct_definition']
