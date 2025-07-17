@@ -116,6 +116,10 @@ This project provides a graphical user interface (GUI) tool built with Python an
 - [src/view/GUI_DEVELOPER_GUIDE.md](src/view/GUI_DEVELOPER_GUIDE.md): GUI 元件結構、事件流程與擴充指引
 - [src/presenter/PRESENTER_DEVELOPER_GUIDE.md](src/presenter/PRESENTER_DEVELOPER_GUIDE.md): Presenter 事件流、狀態管理、錯誤處理設計
 - [src/model/input_field_processor.py](src/model/input_field_processor.py): Input 處理 API 與用法（見檔案開頭 docstring）
+- **Pragma pack TDD 實作與測試覆蓋：**
+  - `src/model/layout.py` 已支援 `pack_alignment` 參數，對應 `#pragma pack` 行為。
+  - `tests/utils/test_pack_alignment_placeholder.py` 有單元測試驗證 pack_alignment=1 行為。
+  - 詳細設計與進度請見 `docs/development/v5_pragma_pack.md`。
 
 ## Example Files
 
@@ -129,6 +133,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
   - The size and alignment of each member.
   - The required memory padding between members.
   - The final total size of the struct.
+  - **Supports `#pragma pack` (pack_alignment) for alignment control.**
 - **Bitfield Support**: Full support for C/C++ bitfield members (e.g., `int a : 1;`) with proper packing and storage unit alignment.
 - **Manual Struct Definition**: Define structs directly in the GUI with a single value input field (no dynamic multi-column editing). The manual struct tab now only provides a single struct member value input, matching the original simple design.
 - **Chunked Hexadecimal Data Input**: Allows inputting hex data in user-defined chunks (1, 4, or 8 bytes) for better readability and ease of entry.

@@ -39,6 +39,22 @@ class TestStructParsing(unittest.TestCase):
         for case in self.cases:
             with self.subTest(case=case['name']):
                 if case['type'] == 'parse':
+                    # 巢狀 struct case 改用 AST 驗證
+                    if case['name'] == 'nested_struct_basic':
+                        from src.model.struct_parser import parse_struct_definition_ast
+                        sdef = parse_struct_definition_ast(case['struct_definition'])
+                        ast_members = sdef.members
+                        expected_members = case['expected_members']
+                        # 遞迴比對 AST
+                        for am, em in zip(ast_members, expected_members):
+                            self.assertEqual(am.type, em['type'])
+                            self.assertEqual(am.name, em['name'])
+                            if am.type == 'struct' and 'nested_members' in em:
+                                self.assertIsNotNone(am.nested)
+                                for am2, em2 in zip(am.nested.members, em['nested_members']):
+                                    self.assertEqual(am2.type, em2['type'])
+                                    self.assertEqual(am2.name, em2['name'])
+                        continue
                     struct_name, members = parse_struct_definition(case['struct_definition'])
                     if case.get('expect_none'):
                         self.assertIsNone(struct_name)
@@ -48,26 +64,20 @@ class TestStructParsing(unittest.TestCase):
                     self.assertEqual(len(members), len(case['expected_members']))
                     for m, exp in zip(members, case['expected_members']):
                         if isinstance(m, tuple):
-                            self.assertEqual(m, (exp['type'], exp['name']))
+                            try:
+                                self.assertEqual(m, (exp['type'], exp['name']))
+                            except AssertionError:
+                                print(f"\n[DEBUG] Case: {case['name']}")
+                                print(f"Struct definition:\n{case['struct_definition']}")
+                                print(f"Parsed members: {members}")
+                                print(f"Expected members: {case['expected_members']}")
+                                raise
                         else:
                             self.assertEqual(m['type'], exp['type'])
                             self.assertEqual(m['name'], exp['name'])
                             if exp.get('is_bitfield'):
                                 self.assertTrue(m.get('is_bitfield'))
                                 self.assertEqual(m['bit_size'], exp['bit_size'])
-                    # 巢狀 struct AST 驗證
-                    if case['name'] == 'nested_struct_basic':
-                        # 取得 a 欄位
-                        a_member = None
-                        for m in members:
-                            if (isinstance(m, dict) and m.get('name') == 'a') or (isinstance(m, tuple) and m[1] == 'a'):
-                                a_member = m
-                                break
-                        # parser v1 回傳 tuple/dict，parser v2 以上回傳 MemberDef
-                        # 這裡假設 parse_struct_definition 回傳 dict，nested struct 需額外驗證
-                        # 若 parser 已支援 nested，可改用 parse_struct_definition_ast 驗證
-                        # 這裡僅驗證外層欄位型別與名稱
-                        # 若需驗證 AST，建議改用 parse_struct_definition_ast 並遞迴驗證
                 else:  # layout tests
                     _, members = parse_struct_definition(case['struct_definition'])
                     layout, total_size, align = calculate_layout(members)

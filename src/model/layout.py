@@ -74,9 +74,10 @@ class BaseLayoutCalculator(ABC):
     def _effective_alignment(self, alignment: int) -> int:
         """Return the effective alignment.
 
-        This method simply returns ``alignment`` for now but provides a single
-        point to apply ``pack_alignment`` rules in the future.
+        This method applies pack_alignment if set, mimicking #pragma pack behavior.
         """
+        if self.pack_alignment is not None:
+            return min(alignment, self.pack_alignment)
         return alignment
 
     def _get_attr(
