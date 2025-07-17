@@ -83,17 +83,18 @@ class BaseLayoutCalculator(ABC):
     def _get_attr(
         self, member: Union[Tuple[str, str], dict, object], attr: str, default=None
     ):
-        """Retrieve attribute from ``member`` supporting multiple formats."""
+        """Retrieve attribute from ``member`` supporting multiple formats, including AST objects."""
         if isinstance(member, tuple):
             if attr == "type":
                 return member[0]
             if attr == "name":
                 return member[1]
             return default
-        if hasattr(member, attr):
-            return getattr(member, attr)
         if isinstance(member, dict):
             return member.get(attr, default)
+        # 支援 AST dataclass 物件
+        if hasattr(member, attr):
+            return getattr(member, attr)
         return default
 
     @abstractmethod
@@ -108,26 +109,74 @@ class StructLayoutCalculator(BaseLayoutCalculator):
     def __init__(self, pack_alignment: Optional[int] = None):
         super().__init__(pack_alignment=pack_alignment)
 
-    def _get_type_size_and_align(self, mtype: str) -> Tuple[int, int]:
-        """Return (size, alignment) for a given C type."""
-        info = TYPE_INFO[mtype]
-        return info["size"], info["align"]
+    def _get_type_size_and_align(self, mtype: str, nested=None) -> Tuple[int, int]:
+        """Return (size, alignment) for a given C type or struct/union (AST)。"""
+        if mtype in TYPE_INFO:
+            info = TYPE_INFO[mtype]
+            return info["size"], info["align"]
+        # 若是 struct/union 型別，遞迴計算 nested
+        if nested is not None:
+            nested_members = None
+            if hasattr(nested, "members"):
+                nested_members = nested.members
+            elif isinstance(nested, dict):
+                nested_members = nested.get("members", [])
+            if nested_members is not None:
+                _, size, align = StructLayoutCalculator().calculate(nested_members)
+                return size, align
+        raise KeyError(f"Unknown type: {mtype}")
 
     # Array processing -------------------------------------------------
-    def _process_array_member(self, name: str, mtype: str, array_dims: list):
-        """Placeholder for array member handling.
+    def _process_array_member(self, name: str, mtype: str, array_dims: list, nested=None):
+        """展開多維陣列，支援巢狀 struct/array。"""
+        # 若是 struct array，需遞迴展開 nested members
+        def expand_indices(dims):
+            if not dims:
+                yield []
+            else:
+                for i in range(dims[0]):
+                    for rest in expand_indices(dims[1:]):
+                        yield [i] + rest
 
-        Currently treats the array as a single element to preserve legacy
-        behavior. This will be expanded for full N-D array support in the
-        future.
-        """
-        size, alignment = self._get_type_size_and_align(mtype)
-        if alignment > self.max_alignment:
-            self.max_alignment = alignment
-        self._add_padding_if_needed(alignment)
-        # TODO: expand array dimensions in future implementation
-        self._add_member_to_layout(name, mtype, size)
-        self.current_offset += size
+        # 巢狀 struct/union/array: 只要 nested 不為 None 就遞迴展開
+        nested_members = None
+        if nested is not None:
+            if hasattr(nested, "members"):
+                nested_members = nested.members
+            elif isinstance(nested, dict):
+                nested_members = nested.get("members", [])
+        if nested_members is not None:
+            struct_layout, struct_size, struct_align = StructLayoutCalculator().calculate(nested_members)
+            if struct_align > self.max_alignment:
+                self.max_alignment = struct_align
+            self._add_padding_if_needed(struct_align)
+            for idx_tuple in expand_indices(array_dims):
+                idx_str = ''.join(f'[{i}]' for i in idx_tuple)
+                prefix = f"{name}{idx_str}"
+                base_offset = self.current_offset
+                for member in nested_members:
+                    self._process_regular_member(self._clone_member_with_prefix(member, prefix, base_offset))
+                self.current_offset += struct_size
+        else:
+            # 基本型別 array
+            size, alignment = self._get_type_size_and_align(mtype, nested)
+            if alignment > self.max_alignment:
+                self.max_alignment = alignment
+            self._add_padding_if_needed(alignment)
+            for idx_tuple in expand_indices(array_dims):
+                idx_str = ''.join(f'[{i}]' for i in idx_tuple)
+                elem_name = f"{name}{idx_str}"
+                self._add_member_to_layout(elem_name, mtype, size)
+                self.current_offset += size
+
+    def _clone_member_with_prefix(self, member, prefix, base_offset):
+        import copy
+        m = copy.deepcopy(member)
+        if hasattr(m, 'name') and m.name:
+            m.name = f"{prefix}.{m.name}" if not prefix.endswith('.') else f"{prefix}{m.name}"
+        if hasattr(m, 'offset'):
+            m.offset = base_offset + getattr(m, 'offset', 0)
+        return m
 
     def calculate(self, members: List[Union[Tuple[str, str], dict]]):
         """Calculate the complete memory layout for the struct."""
@@ -160,23 +209,40 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         self.bitfield_bit_offset += mbit_size
 
     def _process_regular_member(self, member: Union[Tuple[str, str], dict]):
-        # End any open bitfield unit
+        print("DEBUG _process_regular_member:", member)
         self.bitfield_unit_type = None
         self.bitfield_bit_offset = 0
 
         member_type = self._get_attr(member, "type")
         member_name = self._get_attr(member, "name")
         array_dims = self._get_attr(member, "array_dims") or []
+        nested = self._get_attr(member, "nested", None)
 
         if array_dims:
-            self._process_array_member(member_name, member_type, array_dims)
+            self._process_array_member(member_name, member_type, array_dims, nested)
             return
 
-        size, alignment = self._get_type_size_and_align(member_type)
+        # 巢狀 struct/union: 只要 nested 不為 None 就遞迴展開
+        nested_members = None
+        if nested is not None:
+            if hasattr(nested, "members"):
+                nested_members = nested.members
+            elif isinstance(nested, dict):
+                nested_members = nested.get("members", [])
+        if nested_members is not None:
+            struct_layout, struct_size, struct_align = StructLayoutCalculator().calculate(nested_members)
+            if struct_align > self.max_alignment:
+                self.max_alignment = struct_align
+            self._add_padding_if_needed(struct_align)
+            base_offset = self.current_offset
+            for member in nested_members:
+                self._process_regular_member(self._clone_member_with_prefix(member, member_name, base_offset))
+            self.current_offset += struct_size
+            return
 
+        size, alignment = self._get_type_size_and_align(member_type, nested)
         if alignment > self.max_alignment:
             self.max_alignment = alignment
-
         self._add_padding_if_needed(alignment)
         self._add_member_to_layout(member_name, member_type, size)
         self.current_offset += size

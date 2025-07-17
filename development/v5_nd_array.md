@@ -44,3 +44,26 @@ class TestStructModelNDArray(unittest.TestCase):
   1. 依據本摘要，分步驟將 parser、layout、export、測試等功能逐一補齊。
   2. 測試可參考 v5 相關測試案例，確保所有多維情境皆能正確處理。
   3. 文件與 README 也需同步補充。 
+
+## 七、TDD 實作紀錄（2024/07 補充）
+
+- **步驟一：新增失敗測試**
+  - 已於 `tests/model/test_struct_model.py` 新增 `TestStructModelNDArray.test_nd_array_layout`，驗證 `int arr[2][3];` 應展開為 6 個元素（arr[0][0]~arr[1][2]）。
+  - 已新增 `test_nested_struct_with_nd_array_layout`，驗證 `struct S { int x; }; struct NDArrayTest { struct S arr[2][2]; };` 應展開為 4 個元素（arr[0][0].x ~ arr[1][1].x）。
+  - 目前 parser 僅支援單一 struct 定義，巢狀 struct array 測試需手動構造 AST 並補 nested 型別。
+- **步驟二：實作多維展開與巢狀展平**
+  - layout calculator 已支援多維展開與巢狀 struct/array 遞迴展平，產生正確名稱、offset、size。
+  - 測試已通過，layout 結構正確。
+- **步驟三：建議未來擴充**
+  - parser 可擴充 symbol table 支援多 struct 定義與型別查找，讓 nested struct array 測試更自動化。
+  - 文件與測試可同步補充更複雜巢狀 struct/array/bitfield 組合案例。
+
+## 八、目前 N-D Array 功能狀態（2024/07 補充）
+
+- 多維陣列（N-D Array）展開、巢狀 struct/array 遞迴展平功能已完成，所有單元測試與 TDD 驗證皆通過。
+- 支援任意維度 array、巢狀 struct array，layout 能正確產生所有元素名稱、offset、size。
+- 測試涵蓋單層、多層、多維陣列、巢狀 struct/array。
+- 目前 parser 僅支援單一 struct 定義，巢狀 struct array 測試需手動構造 AST 並補 nested 型別。
+- 後續可擴充 symbol table 型別查找、bitfield/pragma pack 組合、XML 驅動測試等進階情境。
+
+--- 

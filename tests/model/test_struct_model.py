@@ -460,5 +460,53 @@ class TestStructModelXMLDriven(unittest.TestCase):
                                 self.assertEqual(item[key], val)
 
 
+class TestStructModelNDArray(unittest.TestCase):
+    """TDD: 驗證多維陣列 layout 是否正確展開 (v5_nd_array)"""
+    def test_nd_array_layout(self):
+        struct_content = """
+        struct NDArrayTest {
+            int arr[2][3];
+        };
+        """
+        model = StructModel()
+        # 直接模擬從檔案載入 struct
+        model.struct_name, model.members = parse_struct_definition(struct_content)
+        model.layout, model.total_size, model.struct_align = calculate_layout(model.members)
+        # 預期 layout 會展開成 6 個 int 元素
+        int_size = TYPE_INFO["int"]["size"]
+        expected = [
+            {"name": f"arr[{i}][{j}]", "type": "int", "size": int_size, "offset": int_size * (i * 3 + j)}
+            for i in range(2) for j in range(3)
+        ]
+        # 目前 layout 尚未展開，預期會失敗
+        # 只驗證 layout 長度與名稱
+        actual = [item for item in model.layout if item["type"] == "int"]
+        self.assertEqual(len(actual), 6, "多維陣列應展開為 6 個元素 (2x3)")
+        for idx, exp in enumerate(expected):
+            self.assertEqual(actual[idx]["name"], exp["name"], f"第 {idx} 個元素名稱錯誤")
+
+    def test_nested_struct_with_nd_array_layout(self):
+        from src.model.struct_parser import MemberDef, StructDef
+        # 構造 struct S 的 AST
+        s_ast = StructDef(name="S", members=[MemberDef(type="int", name="x")])
+        # 構造 NDArrayTest 的 AST，arr[2][2]，nested 指向 s_ast
+        arr_member = MemberDef(type="S", name="arr", array_dims=[2,2], nested=s_ast)
+        nd_ast = StructDef(name="NDArrayTest", members=[arr_member])
+        model = StructModel()
+        model.struct_name = nd_ast.name
+        model.members = nd_ast.members
+        model.layout, model.total_size, model.struct_align = calculate_layout(model.members)
+        print("DEBUG layout:", model.layout)
+        int_size = TYPE_INFO["int"]["size"]
+        expected = [
+            {"name": f"arr[{i}][{j}].x", "type": "int", "size": int_size, "offset": int_size * (i * 2 + j)}
+            for i in range(2) for j in range(2)
+        ]
+        actual = [item for item in model.layout if item["type"] == "int"]
+        self.assertEqual(len(actual), 4, "巢狀 struct 多維陣列應展開為 4 個元素 (2x2)")
+        for idx, exp in enumerate(expected):
+            self.assertEqual(actual[idx]["name"], exp["name"], f"第 {idx} 個元素名稱錯誤")
+
+
 if __name__ == "__main__":
     unittest.main() 

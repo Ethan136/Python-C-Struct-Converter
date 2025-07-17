@@ -40,11 +40,21 @@ def calculate_layout(members, calculator_cls=None, pack_alignment=None):
     if not members:
         return [], 0, 1
 
-    # legacy union/struct 展平
-    flat_members = _flatten_legacy_members(members)
-    calculator_cls = calculator_cls or LayoutCalculator
-    layout_calculator = calculator_cls(pack_alignment=pack_alignment)
-    return layout_calculator.calculate(flat_members)
+    # 判斷是否為 AST 物件（MemberDef/StructDef）
+    def is_ast_member(m):
+        return hasattr(m, '__dataclass_fields__') and hasattr(m, 'type') and hasattr(m, 'name')
+
+    if all(is_ast_member(m) for m in members):
+        # 直接傳給 layout calculator，保留 array_dims/nested 等資訊
+        calculator_cls = calculator_cls or LayoutCalculator
+        layout_calculator = calculator_cls(pack_alignment=pack_alignment)
+        return layout_calculator.calculate(members)
+    else:
+        # legacy dict/tuple 格式才展平
+        flat_members = _flatten_legacy_members(members)
+        calculator_cls = calculator_cls or LayoutCalculator
+        layout_calculator = calculator_cls(pack_alignment=pack_alignment)
+        return layout_calculator.calculate(flat_members)
 
 
 
