@@ -4,7 +4,7 @@ block_cipher = None
 
 a = Analysis(
     ['../src/main.py'],
-    pathex=[],
+    pathex=['..'],
     binaries=[],
     datas=[
         ('../src/config', 'config'),  # 整個 config 目錄
