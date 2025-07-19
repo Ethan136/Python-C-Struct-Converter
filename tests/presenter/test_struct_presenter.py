@@ -897,6 +897,18 @@ class TestStructPresenter(unittest.TestCase):
         self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_undo")
         # on_load_file async 測試略，已於其他測試覆蓋
 
+    def test_on_redo_event_and_context(self):
+        # 準備 redo_history
+        ctx0 = self.presenter.get_default_context()
+        ctx1 = self.presenter.get_default_context()
+        ctx1["selected_node"] = "A"
+        self.presenter.context = ctx0.copy()
+        self.presenter.context["redo_history"] = [ctx1.copy()]
+        self.presenter.on_redo()
+        self.assertEqual(self.presenter.context["selected_node"], "A")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_redo")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event_args"], {})
+
     def test_performance_lru_cache_under_stress(self):
         # 壓力測試 LRU cache: 大量不同 key
         self.presenter.set_lru_cache_size(100)

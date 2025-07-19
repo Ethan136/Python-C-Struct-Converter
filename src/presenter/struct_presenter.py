@@ -505,6 +505,15 @@ class StructPresenter:
         self.context["debug_info"]["last_event_args"] = {}
         self.push_context()
 
+    def on_redo(self):
+        # 支援 redo_history，與 undo 對稱
+        if self.context.get("redo_history") and len(self.context["redo_history"]):
+            self.context = self.context["redo_history"].pop()
+        # 補寫 last_event/last_event_args，確保 contract 一致
+        self.context["debug_info"]["last_event"] = "on_redo"
+        self.context["debug_info"]["last_event_args"] = {}
+        self.push_context()
+
     def _check_permission(self, action):
         # action: "delete"、"edit"、... 依 context 欄位 can_delete/can_edit/user_role 判斷
         if action == "delete" and not self.context.get("can_delete", False):
