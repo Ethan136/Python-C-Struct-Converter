@@ -6,17 +6,29 @@ from src.model.struct_model import StructModel
 import time
 
 # --- Treeview 巢狀遞迴插入與互動 helper ---
-def insert_treeview_node(tree, parent_id, node, icon_map=None):
-    """遞迴插入 treeview node 結構。node: dict, 需包含 id, label, type, children, icon, extra"""
-    if parent_id in (None, "", 0):
-        parent_id = ""
-    values = (node.get("label", ""), node.get("type", ""))
-    icon = icon_map.get(node["icon"]) if icon_map and node.get("icon") else ""
-    tags = ()
-    item_id = tree.insert(parent_id, 'end', iid=node['id'], text=node['label'], values=values, image=icon, tags=tags)
-    for child in node.get('children', []):
-        insert_treeview_node(tree, item_id, child, icon_map)
-    return item_id
+MEMBER_TREEVIEW_COLUMNS = [
+    {"name": "name", "title": "欄位名稱", "width": 120},
+    {"name": "value", "title": "值", "width": 100},
+    {"name": "hex_value", "title": "Hex Value", "width": 100},
+    {"name": "hex_raw", "title": "Hex Raw", "width": 150},
+]
+
+def create_member_treeview(parent):
+    all_columns = MEMBER_TREEVIEW_COLUMNS
+    col_names = tuple(c["name"] for c in all_columns)
+    tree = ttk.Treeview(
+        parent,
+        columns=col_names,
+        show="headings",
+        height=6,
+        selectmode="extended"  # 支援多選
+    )
+    for c in all_columns:
+        tree.heading(c["name"], text=c["title"])
+        tree.column(c["name"], width=c["width"], stretch=False)
+    tree["displaycolumns"] = col_names
+    tree.pack(fill="x")
+    return tree
 
 def update_treeview_by_context(tree, context):
     # 展開/收合
@@ -49,25 +61,6 @@ def _update_treeview_expand_recursive(tree, item_id, expanded):
     tree.item(item_id, open=(item_id in expanded))
     for child in tree.get_children(item_id):
         _update_treeview_expand_recursive(tree, child, expanded)
-
-def create_member_treeview(parent):
-    tree = ttk.Treeview(
-        parent,
-        columns=("name", "value", "hex_value", "hex_raw"),
-        show="headings",
-        height=6,
-        selectmode="extended"  # 支援多選
-    )
-    tree.heading("name", text="欄位名稱")
-    tree.heading("value", text="值")
-    tree.heading("hex_value", text="Hex Value")
-    tree.heading("hex_raw", text="Hex Raw")
-    tree.column("name", width=120, stretch=False)
-    tree.column("value", width=100, stretch=False)
-    tree.column("hex_value", width=100, stretch=False)
-    tree.column("hex_raw", width=150, stretch=False)
-    tree.pack(fill="x")
-    return tree
 
 def create_scrollable_tab_frame(parent):
     canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
@@ -982,22 +975,15 @@ class StructView(tk.Tk):
             self.presenter.on_node_select(list(selected))
 
     def show_treeview_nodes(self, nodes, context, icon_map=None):
-        tree = self.member_tree
-        # 依據 user_settings 設定 columns
-        columns = ("name", "value", "hex_value", "hex_raw")
+        # 依據 user_settings 設定 displaycolumns
+        all_columns = tuple(c["name"] for c in MEMBER_TREEVIEW_COLUMNS)
+        columns = all_columns
         col_settings = context.get("user_settings", {}).get("treeview_columns")
         if col_settings:
-            # 只取 visible=True 並依 order 排序
             visible_cols = [c for c in sorted(col_settings, key=lambda x: x.get("order", 0)) if c.get("visible", True)]
             columns = tuple(c["name"] for c in visible_cols)
-            tree["columns"] = columns
-            # 設定標題
-            for c in columns:
-                tree.heading(c, text=c)
-        else:
-            tree["columns"] = ("name", "value", "hex_value", "hex_raw")
-            for c in ("name", "value", "hex_value", "hex_raw"):
-                tree.heading(c, text=c)
+        tree = self.member_tree
+        tree["displaycolumns"] = columns
         for item in tree.get_children(""):
             tree.delete(item)
         # 設定高亮 tag 樣式

@@ -33,7 +33,22 @@
 - 封裝 member value、struct layout、debug input raw data 為獨立元件，統一 API（如 set_data, get_data, refresh, clear），方便切換時資料同步。
 - 頁面可嵌入多組顯示元件，方便切換與比對。
 - UI/UX 優化：展開/收合、icon、顏色、[struct]/[union] 標籤。
-- 事件 callback 設計：on_node_click, on_switch_display_mode, on_refresh, 其他互動事件（如展開/收合、hover、右鍵選單等）。 
+- 事件 callback 設計：on_node_click, on_switch_display_mode, on_refresh, 其他互動事件（如展開/收合、hover、右鍵選單等）。
+
+### 6.1 Treeview/表格欄位設定一致性與共用化（2024/07 補充）
+- **所有 Treeview 欄位結構、標題、寬度、順序，集中定義於單一設定（如 MEMBER_TREEVIEW_COLUMNS）**：
+  ```python
+  MEMBER_TREEVIEW_COLUMNS = [
+      {"name": "name", "title": "欄位名稱", "width": 120},
+      {"name": "value", "title": "值", "width": 100},
+      {"name": "hex_value", "title": "Hex Value", "width": 100},
+      {"name": "hex_raw", "title": "Hex Raw", "width": 150},
+  ]
+  ```
+- **所有 tab（如 file/manual/debug）都只根據這份設定產生 Treeview**，不再於各自 tab 動態設定 heading text。
+- **動態顯示/欄位顯示/隱藏時，只重建 widget 並傳入正確 columns，不再動態改 heading text**。
+- **這樣可保證 UI/UX 一致、易於維護與擴充**，未來要加欄位、改標題、調寬度，只需改一份設定。
+- **測試驗證**：只需驗證同一份欄位設定產生的 Treeview 標題、寬度、順序一致。
 
 ## 6. 進階 UI/UX 功能建議
 

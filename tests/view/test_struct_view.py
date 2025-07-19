@@ -1459,7 +1459,7 @@ class TestStructView(unittest.TestCase):
         view.destroy()
 
     def test_treeview_column_customization(self):
-        """驗證 Treeview 欄位可根據 context['user_settings']['treeview_columns'] 動態顯示/隱藏/排序，並驗證右鍵選單切換欄位顯示會呼叫 presenter 並刷新。"""
+        """驗證 Treeview 欄位顯示/隱藏/順序僅由 displaycolumns 控制，columns 永遠是全部 centralized 欄位。"""
         class PresenterWithColumnToggle(PresenterStub):
             def __init__(self):
                 super().__init__()
@@ -1474,39 +1474,34 @@ class TestStructView(unittest.TestCase):
                 if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
                     self.view.update_display(self.get_display_nodes(self.context.get("display_mode", "tree")), self.context)
         presenter = PresenterWithColumnToggle()
-        # 初始欄位設定：label/type/offset/size
         presenter.context["user_settings"]["treeview_columns"] = [
-            {"name": "label", "visible": True, "order": 0},
-            {"name": "type", "visible": True, "order": 1},
-            {"name": "offset", "visible": True, "order": 2},
-            {"name": "size", "visible": True, "order": 3},
+            {"name": "name", "visible": True, "order": 0},
+            {"name": "value", "visible": True, "order": 1},
+            {"name": "hex_value", "visible": True, "order": 2},
+            {"name": "hex_raw", "visible": True, "order": 3},
         ]
         view = StructView(presenter=presenter)
         presenter.view = view
         nodes = [
-            {"id": "root", "label": "RootStruct", "type": "struct", "offset": 0, "size": 8, "children": []}
+            {"id": "root", "name": "RootStruct", "value": "1", "hex_value": "0x1", "hex_raw": "01", "type": "struct", "children": []}
         ]
         presenter.get_display_nodes = lambda mode: nodes
         presenter.context["display_mode"] = "tree"
         view.update_display(nodes, presenter.context)
         tree = view.member_tree
-        # 驗證初始欄位順序與顯示
-        columns = tree.cget("columns")
-        self.assertEqual(columns, ("label", "type", "offset", "size"))
-        # 隱藏 offset 欄位
-        presenter.on_toggle_column("offset")
-        columns2 = tree.cget("columns")
-        self.assertNotIn("offset", columns2)
-        self.assertIn("label", columns2)
-        # 隱藏所有欄位只剩 label
-        presenter.on_toggle_column("type")
-        presenter.on_toggle_column("size")
-        columns3 = tree.cget("columns")
-        self.assertEqual(columns3, ("label",))
+        # 驗證初始顯示欄位順序
+        self.assertEqual(tree.cget("displaycolumns"), ("name", "value", "hex_value", "hex_raw"))
+        # 隱藏 hex_value 欄位
+        presenter.on_toggle_column("hex_value")
+        self.assertEqual(tree.cget("displaycolumns"), ("name", "value", "hex_raw"))
+        # 隱藏所有欄位只剩 name
+        presenter.on_toggle_column("value")
+        presenter.on_toggle_column("hex_raw")
+        self.assertEqual(tree.cget("displaycolumns"), ("name",))
         # 右鍵選單觸發（模擬）
         if hasattr(view, "_on_treeview_column_menu_click"):
-            view._on_treeview_column_menu_click("offset")
-            self.assertIn("offset", presenter.toggle_calls)
+            view._on_treeview_column_menu_click("hex_value")
+            self.assertIn("hex_value", presenter.toggle_calls)
         # 驗證右鍵選單 UI（移到 destroy 前）
         if hasattr(view, "_show_treeview_column_menu"):
             class DummyEvent:
@@ -1515,7 +1510,7 @@ class TestStructView(unittest.TestCase):
                     self.y_root = y_root
                     self.widget = view.member_tree
                     self.col = col
-            event = DummyEvent(100, 100, "label")
+            event = DummyEvent(100, 100, "name")
             view._show_treeview_column_menu(event, test_mode=True)
             self.assertTrue(hasattr(view, "_treeview_column_menu"))
             menu = view._treeview_column_menu
@@ -1529,6 +1524,26 @@ class TestStructView(unittest.TestCase):
                         break
                 self.assertTrue(found, f"Menu 應包含欄位 {name}")
         view.destroy()
+
+    def test_member_treeview_column_config一致(self):
+        """驗證 file tab 與 manual tab 的 member_tree 欄位名稱、寬度、順序完全一致（heading text fallback 行為不驗證）"""
+        view = self.view
+        # 先觸發一次 update_display，確保 file tab 的 member_tree 會被正確重建
+        presenter = self.presenter
+        nodes = presenter.get_display_nodes(presenter.context.get("display_mode", "tree"))
+        view.update_display(nodes, presenter.context)
+        # file tab
+        file_tree = view.member_tree
+        # manual tab
+        manual_tree = view.manual_member_tree
+        # 欄位名稱
+        self.assertEqual(file_tree.cget("columns"), manual_tree.cget("columns"))
+        # 欄位順序
+        self.assertEqual(file_tree.cget("displaycolumns"), manual_tree.cget("displaycolumns"))
+        # 欄位寬度
+        for col in file_tree.cget("columns"):
+            self.assertEqual(file_tree.column(col)["width"], manual_tree.column(col)["width"])
+        # tkinter/ttk heading fallback 行為：不同平台/版本查詢 heading text 可能回傳欄位 name 而非 title，故不驗證 heading text。
 
 if __name__ == "__main__":
     unittest.main()
