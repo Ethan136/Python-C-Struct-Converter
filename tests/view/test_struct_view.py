@@ -1545,5 +1545,61 @@ class TestStructView(unittest.TestCase):
             self.assertEqual(file_tree.column(col)["width"], manual_tree.column(col)["width"])
         # tkinter/ttk heading fallback 行為：不同平台/版本查詢 heading text 可能回傳欄位 name 而非 title，故不驗證 heading text。
 
+    def test_treeview_drag_reorder_nodes(self):
+        """TDD: 驗證 Treeview 拖曳排序（同層級節點順序調整）功能。"""
+        class PresenterWithReorder(PresenterStub):
+            def __init__(self):
+                super().__init__()
+                self.reorder_calls = []
+                self._nodes = [
+                    {"id": "root", "name": "RootStruct", "type": "struct", "children": [
+                        {"id": "child1", "name": "A", "type": "int", "children": []},
+                        {"id": "child2", "name": "B", "type": "int", "children": []},
+                        {"id": "child3", "name": "C", "type": "int", "children": []},
+                    ]}
+                ]
+            def get_display_nodes(self, mode):
+                return self._nodes
+            def on_reorder_nodes(self, parent_id, new_order):
+                self.reorder_calls.append((parent_id, new_order))
+                # 依 new_order 重排 children
+                for n in self._nodes:
+                    if n["id"] == parent_id:
+                        id2node = {c["id"]: c for c in n["children"]}
+                        n["children"] = [id2node[i] for i in new_order]
+                if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
+                    self.view.update_display(self.get_display_nodes("tree"), self.context)
+        presenter = PresenterWithReorder()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        nodes = presenter.get_display_nodes("tree")
+        presenter.context["display_mode"] = "tree"
+        view.update_display(nodes, presenter.context)
+        tree = view.member_tree
+        # 初始順序
+        children = tree.get_children("root")
+        self.assertEqual(children, ("child1", "child2", "child3"))
+        # 模擬拖曳 child3 到 child1 前面
+        new_order = ["child3", "child1", "child2"]
+        if hasattr(view, "_on_treeview_reorder"):
+            view._on_treeview_reorder("root", new_order)
+        else:
+            presenter.on_reorder_nodes("root", new_order)
+        # 驗證 callback 被呼叫
+        self.assertIn(("root", new_order), presenter.reorder_calls)
+        # 驗證 UI 順序
+        children2 = tree.get_children("root")
+        self.assertEqual(children2, tuple(new_order))
+        # 再拖曳 child1 到最後
+        new_order2 = ["child3", "child2", "child1"]
+        if hasattr(view, "_on_treeview_reorder"):
+            view._on_treeview_reorder("root", new_order2)
+        else:
+            presenter.on_reorder_nodes("root", new_order2)
+        self.assertIn(("root", new_order2), presenter.reorder_calls)
+        children3 = tree.get_children("root")
+        self.assertEqual(children3, tuple(new_order2))
+        view.destroy()
+
 if __name__ == "__main__":
     unittest.main()

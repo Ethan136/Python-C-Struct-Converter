@@ -935,6 +935,86 @@ class StructView(tk.Tk):
                 self.member_tree.heading(col, command=lambda c=col: None)
             self.member_tree.bind("<Button-3>", self._show_treeview_column_menu)
         bind_header_right_click()
+        # 拖曳排序事件
+        self._dragging_item = None
+        self._dragging_parent = None
+        self._dragging_index = None
+        self._dragging_highlight = None
+        tree = self.member_tree
+        tree.bind("<ButtonPress-1>", self._on_treeview_drag_start)
+        tree.bind("<B1-Motion>", self._on_treeview_drag_motion)
+        tree.bind("<ButtonRelease-1>", self._on_treeview_drag_release)
+
+    def _on_treeview_drag_start(self, event):
+        tree = self.member_tree
+        region = tree.identify("region", event.x, event.y)
+        if region != "cell":
+            self._dragging_item = None
+            return
+        item = tree.identify_row(event.y)
+        if not item:
+            self._dragging_item = None
+            return
+        self._dragging_item = item
+        self._dragging_parent = tree.parent(item)
+        self._dragging_index = tree.index(item)
+        # highlight 起始 row
+        tree.selection_set(item)
+
+    def _on_treeview_drag_motion(self, event):
+        tree = self.member_tree
+        if not self._dragging_item:
+            return
+        target_item = tree.identify_row(event.y)
+        if not target_item or target_item == self._dragging_item:
+            return
+        # 僅允許同層級
+        if tree.parent(target_item) != self._dragging_parent:
+            return
+        # highlight 目標 row
+        if self._dragging_highlight:
+            tree.item(self._dragging_highlight, tags=())
+        self._dragging_highlight = target_item
+        tree.item(target_item, tags=("highlighted",))
+
+    def _on_treeview_drag_release(self, event):
+        tree = self.member_tree
+        if not self._dragging_item:
+            return
+        target_item = tree.identify_row(event.y)
+        if not target_item or target_item == self._dragging_item:
+            self._clear_drag_highlight()
+            self._dragging_item = None
+            return
+        # 僅允許同層級
+        if tree.parent(target_item) != self._dragging_parent:
+            self._clear_drag_highlight()
+            self._dragging_item = None
+            return
+        # 計算新順序
+        siblings = list(tree.get_children(self._dragging_parent))
+        from_idx = siblings.index(self._dragging_item)
+        to_idx = siblings.index(target_item)
+        new_order = siblings[:]
+        item = new_order.pop(from_idx)
+        new_order.insert(to_idx, item)
+        # 呼叫 reorder callback
+        if hasattr(self, "_on_treeview_reorder"):
+            self._on_treeview_reorder(self._dragging_parent or "", new_order)
+        elif self.presenter and hasattr(self.presenter, "on_reorder_nodes"):
+            self.presenter.on_reorder_nodes(self._dragging_parent or "", new_order)
+        self._clear_drag_highlight()
+        self._dragging_item = None
+
+    def _clear_drag_highlight(self):
+        tree = self.member_tree
+        if self._dragging_highlight:
+            tree.item(self._dragging_highlight, tags=())
+        self._dragging_highlight = None
+
+    def _on_treeview_reorder(self, parent_id, new_order):
+        if self.presenter and hasattr(self.presenter, "on_reorder_nodes"):
+            self.presenter.on_reorder_nodes(parent_id, list(new_order))
 
     def _show_treeview_column_menu(self, event, test_mode=False):
         # 動態產生欄位選單
