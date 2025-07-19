@@ -116,6 +116,24 @@ class PresenterStub:
             self.context.update(snap)
             if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
                 self.view.update_display(self.get_display_nodes(self.context.get("display_mode", "tree")), self.context)
+    def on_filter(self, filter_str):
+        self.context["filter"] = filter_str
+        all_nodes = self.get_display_nodes(self.context.get("display_mode", "tree"))
+        def filter_nodes(node):
+            label = node.get("label", "")
+            type_ = node.get("type", "")
+            name = node.get("name", "")
+            match = not filter_str or (filter_str.lower() in label.lower() or filter_str.lower() in type_.lower() or filter_str.lower() in name.lower())
+            filtered_children = [filter_nodes(child) for child in node.get("children", [])]
+            filtered_children = [c for c in filtered_children if c]
+            if match or filtered_children:
+                new_node = node.copy()
+                new_node["children"] = filtered_children
+                return new_node
+            return None
+        filtered_nodes = [n for n in (filter_nodes(n) for n in all_nodes) if n]
+        if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(filtered_nodes, self.context)
 
 @pytest.mark.timeout(15)
 class TestStructView(unittest.TestCase):
@@ -1310,6 +1328,41 @@ class TestStructView(unittest.TestCase):
         # 點擊 Redo
         view._on_redo()
         self.assertEqual(presenter.context["selected_node"], "child2")
+        view.destroy()
+
+    def test_treeview_filter_nodes(self):
+        presenter = PresenterStub()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        # 模擬多層節點
+        nodes = [
+            {"id": "root", "label": "root struct", "type": "struct", "children": [
+                {"id": "child1", "label": "foo", "type": "int", "children": [], "icon": "int", "extra": {}},
+                {"id": "child2", "label": "bar", "type": "char", "children": [], "icon": "char", "extra": {}},
+                {"id": "child3", "label": "baz", "type": "float", "children": [], "icon": "float", "extra": {}}
+            ], "icon": "struct", "extra": {}}
+        ]
+        presenter.get_display_nodes = lambda mode: nodes
+        presenter.context["display_mode"] = "tree"
+        # 無 filter 時全部顯示
+        presenter.on_filter("")
+        tree = view.member_tree
+        self.assertIn("root", tree.get_children(""))
+        self.assertIn("child1", tree.get_children("root"))
+        self.assertIn("child2", tree.get_children("root"))
+        self.assertIn("child3", tree.get_children("root"))
+        # filter "foo" 只顯示 child1
+        presenter.on_filter("foo")
+        children = tree.get_children("root")
+        self.assertIn("child1", children)
+        self.assertNotIn("child2", children)
+        self.assertNotIn("child3", children)
+        # filter "float" 只顯示 child3
+        presenter.on_filter("float")
+        children = tree.get_children("root")
+        self.assertIn("child3", children)
+        self.assertNotIn("child1", children)
+        self.assertNotIn("child2", children)
         view.destroy()
 
 if __name__ == "__main__":

@@ -133,6 +133,12 @@ class StructView(tk.Tk):
         self.search_entry = tk.Entry(control_frame, textvariable=self.search_var, width=16)
         self.search_entry.pack(side=tk.LEFT)
         self.search_entry.bind('<KeyRelease>', self._on_search_entry_change)
+        # Filter 輸入框
+        tk.Label(control_frame, text="  Filter：").pack(side=tk.LEFT)
+        self.filter_var = tk.StringVar()
+        self.filter_entry = tk.Entry(control_frame, textvariable=self.filter_var, width=16)
+        self.filter_entry.pack(side=tk.LEFT)
+        self.filter_entry.bind('<KeyRelease>', self._on_filter_entry_change)
         # 展開全部/收合全部按鈕
         self.expand_all_btn = tk.Button(control_frame, text="展開全部", command=self._on_expand_all)
         self.expand_all_btn.pack(side=tk.LEFT, padx=2)
@@ -1049,6 +1055,11 @@ class StructView(tk.Tk):
         search_str = self.search_var.get()
         if self.presenter and hasattr(self.presenter, "on_search"):
             self.presenter.on_search(search_str)
+
+    def _on_filter_entry_change(self, event):
+        filter_str = self.filter_var.get()
+        if self.presenter and hasattr(self.presenter, "on_filter"):
+            self.presenter.on_filter(filter_str)
 
     def _on_undo(self):
         if self.presenter and hasattr(self.presenter, "on_undo"):

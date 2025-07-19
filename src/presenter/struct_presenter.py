@@ -422,3 +422,27 @@ class StructPresenter:
         t = threading.Timer(1.5, finish_save)
         t.daemon = True
         t.start()
+
+    def on_filter(self, filter_str):
+        """根據 filter 字串過濾 nodes（名稱或型別包含 filter），更新 context['filter']，推送新 nodes/context 給 View。"""
+        self.context["filter"] = filter_str
+        all_nodes = self.model.get_display_nodes(self.context.get("display_mode", "tree"))
+        def filter_nodes(node):
+            label = node.get("label", "")
+            type_ = node.get("type", "")
+            name = node.get("name", "")
+            # 篩選條件：名稱或型別包含 filter 字串
+            match = not filter_str or (filter_str.lower() in label.lower() or filter_str.lower() in type_.lower() or filter_str.lower() in name.lower())
+            # 遞迴過濾子節點
+            filtered_children = [filter_nodes(child) for child in node.get("children", [])]
+            filtered_children = [c for c in filtered_children if c]
+            if match or filtered_children:
+                new_node = node.copy()
+                new_node["children"] = filtered_children
+                return new_node
+            return None
+        filtered_nodes = [n for n in (filter_nodes(n) for n in all_nodes) if n]
+        self.context["debug_info"]["last_event"] = "on_filter"
+        self.context["debug_info"]["last_event_args"] = {"filter": filter_str}
+        if self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(filtered_nodes, self.context)
