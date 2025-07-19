@@ -813,6 +813,62 @@ class TestStructPresenter(unittest.TestCase):
         self.assertEqual(api_trace[-1]["api"], "event_24")
         self.assertEqual(api_trace[0]["api"], "event_15")
 
+    def test_event_chain_context_and_debug_info(self):
+        # on_node_click
+        self.presenter.context = self.presenter.get_default_context()
+        self.presenter.on_node_click("n1")
+        self.assertEqual(self.presenter.context["selected_node"], "n1")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_node_click")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event_args"], {"node_id": "n1"})
+        # on_expand
+        self.presenter.on_expand("n2")
+        self.assertIn("n2", self.presenter.context["expanded_nodes"])
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_expand")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event_args"], {"node_id": "n2"})
+        # on_switch_display_mode
+        self.presenter.on_switch_display_mode("flat")
+        self.assertEqual(self.presenter.context["display_mode"], "flat")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_switch_display_mode")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event_args"], {"mode": "flat"})
+        # on_collapse
+        self.presenter.on_collapse("n2")
+        self.assertNotIn("n2", self.presenter.context["expanded_nodes"])
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_collapse")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event_args"], {"node_id": "n2"})
+        # set_readonly
+        self.presenter.set_readonly(True)
+        self.assertTrue(self.presenter.context["readonly"])
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "set_readonly")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event_args"], {"readonly": True})
+        # on_refresh
+        self.presenter.on_refresh()
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_refresh")
+        # on_delete_node 權限不足
+        self.presenter.context["can_delete"] = False
+        result = self.presenter.on_delete_node("n3")
+        self.assertFalse(result["success"])
+        self.assertEqual(self.presenter.context["error"], "Permission denied")
+        self.assertEqual(self.presenter.context["debug_info"]["last_error"], "PERMISSION_DENIED")
+        # on_edit_node 權限不足
+        self.presenter.context["can_edit"] = False
+        self.presenter.on_edit_node = lambda node_id, new_value: self.presenter._check_permission("edit")
+        result2 = self.presenter.on_edit_node("n4", 123)
+        self.assertFalse(result2["success"])
+        self.assertEqual(self.presenter.context["error"], "Permission denied")
+        self.assertEqual(self.presenter.context["debug_info"]["last_error"], "PERMISSION_DENIED")
+        # on_undo
+        ctx0 = self.presenter.get_default_context()
+        self.presenter.context = ctx0.copy()
+        self.presenter.context["history"] = []
+        self.presenter.context["selected_node"] = "A"
+        self.presenter.context["history"].append(ctx0.copy())
+        ctx1 = self.presenter.context.copy()
+        self.presenter.context["selected_node"] = "B"
+        self.presenter.context["history"].append(ctx1.copy())
+        self.presenter.on_undo()
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_undo")
+        # on_load_file async 測試略，已於其他測試覆蓋
+
 # 為每個測試方法加上 timeout 與 debug print
 for name, method in list(TestStructPresenter.__dict__.items()):
     if name.startswith('test_') and callable(method):
