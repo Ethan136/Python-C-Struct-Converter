@@ -335,3 +335,50 @@ pytest --maxfail=10 --cov=src tests/
 6. 文件同步更新，記錄每次搬移的進度、遇到的問題與解法。
 7. 定期 review 測試覆蓋率，補齊尚未資料驅動的 edge case。
 8. 團隊協作時，建議每次 PR 附上對應 XML 測試資料與 loader 變更，確保規格與驗證同步。 
+
+### 7.10 edge case XML 驗證規劃
+- 已設計 edge case 類型：
+  - padding、final padding
+  - 空 struct
+  - 極短 hex、極長 hex
+  - bitfield、匿名 bitfield
+- XML schema 範例：
+```xml
+<manual_struct_tests>
+    <test_case name="padding_and_final_padding">
+        <members>
+            <member name="a" type="char" bit_size="0"/>
+            <member name="b" type="int" bit_size="0"/>
+        </members>
+        <total_size>8</total_size>
+        <expected_layout>
+            <item name="a" type="char" offset="0" size="1"/>
+            <item name="(padding)" type="padding" offset="1" size="3"/>
+            <item name="b" type="int" offset="4" size="4"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="empty_struct">
+        <members></members>
+        <total_size>0</total_size>
+        <expected_layout></expected_layout>
+    </test_case>
+    <test_case name="short_hex_struct">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+            <member name="b" type="int" bit_size="0"/>
+        </members>
+        <total_size>8</total_size>
+        <expected_layout>
+            <item name="a" type="int" offset="0" size="4"/>
+            <item name="b" type="int" offset="4" size="4"/>
+        </expected_layout>
+    </test_case>
+</manual_struct_tests>
+```
+- 驗證重點：
+  - layout 結果正確（offset/size/padding/bitfield/匿名欄位）
+  - 空 struct 不產生 layout
+  - 支援極短/極長 hex 對應 layout
+- 擴充方式：
+  - 依 7.6.1 條列 edge case，持續新增 XML 測試資料即可。
+  - 每次擴充後執行 pytest，確保驗證邏輯與資料一致。 
