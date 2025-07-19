@@ -100,5 +100,36 @@ class TestV2PAPIContract(unittest.TestCase):
         self.assertIn("error_message", result)
         self.assertEqual(result["error_code"], "PERMISSION_DENIED")
 
+    def test_on_node_click_event(self):
+        self.presenter.on_node_click("V2PTest.a")
+        self.assertEqual(self.presenter.context["selected_node"], "V2PTest.a")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_node_click")
+
+    def test_on_expand_and_collapse_event(self):
+        self.presenter.on_expand("V2PTest.a")
+        self.assertIn("V2PTest.a", self.presenter.context["expanded_nodes"])
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_expand")
+        self.presenter.on_collapse("V2PTest.a")
+        self.assertNotIn("V2PTest.a", self.presenter.context["expanded_nodes"])
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_collapse")
+
+    def test_on_refresh_event(self):
+        self.presenter.on_refresh()
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_refresh")
+
+    def test_on_undo_event(self):
+        # 模擬 history
+        old_ctx = dict(self.presenter.context)
+        self.presenter.context["history"] = [old_ctx]
+        self.presenter.context["selected_node"] = "V2PTest.a"
+        self.presenter.on_undo()
+        self.assertEqual(self.presenter.context["selected_node"], old_ctx["selected_node"])
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_undo")
+
+    def test_set_readonly_event(self):
+        self.presenter.set_readonly(True)
+        self.assertTrue(self.presenter.context["readonly"])
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "set_readonly")
+
 if __name__ == "__main__":
     unittest.main() 

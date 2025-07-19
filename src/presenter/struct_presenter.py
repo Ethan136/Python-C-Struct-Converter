@@ -339,3 +339,46 @@ class StructPresenter:
             return {"success": False, "error_code": "PERMISSION_DENIED", "error_message": "No permission to delete."}
         # ...實際刪除邏輯略...
         return {"success": True}
+
+    def on_node_click(self, node_id):
+        self.context["selected_node"] = node_id
+        self.context["debug_info"]["last_event"] = "on_node_click"
+        self.context["debug_info"]["last_event_args"] = {"node_id": node_id}
+        if self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+
+    def on_expand(self, node_id):
+        if node_id not in self.context["expanded_nodes"]:
+            self.context["expanded_nodes"].append(node_id)
+        self.context["debug_info"]["last_event"] = "on_expand"
+        self.context["debug_info"]["last_event_args"] = {"node_id": node_id}
+        if self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+
+    def on_refresh(self):
+        self.context["debug_info"]["last_event"] = "on_refresh"
+        self.context["debug_info"]["last_event_args"] = {}
+        if self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+
+    def on_collapse(self, node_id):
+        if node_id in self.context["expanded_nodes"]:
+            self.context["expanded_nodes"].remove(node_id)
+        self.context["debug_info"]["last_event"] = "on_collapse"
+        self.context["debug_info"]["last_event_args"] = {"node_id": node_id}
+        if self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+
+    def on_undo(self):
+        if self.context["history"]:
+            self.context = self.context["history"].pop()
+            self.context["debug_info"]["last_event"] = "on_undo"
+            if self.view and hasattr(self.view, "update_display"):
+                self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+
+    def set_readonly(self, readonly: bool):
+        self.context["readonly"] = readonly
+        self.context["debug_info"]["last_event"] = "set_readonly"
+        self.context["debug_info"]["last_event_args"] = {"readonly": readonly}
+        if self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
