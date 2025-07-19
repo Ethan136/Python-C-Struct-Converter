@@ -30,6 +30,8 @@
 - V2P API 文件/contract 已最終 review，欄位、事件、錯誤、權限、debug、版本一致
 - （如有）多語系/本地化/a11y 基礎設計已預留
 
+**特別強調：Checklist 狀態必須同步於 YAML/JSON，並於 CI pipeline 自動驗證，所有關鍵項目未全綠不得進入平行開發。每次 worktree/feature branch 合併前，必須 review 並同步 checklist 狀態。**
+
 > 詳細 checklist 與進度追蹤，請見 [v6_parallel_dev_checklist.md](./v6_parallel_dev_checklist.md)
 
 ## 4. 注意事項與風險控管
