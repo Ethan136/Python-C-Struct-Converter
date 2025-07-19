@@ -3,13 +3,17 @@ from tkinter import ttk
 from tkinter import filedialog, messagebox
 # from src.config import get_string
 from src.model.struct_model import StructModel
+import time
 
 # --- Treeview 巢狀遞迴插入與互動 helper ---
 def insert_treeview_node(tree, parent_id, node, icon_map=None):
     """遞迴插入 treeview node 結構。node: dict, 需包含 id, label, type, children, icon, extra"""
+    if parent_id in (None, "", 0):
+        parent_id = ""
     values = (node.get("label", ""), node.get("type", ""))
-    icon = icon_map.get(node["icon"]) if icon_map and node.get("icon") else None
-    item_id = tree.insert(parent_id, 'end', iid=node['id'], text=node['label'], values=values, image=icon)
+    icon = icon_map.get(node["icon"]) if icon_map and node.get("icon") else ""
+    tags = ()
+    item_id = tree.insert(parent_id, 'end', iid=node['id'], text=node['label'], values=values, image=icon, tags=tags)
     for child in node.get('children', []):
         insert_treeview_node(tree, item_id, child, icon_map)
     return item_id
@@ -21,7 +25,11 @@ def update_treeview_by_context(tree, context):
         _update_treeview_expand_recursive(tree, item, expanded)
     # 高亮選取
     selected = context.get("selected_node")
-    if selected:
+    selected_nodes = context.get("selected_nodes")
+    # 僅在型別正確時才呼叫 selection_set
+    if isinstance(selected_nodes, (list, tuple)) and selected_nodes:
+        tree.selection_set(selected_nodes)
+    elif isinstance(selected, str) and selected:
         tree.selection_set(selected)
     else:
         tree.selection_remove(tree.selection())
@@ -36,7 +44,8 @@ def create_member_treeview(parent):
         parent,
         columns=("name", "value", "hex_value", "hex_raw"),
         show="headings",
-        height=6
+        height=6,
+        selectmode="extended"  # 支援多選
     )
     tree.heading("name", text="欄位名稱")
     tree.heading("value", text="值")
@@ -79,6 +88,8 @@ class StructView(tk.Tk):
         # Treeview 事件綁定
         if hasattr(self, "member_tree"):
             self._bind_member_tree_events()
+        # 新增 presenter/view 綁定與初始顯示
+        self._init_presenter_view_binding()
 
     def _create_tab_control(self):
         self.tab_control = ttk.Notebook(self)
@@ -110,7 +121,23 @@ class StructView(tk.Tk):
         endian_options = ["Little Endian", "Big Endian"]
         self.endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=lambda _: self._on_endianness_change())
         self.endian_menu.pack(side=tk.LEFT)
-
+        # 顯示模式切換
+        tk.Label(control_frame, text="  顯示模式：").pack(side=tk.LEFT)
+        self.display_mode_var = tk.StringVar(value="tree")
+        display_mode_options = ["tree", "flat"]
+        self.display_mode_menu = tk.OptionMenu(control_frame, self.display_mode_var, *display_mode_options, command=self._on_display_mode_change)
+        self.display_mode_menu.pack(side=tk.LEFT)
+        # 搜尋輸入框
+        tk.Label(control_frame, text="  搜尋：").pack(side=tk.LEFT)
+        self.search_var = tk.StringVar()
+        self.search_entry = tk.Entry(control_frame, textvariable=self.search_var, width=16)
+        self.search_entry.pack(side=tk.LEFT)
+        self.search_entry.bind('<KeyRelease>', self._on_search_entry_change)
+        # 展開全部/收合全部按鈕
+        self.expand_all_btn = tk.Button(control_frame, text="展開全部", command=self._on_expand_all)
+        self.expand_all_btn.pack(side=tk.LEFT, padx=2)
+        self.collapse_all_btn = tk.Button(control_frame, text="收合全部", command=self._on_collapse_all)
+        self.collapse_all_btn.pack(side=tk.LEFT, padx=2)
         # 檔案選擇按鈕
         tk.Button(main_frame, text="選擇 .h 檔", command=self._on_browse_file).pack(anchor="w", pady=2)
         # 檔案路徑顯示
@@ -894,10 +921,99 @@ class StructView(tk.Tk):
             self.presenter.on_node_click(selected[0])
 
     def show_treeview_nodes(self, nodes, context, icon_map=None):
-        """清空並遞迴插入 treeview node，根據 context 展開/高亮"""
         tree = self.member_tree
         for item in tree.get_children(""):
             tree.delete(item)
+        # 設定高亮 tag 樣式
+        tree.tag_configure("highlighted", background="yellow")
+        highlighted = set(context.get("highlighted_nodes", []))
+        def insert_with_highlight(tree, parent_id, node):
+            if parent_id in (None, "", 0):
+                parent_id = ""
+            values = (node.get("label", ""), node.get("type", ""))
+            icon = icon_map.get(node["icon"]) if icon_map and node.get("icon") else ""
+            tags = ("highlighted",) if node["id"] in highlighted else ()
+            item_id = tree.insert(parent_id, 'end', iid=node['id'], text=node['label'], values=values, image=icon, tags=tags)
+            for child in node.get('children', []):
+                insert_with_highlight(tree, item_id, child)
+            return item_id
         for node in nodes:
-            insert_treeview_node(tree, '', node, icon_map)
+            insert_with_highlight(tree, None, node)
         update_treeview_by_context(tree, context)
+        # 多選高亮
+        selected_nodes = context.get("selected_nodes")
+        if selected_nodes:
+            tree.selection_set(selected_nodes)
+
+    def update_display(self, nodes, context, icon_map=None):
+        self.show_treeview_nodes(nodes, context, icon_map)
+        # 顯示錯誤訊息
+        if context.get("error"):
+            from tkinter import messagebox
+            messagebox.showerror("錯誤", str(context["error"]))
+        # loading/readonly 狀態禁用 Treeview
+        # if context.get("loading") or context.get("readonly"):
+        #     self.member_tree.config(state="disabled")
+        # else:
+        #     self.member_tree.config(state="normal")
+        # 顯示 debug_info
+        debug_info = context.get("debug_info", {})
+        debug_lines = []
+        if debug_info:
+            if "last_event" in debug_info:
+                debug_lines.append(f"last_event: {debug_info['last_event']}")
+            if "last_event_args" in debug_info:
+                debug_lines.append(f"last_event_args: {debug_info['last_event_args']}")
+            if "last_error" in debug_info:
+                debug_lines.append(f"last_error: {debug_info['last_error']}")
+            if "api_trace" in debug_info:
+                debug_lines.append(f"api_trace: {debug_info['api_trace']}")
+        self.debug_info_label.config(text="\n".join(debug_lines))
+
+    def _init_presenter_view_binding(self):
+        if self.presenter:
+            self.presenter.view = self
+            # 若 presenter 有 context 與 get_display_nodes，載入初始資料
+            if hasattr(self.presenter, "context") and hasattr(self.presenter, "get_display_nodes"):
+                context = self.presenter.context
+                mode = context.get("display_mode", "tree")
+                try:
+                    nodes = self.presenter.get_display_nodes(mode)
+                except Exception:
+                    nodes = []
+                self.update_display(nodes, context)
+            # 若 context 尚未初始化，mock 一份 context 以便 UI 測試
+            elif hasattr(self.presenter, "get_display_nodes"):
+                context = {
+                    "display_mode": "tree",
+                    "expanded_nodes": ["root"],
+                    "selected_node": None,
+                    "error": None,
+                    "version": "1.0",
+                    "extra": {},
+                    "loading": False,
+                    "history": [],
+                    "user_settings": {},
+                    "last_update_time": time.time(),
+                    "readonly": False,
+                    "debug_info": {"last_event": None}
+                }
+                nodes = self.presenter.get_display_nodes("tree")
+                self.update_display(nodes, context)
+
+    def _on_expand_all(self):
+        if self.presenter and hasattr(self.presenter, "on_expand_all"):
+            self.presenter.on_expand_all()
+
+    def _on_collapse_all(self):
+        if self.presenter and hasattr(self.presenter, "on_collapse_all"):
+            self.presenter.on_collapse_all()
+
+    def _on_display_mode_change(self, mode):
+        if self.presenter and hasattr(self.presenter, "on_switch_display_mode"):
+            self.presenter.on_switch_display_mode(mode)
+
+    def _on_search_entry_change(self, event):
+        search_str = self.search_var.get()
+        if self.presenter and hasattr(self.presenter, "on_search"):
+            self.presenter.on_search(search_str)

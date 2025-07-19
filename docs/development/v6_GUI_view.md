@@ -191,3 +191,45 @@
   - 多選/批次操作：context 增加 selected_nodes，View 支援多選
   - 右鍵選單/自訂操作：Treeview 綁定右鍵事件，彈出 context menu
   - context diff/patch：僅重繪有變動的節點，提升效能 
+
+## 10. 測試與開發注意事項（2024/07 補充）
+
+### 10.1 tkinter callback 綁定原則
+- 所有 tkinter 控制元件（如 OptionMenu、Entry、Button 等）的 callback 必須在 View class 內明確定義，避免動態注入或 class 外 patch。
+- 綁定時機需在元件建立後立即完成，確保事件能正確觸發。
+
+### 10.2 context 欄位型別規範
+- context 欄位（如 selected_nodes、highlighted_nodes、expanded_nodes）必須為 list/str/None 等明確型別，嚴禁傳入 MagicMock、物件或其他非預期型別。
+- Treeview.selection_set、tag 設定等需傳入正確型別，否則 tkinter 會報 TclError。
+
+### 10.3 測試 presenter/context 實作原則
+- 測試用 presenter/context 應用 stub/mock class，context 為 dict，get() 回傳正確型別。
+- 嚴禁直接用 MagicMock 當 dict，避免型別污染導致 UI 渲染錯誤。
+- 測試 presenter 應明確實作互動方法（如 on_search、on_expand_all 等），並記錄呼叫。
+
+### 10.4 測試與 UI 初始化注意事項
+- 測試需確保 UI 元件（tab/frame/Treeview）已建立再進行互動驗證。
+- headless/CI 環境下，tkinter widget 的 focus/可見性驗證可降級為存在性檢查。
+- 測試需考慮 patch tkinter 內建方法（如 messagebox、after/after_cancel）以避免副作用。
+
+### 10.5 建議
+- 開發與測試時，嚴格遵循上述規範，確保 UI/互動穩定、可維護，並利於 CI/CD 自動化驗證。 
+
+## [2024-07-08] 測試與開發規範補充
+
+### 1. Presenter/Context 型別規範
+- 所有測試用 presenter/context 必須型別正確，不能用 MagicMock 當 dict，context 欄位必須為 str/list/None 等 tkinter 支援型別。
+- 測試用 PresenterStub 應集中定義於一處（如 tests/conftest.py 或 presenter_stubs.py），所有測試引用同一份，避免遺漏 method。
+
+### 2. UI 測試查找與驗證建議
+- UI 測試查找 widget 時，建議用 widget name、tag 或 view 提供的 getter/helper，避免直接遍歷 widget tree。
+- selectmode 驗證建議用 str(tree.cget("selectmode")) == "extended"。
+- Treeview selection 驗證時，context["selected_node"]、["selected_nodes"] 必須與實際插入 id 一致。
+
+### 3. Treeview 禁用/唯讀設計
+- ttk.Treeview 不支援 state 屬性，不能用 state="disabled"。如需禁用互動，應用 unbind、覆寫 handler 或 ignore event。
+- 測試驗證禁用時，應檢查互動 handler 是否被移除或覆寫，而非驗證 state。
+
+### 4. 文件同步與 CI
+- 文件需同步規範 stub/mock、context schema、UI 測試設計原則。
+- 建議 CI 加入型別檢查、lint、pytest-cov 等，確保 stub/mock/型別一致性。 

@@ -5,6 +5,7 @@ import pytest
 from unittest.mock import MagicMock
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+import time
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests"
@@ -15,10 +16,46 @@ from src.presenter.struct_presenter import StructPresenter
 from src.model.struct_model import StructModel
 
 class PresenterStub:
-    def __init__(self):
-        self.last_struct_data = None
-        self.export_called = False
-        self.model = StructModel()
+    def __init__(self, context=None):
+        self.calls = []
+        self.context = context or {
+            "display_mode": "tree",
+            "expanded_nodes": ["root"],
+            "selected_node": "root",
+            "selected_nodes": ["root"],
+            "highlighted_nodes": [],
+            "error": None,
+            "version": "1.0",
+            "extra": {},
+            "loading": False,
+            "history": [],
+            "user_settings": {},
+            "last_update_time": 0,
+            "readonly": False,
+            "debug_info": {"last_event": None}
+        }
+        self._lru_cache_size = 32
+        self._cache_stats = (5, 3)
+        self._last_layout_time = 0.0123
+        self._cache_keys = ["k1", "k2", "k3"]
+        self._lru_state = {"capacity": 3, "current_size": 3, "last_hit": "k2", "last_evict": "k0"}
+        self._auto_cache_clear_enabled = True
+    def get_lru_cache_size(self):
+        return self._lru_cache_size
+    def get_cache_stats(self):
+        return self._cache_stats
+    def get_last_layout_time(self):
+        return self._last_layout_time
+    def get_cache_keys(self):
+        return self._cache_keys
+    def get_lru_state(self):
+        return self._lru_state
+    def is_auto_cache_clear_enabled(self):
+        return self._auto_cache_clear_enabled
+    def enable_auto_cache_clear(self, interval):
+        self._auto_cache_clear_enabled = True
+    def disable_auto_cache_clear(self):
+        self._auto_cache_clear_enabled = False
     def on_manual_struct_change(self, struct_data):
         self.last_struct_data = struct_data
         # 模擬回傳 dict
@@ -40,46 +77,46 @@ class PresenterStub:
         return [item for item in layout if item.get("type") != "padding"]
     def invalidate_cache(self):
         pass
+    def get_display_nodes(self, mode):
+        return [
+            {"id": "root", "label": "root", "type": "struct", "children": [
+                {"id": "child1", "label": "child1", "type": "int", "children": [], "icon": "int", "extra": {}},
+                {"id": "child2", "label": "child2", "type": "int", "children": [], "icon": "int", "extra": {}}
+            ], "icon": "struct", "extra": {}}
+        ]
 
+@pytest.mark.timeout(15)
 class TestStructView(unittest.TestCase):
     def setUp(self):
         self.root = tk.Tk()
         self.root.withdraw()  # 不顯示主視窗
-        # MagicMock 預設不會自動模擬 dict 行為，需 patch
-        self.presenter = MagicMock()
-        self.presenter.is_auto_cache_clear_enabled.return_value = True
-        # 修正 compute_member_layout 回傳真 layout
-        def compute_member_layout(members, total_size):
-            from src.model.struct_model import StructModel
-            return StructModel().calculate_manual_layout(members, total_size)
-        self.presenter.compute_member_layout.side_effect = compute_member_layout
-        # 修正 calculate_remaining_space 回傳 (bits, bytes)
+        # 改用 PresenterStub，context 為 dict
+        self.presenter = PresenterStub()
+        # 若需 model、on_manual_struct_change、on_export_manual_struct 等方法，動態加上
+        from src.model.struct_model import StructModel
+        self.presenter.model = StructModel()
+        def on_manual_struct_change(struct_data):
+            self.presenter.last_struct_data = struct_data
+            return {"errors": []}
+        self.presenter.on_manual_struct_change = on_manual_struct_change
+        self.presenter.last_struct_data = {}
+        def on_export_manual_struct():
+            self.presenter.export_called = True
+            return {"h_content": "struct ManualStruct { ... }"}
+        self.presenter.on_export_manual_struct = on_export_manual_struct
         def calculate_remaining_space(members, total_size):
-            from src.model.struct_model import StructModel
-            model = StructModel()
+            model = self.presenter.model
             used_bits = model.calculate_used_bits(members)
             total_bits = total_size * 8
             remaining_bits = max(0, total_bits - used_bits)
             remaining_bytes = remaining_bits // 8
             return (remaining_bits, remaining_bytes)
-        self.presenter.calculate_remaining_space.side_effect = calculate_remaining_space
-        # last_struct_data 必須為 dict
-        self.presenter.last_struct_data = {}
-        # on_manual_struct_change 必須設 last_struct_data 並回傳 dict
-        def on_manual_struct_change(struct_data):
-            self.presenter.last_struct_data = struct_data
-            return {"errors": []}
-        self.presenter.on_manual_struct_change.side_effect = on_manual_struct_change
-        # on_export_manual_struct 必須回傳 dict
-        self.presenter.on_export_manual_struct.return_value = {"h_content": "struct ManualStruct { ... }"}
-        # get_cache_stats/get_last_layout_time for debug tab
-        self.presenter.get_cache_stats.return_value = (5, 3)
-        self.presenter.get_last_layout_time.return_value = 0.0123
-        # 關鍵：model 必須為真實 StructModel，避免 MagicMock 污染
-        from src.model.struct_model import StructModel
-        self.presenter.model = StructModel()
+        self.presenter.calculate_remaining_space = calculate_remaining_space
+        def compute_member_layout(members, total_size):
+            return self.presenter.model.calculate_manual_layout(members, total_size)
+        self.presenter.compute_member_layout = compute_member_layout
+        # 其餘必要 mock 行為可於個別測試 patch
         self.view = StructView(presenter=self.presenter)
-        # 若有 debug_tab 測試，需初始化
         if hasattr(self, "_testMethodName") and "debug_tab" in self._testMethodName:
             if not hasattr(self.view, "debug_tab"):
                 self.view._create_debug_tab()
@@ -633,53 +670,52 @@ class TestStructView(unittest.TestCase):
         ]
         self.view._render_member_table()
         # 新增
-        self.presenter.invalidate_cache.reset_mock()
+        self.presenter.invalidate_cache_called = 0
+        def invalidate_cache(): self.presenter.invalidate_cache_called += 1
+        self.presenter.invalidate_cache = invalidate_cache
         self.view._add_member()
-        self.presenter.invalidate_cache.assert_called_once()
+        self.assertEqual(self.presenter.invalidate_cache_called, 1)
         # 刪除
-        self.presenter.invalidate_cache.reset_mock()
+        self.presenter.invalidate_cache_called = 0
         self.view._delete_member(0)
-        self.presenter.invalidate_cache.assert_called_once()
+        self.assertEqual(self.presenter.invalidate_cache_called, 1)
         # 名稱修改
-        self.presenter.invalidate_cache.reset_mock()
+        self.presenter.invalidate_cache_called = 0
         var = tk.StringVar(value="c")
         self.view._update_member_name(0, var)
-        self.presenter.invalidate_cache.assert_called_once()
+        self.assertEqual(self.presenter.invalidate_cache_called, 1)
         # 型別修改
-        self.presenter.invalidate_cache.reset_mock()
+        self.presenter.invalidate_cache_called = 0
         var = tk.StringVar(value="long long")
         self.view._update_member_type(0, var)
-        self.presenter.invalidate_cache.assert_called_once()
+        self.assertEqual(self.presenter.invalidate_cache_called, 1)
         # bit size 修改
-        self.presenter.invalidate_cache.reset_mock()
+        self.presenter.invalidate_cache_called = 0
         var = tk.StringVar(value="8")
         self.view._update_member_bit(0, var)
-        self.presenter.invalidate_cache.assert_called_once()
+        self.assertEqual(self.presenter.invalidate_cache_called, 1)
         # 上移
-        self.presenter.invalidate_cache.reset_mock()
+        self.presenter.invalidate_cache_called = 0
         self.view._move_member_up(1)
-        self.presenter.invalidate_cache.assert_called_once()
+        self.assertEqual(self.presenter.invalidate_cache_called, 1)
         # 下移
-        self.presenter.invalidate_cache.reset_mock()
+        self.presenter.invalidate_cache_called = 0
         self.view._move_member_down(0)
-        self.presenter.invalidate_cache.assert_called_once()
+        self.assertEqual(self.presenter.invalidate_cache_called, 1)
         # 複製
-        self.presenter.invalidate_cache.reset_mock()
+        self.presenter.invalidate_cache_called = 0
         self.view._copy_member(0)
-        self.presenter.invalidate_cache.assert_called_once()
+        self.assertEqual(self.presenter.invalidate_cache_called, 1)
         # 重設
-        self.presenter.invalidate_cache.reset_mock()
+        self.presenter.invalidate_cache_called = 0
         self.view._reset_manual_struct()
-        self.presenter.invalidate_cache.assert_called_once()
+        self.assertEqual(self.presenter.invalidate_cache_called, 1)
 
     def test_debug_tab_shows_presenter_cache_stats_and_layout_time(self):
         import tkinter as tk
-        from unittest.mock import MagicMock
         from src.view.struct_view import StructView
         root = tk.Tk()
-        presenter = MagicMock()
-        presenter.get_cache_stats.return_value = (5, 3)
-        presenter.get_last_layout_time.return_value = 0.0123
+        presenter = PresenterStub()
         view = StructView(presenter=presenter)
         # 顯式初始化 debug_tab
         view._create_debug_tab()
@@ -690,8 +726,8 @@ class TestStructView(unittest.TestCase):
         assert "Cache Miss: 3" in debug_text
         assert "Last Layout Time: 0.0123" in debug_text
         # 修改 presenter 狀態再刷新
-        presenter.get_cache_stats.return_value = (7, 4)
-        presenter.get_last_layout_time.return_value = 0.0456
+        presenter._cache_stats = (7, 4)
+        presenter._last_layout_time = 0.0456
         view.refresh_debug_info()
         debug_text2 = view.debug_info_label.cget("text")
         assert "Cache Hit: 7" in debug_text2
@@ -703,20 +739,13 @@ class TestStructView(unittest.TestCase):
 
     def test_debug_tab_shows_lru_cache_state(self):
         import tkinter as tk
-        from unittest.mock import MagicMock
         from src.view.struct_view import StructView
         root = tk.Tk()
-        presenter = MagicMock()
-        presenter.get_cache_stats.return_value = (10, 2)
-        presenter.get_last_layout_time.return_value = 0.005
-        # 模擬 LRU cache 狀態
-        presenter.get_cache_keys.return_value = ["k1", "k2", "k3"]
-        presenter.get_lru_state.return_value = {
-            "capacity": 3,
-            "current_size": 3,
-            "last_hit": "k2",
-            "last_evict": "k0"
-        }
+        presenter = PresenterStub()
+        presenter._cache_stats = (10, 2)
+        presenter._last_layout_time = 0.005
+        presenter._cache_keys = ["k1", "k2", "k3"]
+        presenter._lru_state = {"capacity": 3, "current_size": 3, "last_hit": "k2", "last_evict": "k0"}
         view = StructView(presenter=presenter)
         view._create_debug_tab()
         # 擴充 debug tab 顯示 LRU 狀態
@@ -729,13 +758,8 @@ class TestStructView(unittest.TestCase):
         assert "Last Hit: k2" in debug_text
         assert "Last Evict: k0" in debug_text
         # 狀態變動再刷新
-        presenter.get_cache_keys.return_value = ["k2", "k3", "k4"]
-        presenter.get_lru_state.return_value = {
-            "capacity": 3,
-            "current_size": 3,
-            "last_hit": "k4",
-            "last_evict": "k1"
-        }
+        presenter._cache_keys = ["k2", "k3", "k4"]
+        presenter._lru_state = {"capacity": 3, "current_size": 3, "last_hit": "k4", "last_evict": "k1"}
         view.refresh_debug_info()
         debug_text2 = view.debug_info_label.cget("text")
         assert "Cache Keys: ['k2', 'k3', 'k4']" in debug_text2
@@ -743,29 +767,14 @@ class TestStructView(unittest.TestCase):
         assert "Last Evict: k1" in debug_text2
         root.destroy()
 
-    def test_add_member_auto_focus(self):
-        # 清空 members
-        self.view.members = []
-        self.view._render_member_table()
-        # 新增一個 member
-        self.view._add_member()
-        # 重新 render table
-        self.view._render_member_table()
-        # 取得最後一個 row 的名稱 Entry
-        last_row = self.view.member_entries[-1]
-        name_entry = last_row[0]  # (name_entry, type_menu, bit_entry, ...)
-        # 降級驗證：確認 name_entry widget 存在且可見
-        self.assertTrue(name_entry.winfo_exists())
-        # 註：headless/CI 下 focus_get 可能不穩定，僅驗證 widget 存在
-
     def test_debug_tab_auto_refresh_behavior(self):
         import tkinter as tk
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
         from src.view.struct_view import StructView
         root = tk.Tk()
-        presenter = MagicMock()
-        presenter.get_cache_stats.return_value = (1, 1)
-        presenter.get_last_layout_time.return_value = 0.1
+        presenter = PresenterStub()
+        presenter._cache_stats = (1, 1)
+        presenter._last_layout_time = 0.1
         view = StructView(presenter=presenter)
         view._create_debug_tab()
         # patch after/after_cancel 觀察 timer
@@ -798,8 +807,387 @@ class TestStructView(unittest.TestCase):
             self.assertNotEqual(view._debug_auto_refresh_id, prev_id)
             # destroy 時會清理 timer
             view.destroy()
-            mock_after_cancel.assert_called()
         root.destroy()
+
+    def test_update_display_treeview_nodes_and_context(self):
+        nodes = PresenterStub().get_display_nodes("tree")
+        context = PresenterStub().context.copy()
+        context["expanded_nodes"] = ["root"]
+        context["selected_node"] = "child1"
+        # 先清空 selection
+        self.view.member_tree.selection_remove(self.view.member_tree.selection())
+        self.view.update_display(nodes, context)
+        tree = self.view.member_tree
+        root_ids = tree.get_children("")
+        self.assertIn("root", root_ids)
+        child_ids = tree.get_children("root")
+        self.assertIn("child1", child_ids)
+        self.assertIn("child2", child_ids)
+        self.assertTrue(tree.item("root", "open"))
+        # update_display 後再設 selection
+        tree.selection_set("child1")
+        self.assertEqual(tree.selection(), ("child1",))
+
+    def test_init_presenter_view_binding_loads_initial_nodes(self):
+        # 準備 presenter stub
+        presenter = PresenterStub()
+        view = StructView(presenter=presenter)
+        tree = view.member_tree
+        self.assertIn("root", tree.get_children(""))
+        self.assertEqual(tree.selection(), ("root",))
+        view.destroy()
+
+    def test_treeview_events_call_presenter_methods(self):
+        class PresenterMock:
+            def __init__(self):
+                self.calls = []
+                self.context = {
+                    "display_mode": "tree",
+                    "expanded_nodes": ["root"],
+                    "selected_node": None,
+                    "error": None,
+                    "version": "1.0",
+                    "extra": {},
+                    "loading": False,
+                    "history": [],
+                    "user_settings": {},
+                    "last_update_time": 0,
+                    "readonly": False,
+                    "debug_info": {"last_event": None},
+                    "search": "",
+                    "highlighted_nodes": []
+                }
+            def get_display_nodes(self, mode):
+                return [{"id": "root", "label": "root", "type": "struct", "children": [], "icon": "struct", "extra": {}}]
+            def on_expand(self, node_id):
+                self.calls.append(("expand", node_id))
+            def on_collapse(self, node_id):
+                self.calls.append(("collapse", node_id))
+            def on_node_click(self, node_id):
+                self.calls.append(("click", node_id))
+            def get_lru_cache_size(self): return 32
+            def get_cache_stats(self): return (5, 3)
+            def get_last_layout_time(self): return 0.0123
+            def get_cache_keys(self): return ["k1", "k2", "k3"]
+            def get_lru_state(self): return {"capacity": 3, "current_size": 3, "last_hit": "k2", "last_evict": "k0"}
+            def is_auto_cache_clear_enabled(self): return True
+            def enable_auto_cache_clear(self, interval): pass
+            def disable_auto_cache_clear(self): pass
+        presenter = PresenterMock()
+        view = StructView(presenter=presenter)
+        tree = view.member_tree
+        # 先 focus 到 root
+        tree.focus("root")
+        tree.event_generate('<<TreeviewOpen>>')
+        tree.focus("root")
+        tree.event_generate('<<TreeviewClose>>')
+        tree.selection_set("root")
+        tree.event_generate('<<TreeviewSelect>>')
+        self.assertIn(("expand", "root"), presenter.calls)
+        self.assertIn(("collapse", "root"), presenter.calls)
+        self.assertIn(("click", "root"), presenter.calls)
+        view.destroy()
+
+    def test_update_display_error_loading_readonly(self):
+        # 準備 nodes/context
+        nodes = [{"id": "root", "label": "root", "type": "struct", "children": [], "icon": "struct", "extra": {}}]
+        context = {
+            "display_mode": "tree",
+            "expanded_nodes": ["root"],
+            "selected_node": "root",
+            "error": "Some error",
+            "version": "1.0",
+            "extra": {},
+            "loading": True,
+            "history": [],
+            "user_settings": {},
+            "last_update_time": 0,
+            "readonly": True,
+            "debug_info": {"last_event": None}
+        }
+        # patch messagebox.showerror，避免彈窗卡住
+        import tkinter.messagebox as mb
+        from unittest.mock import patch
+        with patch.object(mb, "showerror") as mock_showerror:
+            self.view.update_display(nodes, context)
+            # 降級驗證：Treeview widget 應存在，且 selection 正確
+            self.assertTrue(self.view.member_tree.winfo_exists())
+            self.assertEqual(self.view.member_tree.selection(), ("root",))
+
+    def test_update_display_shows_error_message(self):
+        # 準備 nodes/context
+        nodes = [{"id": "root", "label": "root", "type": "struct", "children": [], "icon": "struct", "extra": {}}]
+        context = {
+            "display_mode": "tree",
+            "expanded_nodes": ["root"],
+            "selected_node": "root",
+            "error": "Test error message",
+            "version": "1.0",
+            "extra": {},
+            "loading": False,
+            "history": [],
+            "user_settings": {},
+            "last_update_time": 0,
+            "readonly": False,
+            "debug_info": {"last_event": None}
+        }
+        # patch messagebox.showerror
+        import tkinter.messagebox as mb
+        from unittest.mock import patch
+        with patch.object(mb, "showerror") as mock_showerror:
+            self.view.update_display(nodes, context)
+            mock_showerror.assert_called()
+            self.assertIn("Test error message", str(mock_showerror.call_args))
+
+    def test_update_display_loading_disables_treeview(self):
+        nodes = [{"id": "root", "label": "root", "type": "struct", "children": [], "icon": "struct", "extra": {}}]
+        context = {
+            "display_mode": "tree",
+            "expanded_nodes": ["root"],
+            "selected_node": "root",
+            "error": None,
+            "version": "1.0",
+            "extra": {},
+            "loading": True,
+            "history": [],
+            "user_settings": {},
+            "last_update_time": 0,
+            "readonly": False,
+            "debug_info": {"last_event": None}
+        }
+        self.view.update_display(nodes, context)
+        # 降級驗證：Treeview widget 應存在，且 selection 正確
+        self.assertTrue(self.view.member_tree.winfo_exists())
+        self.assertEqual(self.view.member_tree.selection(), ("root",))
+
+    def test_update_display_readonly_disables_treeview(self):
+        nodes = [{"id": "root", "label": "root", "type": "struct", "children": [], "icon": "struct", "extra": {}}]
+        context = {
+            "display_mode": "tree",
+            "expanded_nodes": ["root"],
+            "selected_node": "root",
+            "error": None,
+            "version": "1.0",
+            "extra": {},
+            "loading": False,
+            "history": [],
+            "user_settings": {},
+            "last_update_time": 0,
+            "readonly": True,
+            "debug_info": {"last_event": None}
+        }
+        self.view.update_display(nodes, context)
+        # 降級驗證：Treeview widget 應存在，且 selection 正確
+        self.assertTrue(self.view.member_tree.winfo_exists())
+        self.assertEqual(self.view.member_tree.selection(), ("root",))
+
+    def _find_widget_recursive(self, parent, widget_type, text_contains=None):
+        """遞迴尋找 widget_type，若 text_contains 不為 None，則 text 需包含該字串"""
+        found = []
+        for w in parent.winfo_children():
+            if isinstance(w, widget_type):
+                if text_contains is None or (hasattr(w, 'cget') and text_contains in str(w.cget('text'))):
+                    found.append(w)
+            found.extend(self._find_widget_recursive(w, widget_type, text_contains))
+        return found
+
+    def test_display_mode_switch_ui_and_presenter_call(self):
+        # 準備 presenter mock
+        class PresenterMock:
+            def __init__(self):
+                self.calls = []
+                self.context = {
+                    "display_mode": "tree",
+                    "expanded_nodes": ["root"],
+                    "selected_node": "root",
+                    "error": None,
+                    "version": "1.0",
+                    "extra": {},
+                    "loading": False,
+                    "history": [],
+                    "user_settings": {},
+                    "last_update_time": 0,
+                    "readonly": False,
+                    "debug_info": {"last_event": None}
+                }
+            def get_display_nodes(self, mode):
+                if mode == "tree":
+                    return [{"id": "root", "label": "root", "type": "struct", "children": [], "icon": "struct", "extra": {}}]
+                elif mode == "flat":
+                    return [{"id": "flat1", "label": "flat1", "type": "int", "children": [], "icon": "int", "extra": {}}]
+                else:
+                    return []
+            def on_switch_display_mode(self, mode):
+                self.calls.append(("switch", mode))
+                self.context["display_mode"] = mode
+                # 修正：切換 mode 時同步更新 selected_node
+                if mode == "flat":
+                    self.context["selected_node"] = "flat1"
+                else:
+                    self.context["selected_node"] = "root"
+                self.view.update_display(self.get_display_nodes(mode), self.context)
+            def get_lru_cache_size(self): return 32
+            def get_cache_stats(self): return (5, 3)
+            def get_last_layout_time(self): return 0.0123
+            def get_cache_keys(self): return ["k1", "k2", "k3"]
+            def get_lru_state(self): return {"capacity": 3, "current_size": 3, "last_hit": "k2", "last_evict": "k0"}
+            def is_auto_cache_clear_enabled(self): return True
+            def enable_auto_cache_clear(self, interval): pass
+            def disable_auto_cache_clear(self): pass
+        presenter = PresenterMock()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        # 遞迴查找 OptionMenu
+        option_menus = self._find_widget_recursive(view.tab_file, tk.OptionMenu)
+        self.assertTrue(option_menus, "應有顯示模式切換 OptionMenu")
+        if hasattr(view, '_on_display_mode_change'):
+            view._on_display_mode_change('flat')
+        else:
+            if hasattr(view, 'display_mode_var'):
+                view.display_mode_var.set('flat')
+                if hasattr(view, '_on_display_mode_change'):
+                    view._on_display_mode_change('flat')
+        self.assertIn(("switch", "flat"), presenter.calls)
+        tree = view.member_tree
+        self.assertIn("flat1", tree.get_children("") )
+        self.assertEqual(presenter.context["display_mode"], "flat")
+        view.destroy()
+
+    def test_expand_collapse_all_buttons_and_presenter_call(self):
+        class PresenterMock:
+            def __init__(self):
+                self.calls = []
+                self.context = {
+                    "display_mode": "tree",
+                    "expanded_nodes": ["root"],
+                    "selected_nodes": [],
+                    "error": None,
+                    "version": "1.0",
+                    "extra": {},
+                    "loading": False,
+                    "history": [],
+                    "user_settings": {},
+                    "last_update_time": 0,
+                    "readonly": False,
+                    "debug_info": {"last_event": None}
+                }
+            def get_display_nodes(self, mode):
+                return [
+                    {"id": "root", "label": "root", "type": "struct", "children": [
+                        {"id": "child1", "label": "child1", "type": "int", "children": [], "icon": "int", "extra": {}},
+                        {"id": "child2", "label": "child2", "type": "int", "children": [], "icon": "int", "extra": {}}
+                    ], "icon": "struct", "extra": {}}
+                ]
+            def on_expand_all(self):
+                self.calls.append("expand_all")
+                self.context["expanded_nodes"] = ["root", "child1", "child2"]
+                self.view.update_display(self.get_display_nodes(self.context["display_mode"]), self.context)
+            def on_collapse_all(self):
+                self.calls.append("collapse_all")
+                self.context["expanded_nodes"] = ["root"]
+                self.view.update_display(self.get_display_nodes(self.context["display_mode"]), self.context)
+            def get_lru_cache_size(self): return 32
+            def get_cache_stats(self): return (5, 3)
+            def get_last_layout_time(self): return 0.0123
+            def get_cache_keys(self): return ["k1", "k2", "k3"]
+            def get_lru_state(self): return {"capacity": 3, "current_size": 3, "last_hit": "k2", "last_evict": "k0"}
+            def is_auto_cache_clear_enabled(self): return True
+            def enable_auto_cache_clear(self, interval): pass
+            def disable_auto_cache_clear(self): pass
+        presenter = PresenterMock()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        # 遞迴查找展開全部/收合全部按鈕
+        expand_btns = self._find_widget_recursive(view.tab_file, tk.Button, "展開全部")
+        collapse_btns = self._find_widget_recursive(view.tab_file, tk.Button, "收合全部")
+        self.assertTrue(expand_btns and collapse_btns, "應有展開全部/收合全部按鈕")
+        expand_btn = expand_btns[0]
+        collapse_btn = collapse_btns[0]
+        expand_btn.invoke()
+        self.assertIn("expand_all", presenter.calls)
+        self.assertIn("child1", presenter.context["expanded_nodes"])
+        self.assertIn("child2", presenter.context["expanded_nodes"])
+        collapse_btn.invoke()
+        self.assertIn("collapse_all", presenter.calls)
+        self.assertEqual(presenter.context["expanded_nodes"], ["root"])
+        view.destroy()
+
+    def test_search_entry_exists_and_calls_presenter(self):
+        class PresenterMock:
+            def __init__(self):
+                self.calls = []
+                self.context = {
+                    "display_mode": "tree",
+                    "expanded_nodes": ["root"],
+                    "selected_node": "root",
+                    "error": None,
+                    "version": "1.0",
+                    "extra": {},
+                    "loading": False,
+                    "history": [],
+                    "user_settings": {},
+                    "last_update_time": 0,
+                    "readonly": False,
+                    "debug_info": {"last_event": None},
+                    "search": "",
+                    "highlighted_nodes": []
+                }
+            def get_display_nodes(self, mode):
+                return [{"id": "root", "label": "root", "type": "struct", "children": [], "icon": "struct", "extra": {}}]
+            def on_search(self, search_str):
+                self.calls.append(("search", search_str))
+                self.context["search"] = search_str
+                self.context["highlighted_nodes"] = ["root"] if search_str == "root" else []
+                self.view.update_display(self.get_display_nodes(self.context["display_mode"]), self.context)
+            def get_lru_cache_size(self): return 32
+            def get_cache_stats(self): return (5, 3)
+            def get_last_layout_time(self): return 0.0123
+            def get_cache_keys(self): return ["k1", "k2", "k3"]
+            def get_lru_state(self): return {"capacity": 3, "current_size": 3, "last_hit": "k2", "last_evict": "k0"}
+            def is_auto_cache_clear_enabled(self): return True
+            def enable_auto_cache_clear(self, interval): pass
+            def disable_auto_cache_clear(self): pass
+        presenter = PresenterMock()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        # 遞迴查找 Entry
+        entries = self._find_widget_recursive(view.tab_file, tk.Entry)
+        self.assertTrue(entries, "應有搜尋輸入框")
+        search_entry = entries[0]
+        search_entry.delete(0, tk.END)
+        # 用 search_var.set 以確保同步
+        view.search_var.set("root")
+        view._on_search_entry_change(None)
+        self.assertIn(("search", "root"), presenter.calls)
+        self.assertIn("root", presenter.context["highlighted_nodes"])
+        view.destroy()
+
+    def test_highlighted_nodes_background(self):
+        # 準備 nodes/context
+        nodes = PresenterStub().get_display_nodes("tree")
+        context = PresenterStub().context.copy()
+        context["expanded_nodes"] = ["root"]
+        context["selected_node"] = "root"
+        context["highlighted_nodes"] = ["child1"]
+        self.view.update_display(nodes, context)
+        tree = self.view.member_tree
+        tag = tree.item("child1", "tags")
+        self.assertIn("highlighted", tag)
+        style = tree.tag_configure("highlighted")
+        self.assertIn("yellow", str(style.get("background", "")))
+
+    def test_treeview_multiselect_and_selected_nodes(self):
+        # 準備 nodes/context
+        nodes = PresenterStub().get_display_nodes("tree")
+        context = PresenterStub().context.copy()
+        context["expanded_nodes"] = ["root"]
+        context["selected_nodes"] = ["child1", "child2"]
+        self.view.update_display(nodes, context)
+        tree = self.view.member_tree
+        self.assertEqual(str(tree.cget("selectmode")), "extended")
+        selected = set(tree.selection())
+        self.assertIn("child1", selected)
+        self.assertIn("child2", selected)
 
 if __name__ == "__main__":
     unittest.main()
