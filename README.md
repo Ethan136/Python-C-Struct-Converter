@@ -64,9 +64,15 @@ This project provides a graphical user interface (GUI) tool built with Python an
 ├── tests/                    # Test files & automation
 │   ├── __init__.py
 │   ├── README.md
-│   ├── data/                 # XML test configs, .h files
-│   │   ├── test_config.xml
-│   │   └── ... (other XML/.h)
+│   ├── model/                # Model 層測試
+│   ├── view/                 # View 層測試
+│   ├── presenter/            # Presenter 層測試
+│   ├── integration/          # 跨層整合測試
+│   ├── utils/                # 測試輔助工具
+│   ├── data_driven/          # XML loader、資料驅動測試
+│   ├── data/                 # XML 測資、.h 範例
+│   ├── faillog/              # 測試失敗 log
+│   └── README.md             # 測試說明與分層結構（詳見此檔）
 │   ├── test_string_parser.py
 │   ├── test_input_conversion.py
 │   ├── test_struct_model.py
