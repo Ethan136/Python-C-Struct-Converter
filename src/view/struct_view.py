@@ -4,6 +4,33 @@ from tkinter import filedialog, messagebox
 # from src.config import get_string
 from src.model.struct_model import StructModel
 
+# --- Treeview 巢狀遞迴插入與互動 helper ---
+def insert_treeview_node(tree, parent_id, node, icon_map=None):
+    """遞迴插入 treeview node 結構。node: dict, 需包含 id, label, type, children, icon, extra"""
+    values = (node.get("label", ""), node.get("type", ""))
+    icon = icon_map.get(node["icon"]) if icon_map and node.get("icon") else None
+    item_id = tree.insert(parent_id, 'end', iid=node['id'], text=node['label'], values=values, image=icon)
+    for child in node.get('children', []):
+        insert_treeview_node(tree, item_id, child, icon_map)
+    return item_id
+
+def update_treeview_by_context(tree, context):
+    # 展開/收合
+    expanded = set(context.get("expanded_nodes", []))
+    for item in tree.get_children(""):
+        _update_treeview_expand_recursive(tree, item, expanded)
+    # 高亮選取
+    selected = context.get("selected_node")
+    if selected:
+        tree.selection_set(selected)
+    else:
+        tree.selection_remove(tree.selection())
+
+def _update_treeview_expand_recursive(tree, item_id, expanded):
+    tree.item(item_id, open=(item_id in expanded))
+    for child in tree.get_children(item_id):
+        _update_treeview_expand_recursive(tree, child, expanded)
+
 def create_member_treeview(parent):
     tree = ttk.Treeview(
         parent,
@@ -49,6 +76,9 @@ class StructView(tk.Tk):
         self._debug_auto_refresh_enabled = None
         self._debug_auto_refresh_interval = None
         self._create_tab_control()
+        # Treeview 事件綁定
+        if hasattr(self, "member_tree"):
+            self._bind_member_tree_events()
 
     def _create_tab_control(self):
         self.tab_control = ttk.Notebook(self)
@@ -100,6 +130,7 @@ class StructView(tk.Tk):
         member_frame = tk.LabelFrame(main_frame, text="Struct Member Value")
         member_frame.pack(fill="x", padx=2, pady=2)
         self.member_tree = create_member_treeview(member_frame)
+        self._bind_member_tree_events()
 
         # debug bytes 顯示區
         debug_frame = tk.LabelFrame(main_frame, text="Debug Bytes")
@@ -839,3 +870,34 @@ class StructView(tk.Tk):
         else:
             text = "No presenter stats available."
         self.debug_info_label.config(text=text)
+
+    def _bind_member_tree_events(self):
+        if not hasattr(self, "member_tree") or not self.member_tree:
+            return
+        self.member_tree.bind('<<TreeviewOpen>>', self._on_member_tree_open)
+        self.member_tree.bind('<<TreeviewClose>>', self._on_member_tree_close)
+        self.member_tree.bind('<<TreeviewSelect>>', self._on_member_tree_select)
+
+    def _on_member_tree_open(self, event):
+        item_id = event.widget.focus()
+        if self.presenter and hasattr(self.presenter, "on_expand"):
+            self.presenter.on_expand(item_id)
+
+    def _on_member_tree_close(self, event):
+        item_id = event.widget.focus()
+        if self.presenter and hasattr(self.presenter, "on_collapse"):
+            self.presenter.on_collapse(item_id)
+
+    def _on_member_tree_select(self, event):
+        selected = event.widget.selection()
+        if selected and self.presenter and hasattr(self.presenter, "on_node_click"):
+            self.presenter.on_node_click(selected[0])
+
+    def show_treeview_nodes(self, nodes, context, icon_map=None):
+        """清空並遞迴插入 treeview node，根據 context 展開/高亮"""
+        tree = self.member_tree
+        for item in tree.get_children(""):
+            tree.delete(item)
+        for node in nodes:
+            insert_treeview_node(tree, '', node, icon_map)
+        update_treeview_by_context(tree, context)
