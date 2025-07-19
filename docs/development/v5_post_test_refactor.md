@@ -451,3 +451,8 @@ pytest --maxfail=10 --cov=src tests/
 - 擴充方式：
   - 依 7.6.1 條列錯誤情境，持續新增 XML 測試資料即可。
   - 每次擴充後執行 pytest，確保驗證邏輯與資料一致。 
+
+### 7.12 進階主題移交說明
+- union/匿名 struct/union/N-D array AST/flatten 的進階 edge case、特殊 flatten 行為、symbol table 型別查找等，已規劃到 v7 文件。
+- 未來如需補齊相關功能、解除 skip/stub、或擴充 edge case，請參考 `docs/development/v7_nested_struct_union_array_flatten.md`。
+- v5_post_test_refactor 主流程已全部完成，進階議題將於 v7 平行主題持續追蹤。 
