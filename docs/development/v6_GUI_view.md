@@ -64,3 +64,12 @@
 - 建議設計 context diff/patch 機制，提升效能。
 - View 可根據 context version 決定是否需要自動升級/降級 context 結構。
 - 若 context 結構不符，View 應顯示警告或請求 Presenter 重送 context。 
+
+---
+
+## 9. Codebase 對齊狀態
+
+- View 端所有 callback、context 欄位、mock/stub、readonly/error/debug 狀態皆有單元測試覆蓋。
+- contract test 路徑：`tests/presenter/test_v2p_contract.py`
+- context schema 驗證路徑：`src/presenter/context_schema.py`
+- 若有 API/欄位/事件異動，請先更新本文件並同步調整 codebase 與測試。 

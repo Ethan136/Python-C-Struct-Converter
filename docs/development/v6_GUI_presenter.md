@@ -249,3 +249,13 @@ def push_context(self):
      - 單元測試可 mock View 驗證 update_display、錯誤顯示、狀態同步。
 
 --- 
+
+---
+
+## 9. Codebase 對齊狀態
+
+- 所有 Presenter 事件方法（on_node_click, on_expand, on_collapse, on_switch_display_mode, on_refresh, set_readonly, on_delete_node, on_undo, on_redo）皆已依 API 文件完整實作。
+- context 欄位、contract test、mock View、權限控制、錯誤格式、debug_info、undo/redo、readonly 狀態皆有單元測試覆蓋。
+- contract test 路徑：`tests/presenter/test_v2p_contract.py`
+- context schema 驗證路徑：`src/presenter/context_schema.py`
+- 若有 API/欄位/事件異動，請先更新本文件並同步調整 codebase 與測試。 

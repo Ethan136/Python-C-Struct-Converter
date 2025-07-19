@@ -66,3 +66,10 @@
 - 需要重構的模組：View、Presenter（或新元件），Model 若已支援巢狀 AST 可不動。
 - 不可避免需動 Model 的情境：Model 只回傳平面展開時，需先補強 Model。
 - 建議的下一步：檢查 Model AST 輸出、設計 Presenter AST 轉換、重構 View、如需補強 Model 則先處理。 
+
+---
+
+## 7. Codebase 對齊狀態
+- contract/schema test、mock/stub、權限、debug、undo/redo、readonly 狀態皆已落實於 codebase，並有單元測試覆蓋。
+- contract test 路徑：`tests/presenter/test_v2p_contract.py`
+- context schema 驗證路徑：`src/presenter/context_schema.py` 

@@ -45,3 +45,10 @@
 
 > 本文件為 v6 平行開發協作基礎，請團隊定期 review 與更新。 
 > 若僅兩人平行開發，i18n/a11y/進階 scaffold 可標註 N/A，僅需確保 V/P contract、事件流、狀態流、mock/stub、基本權限/readonly 行為測試全綠即可。 
+
+---
+
+## 狀態註記
+- API 文件/contract/schema test 已完成，codebase 已與文件完全一致。
+- contract test 路徑：`tests/presenter/test_v2p_contract.py`
+- context schema 驗證路徑：`src/presenter/context_schema.py` 
