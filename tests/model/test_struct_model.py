@@ -200,130 +200,124 @@ class TestStructModel(unittest.TestCase):
         storage_unit_size = layout[0]["size"]
         self.assertEqual(storage_unit_size, 4)
 
-    def test_export_manual_struct_to_h(self):
-        # 多欄位 bitfield
-        members = [
-            {"name": "a", "type": "unsigned int", "bit_size": 3},
-            {"name": "b", "type": "unsigned int", "bit_size": 5},
-            {"name": "c", "type": "unsigned int", "bit_size": 8}
-        ]
-        total_size = 2
-        self.model.set_manual_struct(members, total_size)
-        h_content = self.model.export_manual_struct_to_h()
-        self.assertIn("struct MyStruct", h_content)
-        self.assertIn("unsigned int a : 3;", h_content)
-        self.assertIn("unsigned int b : 5;", h_content)
-        self.assertIn("unsigned int c : 8;", h_content)
-        self.assertIn("// total size: 2 bytes", h_content)
+    # 已搬移到 XML 驅動的測試已移除，請參見 tests/data/test_struct_model_export_h_config.xml
+    # def test_export_manual_struct_to_h(self):
+    #     # 多欄位 bitfield
+    #     members = [
+    #         {"name": "a", "type": "unsigned int", "bit_size": 3},
+    #         {"name": "b", "type": "unsigned int", "bit_size": 5},
+    #         {"name": "c", "type": "unsigned int", "bit_size": 8}
+    #     ]
+    #     total_size = 2
+    #     self.model.set_manual_struct(members, total_size)
+    #     h_content = self.model.export_manual_struct_to_h()
+    #     self.assertIn("struct MyStruct", h_content)
+    #     self.assertIn("unsigned int a : 3;", h_content)
+    #     self.assertIn("unsigned int b : 5;", h_content)
+    #     self.assertIn("unsigned int c : 8;", h_content)
+    #     self.assertIn("// total size: 2 bytes", h_content)
 
-        # 單一欄位
-        members = [{"name": "x", "type": "unsigned int", "bit_size": 16}]
-        total_size = 2
-        self.model.set_manual_struct(members, total_size)
-        h_content = self.model.export_manual_struct_to_h()
-        self.assertIn("unsigned int x : 16;", h_content)
+    #     # 單一欄位
+    #     members = [{"name": "x", "type": "unsigned int", "bit_size": 16}]
+    #     total_size = 2
+    #     self.model.set_manual_struct(members, total_size)
+    #     h_content = self.model.export_manual_struct_to_h()
+    #     self.assertIn("unsigned int x : 16;", h_content)
 
-        # 空 struct
-        members = []
-        total_size = 0
-        self.model.set_manual_struct(members, total_size)
-        h_content = self.model.export_manual_struct_to_h()
-        self.assertIn("struct MyStruct", h_content)
-        self.assertIn("// total size: 0 bytes", h_content)
+    #     # 空 struct
+    #     members = []
+    #     total_size = 0
+    #     self.model.set_manual_struct(members, total_size)
+    #     h_content = self.model.export_manual_struct_to_h()
+    #     self.assertIn("struct MyStruct", h_content)
+    #     self.assertIn("// total size: 0 bytes", h_content)
 
-    def test_export_manual_struct_to_h_with_custom_name(self):
-        # 測試 struct_name 參數自訂時的輸出
-        members = [
-            {"name": "a", "type": "unsigned int", "bit_size": 3},
-            {"name": "b", "type": "unsigned int", "bit_size": 5}
-        ]
-        total_size = 1
-        self.model.set_manual_struct(members, total_size)
-        h_content = self.model.export_manual_struct_to_h(struct_name="CustomStruct")
-        self.assertIn("struct CustomStruct", h_content)
-        self.assertIn("unsigned int a : 3;", h_content)
-        self.assertIn("unsigned int b : 5;", h_content)
-        self.assertIn("// total size: 1 bytes", h_content)
+    # 已搬移到 XML 驅動的測試已移除，請參見 tests/data/test_struct_model_export_h_config.xml
+    # def test_export_manual_struct_to_h_with_custom_name(self):
+    #     # 測試 struct_name 參數自訂時的輸出
+    #     members = [
+    #         {"name": "a", "type": "unsigned int", "bit_size": 3},
+    #         {"name": "b", "type": "unsigned int", "bit_size": 5}
+    #     ]
+    #     total_size = 1
+    #     self.model.set_manual_struct(members, total_size)
+    #     h_content = self.model.export_manual_struct_to_h(struct_name="CustomStruct")
+    #     self.assertIn("struct CustomStruct", h_content)
+    #     self.assertIn("unsigned int a : 3;", h_content)
+    #     self.assertIn("unsigned int b : 5;", h_content)
+    #     self.assertIn("// total size: 1 bytes", h_content)
 
-    def test_manual_struct_byte_bit_size_layout(self):
-        model = StructModel()
-        members = [
-            {"name": "a", "type": "char", "bit_size": 0},
-            {"name": "b", "type": "unsigned int", "bit_size": 12},
-            {"name": "c", "type": "short", "bit_size": 0},
-            {"name": "d", "type": "unsigned int", "bit_size": 4}
-        ]
-        total_size = 16  # C++ align 4, 8, 2, etc.，實際會比 5 大
-        # 驗證 set_manual_struct
-        model.set_manual_struct(members, total_size)
-        self.assertEqual(model.manual_struct["total_size"], total_size)
-        self.assertEqual(len(model.manual_struct["members"]), 4)
-        # 驗證 validate_manual_struct
-        errors = model.validate_manual_struct(members, total_size)
-        self.assertEqual(errors, [])
-        # 驗證 layout 計算
-        layout = model.calculate_manual_layout(members, total_size)
-        # 只驗證非 padding 成員
-        non_pad = [item for item in layout if item["type"] != "padding"]
-        # a: char, offset 0
-        self.assertEqual(non_pad[0]["name"], "a")
-        self.assertEqual(non_pad[0]["type"], "char")
-        self.assertEqual(non_pad[0]["size"], 1)
-        self.assertEqual(non_pad[0]["offset"], 0)
-        # b: unsigned int bitfield, offset 4, bit_offset 0, bit_size 12
-        self.assertEqual(non_pad[1]["name"], "b")
-        self.assertEqual(non_pad[1]["type"], "unsigned int")
-        self.assertEqual(non_pad[1]["offset"], 4)
-        self.assertEqual(non_pad[1]["bit_offset"], 0)
-        self.assertEqual(non_pad[1]["bit_size"], 12)
-        # c: short, offset 8
-        self.assertEqual(non_pad[2]["name"], "c")
-        self.assertEqual(non_pad[2]["type"], "short")
-        self.assertEqual(non_pad[2]["offset"], 8)
-        self.assertEqual(non_pad[2]["size"], 2)
-        # d: unsigned int bitfield, offset 12, bit_offset 0, bit_size 4
-        self.assertEqual(non_pad[3]["name"], "d")
-        self.assertEqual(non_pad[3]["type"], "unsigned int")
-        self.assertEqual(non_pad[3]["offset"], 12)
-        self.assertEqual(non_pad[3]["bit_offset"], 0)
-        self.assertEqual(non_pad[3]["bit_size"], 4)
+    # 已搬移到 XML 驅動的測試已移除，請參見 tests/data/test_struct_model_manual_config.xml
+    # def test_anonymous_bitfield_layout(self):
+    #     model = StructModel()
+    #     members = [
+    #         {"name": "a", "type": "char", "bit_size": 0},
+    #         {"name": "b", "type": "unsigned int", "bit_size": 12},
+    #         {"name": "c", "type": "short", "bit_size": 0},
+    #         {"name": "d", "type": "unsigned int", "bit_size": 4}
+    #     ]
+    #     total_size = 16
+    #     model.set_manual_struct(members, total_size)
+    #     self.assertEqual(model.manual_struct["total_size"], total_size)
+    #     self.assertEqual(len(model.manual_struct["members"]), 4)
+    #     errors = model.validate_manual_struct(members, total_size)
+    #     self.assertEqual(errors, [])
+    #     layout = model.calculate_manual_layout(members, total_size)
+    #     non_pad = [item for item in layout if item["type"] != "padding"]
+    #     self.assertEqual(non_pad[0]["name"], "a")
+    #     self.assertEqual(non_pad[0]["type"], "char")
+    #     self.assertEqual(non_pad[0]["size"], 1)
+    #     self.assertEqual(non_pad[0]["offset"], 0)
+    #     self.assertEqual(non_pad[1]["name"], "b")
+    #     self.assertEqual(non_pad[1]["type"], "unsigned int")
+    #     self.assertEqual(non_pad[1]["offset"], 4)
+    #     self.assertEqual(non_pad[1]["bit_offset"], 0)
+    #     self.assertEqual(non_pad[1]["bit_size"], 12)
+    #     self.assertEqual(non_pad[2]["name"], "c")
+    #     self.assertEqual(non_pad[2]["type"], "short")
+    #     self.assertEqual(non_pad[2]["offset"], 8)
+    #     self.assertEqual(non_pad[2]["size"], 2)
+    #     self.assertEqual(non_pad[3]["name"], "d")
+    #     self.assertEqual(non_pad[3]["type"], "unsigned int")
+    #     self.assertEqual(non_pad[3]["offset"], 12)
+    #     self.assertEqual(non_pad[3]["bit_offset"], 0)
+    #     self.assertEqual(non_pad[3]["bit_size"], 4)
 
-    def test_parse_manual_hex_data_uses_file_parsing_logic(self):
-        """測試 MyStruct 解析機制直接使用載入.h檔的解析邏輯"""
-        manual_layout = [
-            {"name": "a", "type": "int", "offset": 0, "size": 4, "is_bitfield": False},
-            {"name": "b", "type": "char", "offset": 4, "size": 1, "is_bitfield": False}
-        ]
-        hex_data = "04030201" + "41"  # little endian
-        # 直接用 parse_hex_data
-        result = self.model.parse_hex_data(hex_data, "little", layout=manual_layout, total_size=5)
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]["name"], "a")
-        self.assertEqual(result[0]["value"], "16909060")
-        self.assertEqual(result[0]["hex_raw"], "04030201")  # 修正這裡
-        self.assertEqual(result[1]["name"], "b")
-        self.assertEqual(result[1]["value"], "65")
-        self.assertEqual(result[1]["hex_raw"], "41")
+    # 已搬移到 XML 驅動的測試已移除，請參見 tests/data/test_struct_model_manual_config.xml
+    # def test_parse_manual_hex_data_uses_file_parsing_logic(self):
+    #     manual_layout = [
+    #         {"name": "a", "type": "int", "offset": 0, "size": 4, "is_bitfield": False},
+    #         {"name": "b", "type": "char", "offset": 4, "size": 1, "is_bitfield": False}
+    #     ]
+    #     hex_data = "04030201" + "41"
+    #     result = self.model.parse_hex_data(hex_data, "little", layout=manual_layout, total_size=5)
+    #     self.assertEqual(len(result), 2)
+    #     self.assertEqual(result[0]["name"], "a")
+    #     self.assertEqual(result[0]["value"], "16909060")
+    #     self.assertEqual(result[0]["hex_raw"], "04030201")
+    #     self.assertEqual(result[1]["name"], "b")
+    #     self.assertEqual(result[1]["value"], "65")
+    #     self.assertEqual(result[1]["hex_raw"], "41")
 
-    def test_parse_manual_hex_data_preserves_original_layout(self):
-        """測試橋接函數不會影響原始的 layout 和 total_size"""
-        struct_content = """
-        struct FileStruct {
-            int x;
-            char y;
-        };
-        """
-        with patch("builtins.open", mock_open(read_data=struct_content)):
-            self.model.load_struct_from_file("test_file.h")
-        original_layout = self.model.layout.copy()
-        original_total_size = self.model.total_size
-        manual_layout = [
-            {"name": "a", "type": "int", "offset": 0, "size": 4, "is_bitfield": False}
-        ]
-        hex_data = "01000000"
-        self.model.parse_hex_data(hex_data, "little", layout=manual_layout, total_size=4)
-        self.assertEqual(self.model.layout, original_layout)
-        self.assertEqual(self.model.total_size, original_total_size)
+    # 已搬移到 XML 驅動的測試已移除，請參見 tests/data/test_struct_model_manual_config.xml
+    # def test_parse_manual_hex_data_preserves_original_layout(self):
+    #     struct_content = """
+    #     struct FileStruct {
+    #         int x;
+    #         char y;
+    #     };
+    #     """
+    #     with patch("builtins.open", mock_open(read_data=struct_content)):
+    #         self.model.load_struct_from_file("test_file.h")
+    #     original_layout = self.model.layout.copy()
+    #     original_total_size = self.model.total_size
+    #     manual_layout = [
+    #         {"name": "a", "type": "int", "offset": 0, "size": 4, "is_bitfield": False}
+    #     ]
+    #     hex_data = "01000000"
+    #     self.model.parse_hex_data(hex_data, "little", layout=manual_layout, total_size=4)
+    #     self.assertEqual(self.model.layout, original_layout)
+    #     self.assertEqual(self.model.total_size, original_total_size)
 
     def test_anonymous_bitfield_layout(self):
         # 測試匿名 bitfield layout 正確分配 bit offset 並出現在 layout 結果中
