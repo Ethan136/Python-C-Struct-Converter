@@ -32,7 +32,8 @@ class PresenterStub:
             "user_settings": {},
             "last_update_time": 0,
             "readonly": False,
-            "debug_info": {"last_event": None}
+            "debug_info": {"last_event": None},
+            "redo_history": []
         }
         self._lru_cache_size = 32
         self._cache_stats = (5, 3)
@@ -101,6 +102,20 @@ class PresenterStub:
         self.context["highlighted_nodes"] = list(highlighted)
         if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
             self.view.update_display(nodes, self.context)
+    def on_undo(self):
+        if self.context["history"]:
+            snap = self.context["history"].pop()
+            self.context.update(snap)
+            self.context.setdefault("redo_history", []).append(snap)
+            if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
+                self.view.update_display(self.get_display_nodes(self.context.get("display_mode", "tree")), self.context)
+    def on_redo(self):
+        if self.context.get("redo_history"):
+            snap = self.context["redo_history"].pop()
+            self.context["history"].append(snap)
+            self.context.update(snap)
+            if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
+                self.view.update_display(self.get_display_nodes(self.context.get("display_mode", "tree")), self.context)
 
 @pytest.mark.timeout(15)
 class TestStructView(unittest.TestCase):
@@ -1266,6 +1281,35 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(view.parse_button["state"], "normal")
         self.assertEqual(view.expand_all_btn["state"], "normal")
         self.assertEqual(view.collapse_all_btn["state"], "normal")
+        view.destroy()
+
+    def test_undo_redo_buttons_and_context(self):
+        presenter = PresenterStub()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        nodes = presenter.get_display_nodes("tree")
+        presenter.context["display_mode"] = "tree"
+        # 初始無快照，Undo/Redo 應禁用
+        presenter.context["history"] = []
+        presenter.context["redo_history"] = []
+        view.update_display(nodes, presenter.context)
+        self.assertEqual(view.undo_btn["state"], "disabled")
+        self.assertEqual(view.redo_btn["state"], "disabled")
+        # 模擬有快照
+        snap1 = {"selected_node": "child1"}
+        snap2 = {"selected_node": "child2"}
+        presenter.context["history"] = [snap1, snap2]
+        view.update_display(nodes, presenter.context)
+        self.assertEqual(view.undo_btn["state"], "normal")
+        # 點擊 Undo
+        view._on_undo()
+        self.assertEqual(presenter.context["selected_node"], "child2")
+        # Undo 後 redo_history 有快照
+        self.assertTrue(presenter.context["redo_history"])
+        self.assertEqual(view.redo_btn["state"], "normal")
+        # 點擊 Redo
+        view._on_redo()
+        self.assertEqual(presenter.context["selected_node"], "child2")
         view.destroy()
 
 if __name__ == "__main__":

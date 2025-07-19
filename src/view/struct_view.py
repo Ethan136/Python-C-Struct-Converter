@@ -781,42 +781,48 @@ class StructView(tk.Tk):
         control_frame = tk.Frame(self.debug_tab)
         control_frame.pack(fill="x", padx=10, pady=5)
 
+        # Undo/Redo 按鈕
+        self.undo_btn = tk.Button(control_frame, text="Undo", command=self._on_undo)
+        self.undo_btn.grid(row=0, column=0, padx=5)
+        self.redo_btn = tk.Button(control_frame, text="Redo", command=self._on_redo)
+        self.redo_btn.grid(row=0, column=1, padx=5)
+
         # 手動清空 cache 按鈕
         clear_btn = tk.Button(control_frame, text="手動清空 Cache", command=self._on_invalidate_cache)
-        clear_btn.grid(row=0, column=0, padx=5)
+        clear_btn.grid(row=0, column=2, padx=5)
 
         # LRU cache 容量 Spinbox
-        tk.Label(control_frame, text="LRU 容量:").grid(row=0, column=1, padx=2)
+        tk.Label(control_frame, text="LRU 容量:").grid(row=0, column=3, padx=2)
         self.lru_size_var = tk.IntVar(value=self.presenter.get_lru_cache_size() if self.presenter else 32)
         lru_spin = tk.Spinbox(control_frame, from_=0, to=128, width=5, textvariable=self.lru_size_var, command=self._on_set_lru_size)
-        lru_spin.grid(row=0, column=2, padx=2)
+        lru_spin.grid(row=0, column=4, padx=2)
 
         # 自動清空 Checkbox
         val = self.presenter.is_auto_cache_clear_enabled() if self.presenter else False
         self.auto_clear_var = tk.BooleanVar(value=bool(val))
         auto_clear_cb = tk.Checkbutton(control_frame, text="啟用自動清空", variable=self.auto_clear_var, command=self._on_toggle_auto_clear)
-        auto_clear_cb.grid(row=0, column=3, padx=5)
+        auto_clear_cb.grid(row=0, column=5, padx=5)
 
         # 自動清空 interval Entry
-        tk.Label(control_frame, text="Interval (秒):").grid(row=0, column=4, padx=2)
+        tk.Label(control_frame, text="Interval (秒):").grid(row=0, column=6, padx=2)
         self.auto_clear_interval_var = tk.DoubleVar(value=1.0)
         interval_entry = tk.Entry(control_frame, width=6, textvariable=self.auto_clear_interval_var)
-        interval_entry.grid(row=0, column=5, padx=2)
+        interval_entry.grid(row=0, column=7, padx=2)
 
         # --- 新增自動 refresh ---
         self._debug_auto_refresh_enabled = tk.BooleanVar(value=True)
         self._debug_auto_refresh_id = None
         self._debug_auto_refresh_interval = tk.DoubleVar(value=1.0)
         auto_refresh_cb = tk.Checkbutton(control_frame, text="自動 Refresh", variable=self._debug_auto_refresh_enabled, command=self._on_toggle_debug_auto_refresh)
-        auto_refresh_cb.grid(row=0, column=7, padx=5)
-        tk.Label(control_frame, text="Refresh Interval (秒):").grid(row=0, column=8, padx=2)
+        auto_refresh_cb.grid(row=0, column=9, padx=5)
+        tk.Label(control_frame, text="Refresh Interval (秒):").grid(row=0, column=10, padx=2)
         auto_refresh_interval_entry = tk.Entry(control_frame, width=6, textvariable=self._debug_auto_refresh_interval)
-        auto_refresh_interval_entry.grid(row=0, column=9, padx=2)
+        auto_refresh_interval_entry.grid(row=0, column=11, padx=2)
         self._debug_auto_refresh_interval.trace_add("write", lambda *_: self._on_debug_auto_refresh_interval_change())
 
         # 手動 refresh 按鈕
         refresh_btn = tk.Button(control_frame, text="Refresh", command=self.refresh_debug_info)
-        refresh_btn.grid(row=0, column=6, padx=5)
+        refresh_btn.grid(row=0, column=8, padx=5)
 
         self.refresh_debug_info()
         self._start_debug_auto_refresh()
@@ -987,6 +993,15 @@ class StructView(tk.Tk):
                 debug_lines.append(f"api_trace: {debug_info['api_trace']}")
         self.debug_info_label.config(text="\n".join(debug_lines))
 
+        # Undo/Redo 按鈕狀態
+        if hasattr(self, "undo_btn"):
+            can_undo = bool(context.get("history"))
+            self.undo_btn.config(state="normal" if can_undo else "disabled")
+        if hasattr(self, "redo_btn"):
+            # 這裡假設 context['redo_history']，如有可啟用 redo
+            can_redo = bool(context.get("redo_history", []))
+            self.redo_btn.config(state="normal" if can_redo else "disabled")
+
     def _init_presenter_view_binding(self):
         if self.presenter:
             self.presenter.view = self
@@ -1034,3 +1049,10 @@ class StructView(tk.Tk):
         search_str = self.search_var.get()
         if self.presenter and hasattr(self.presenter, "on_search"):
             self.presenter.on_search(search_str)
+
+    def _on_undo(self):
+        if self.presenter and hasattr(self.presenter, "on_undo"):
+            self.presenter.on_undo()
+    def _on_redo(self):
+        if self.presenter and hasattr(self.presenter, "on_redo"):
+            self.presenter.on_redo()
