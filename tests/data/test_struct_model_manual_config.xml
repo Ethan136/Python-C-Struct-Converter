@@ -72,4 +72,43 @@
         <total_size>-1</total_size>
         <expect_error>結構體大小需為正整數</expect_error>
     </test_case>
+    <test_case name="padding_and_final_padding">
+        <members>
+            <member name="a" type="char" bit_size="8"/>
+            <member name="b" type="int" bit_size="32"/>
+        </members>
+        <total_size>8</total_size>
+        <expected_layout>
+            <item name="a" type="char" offset="0" size="1" bit_size="8"/>
+            <item name="(padding)" type="padding" offset="1" size="3"/>
+            <item name="b" type="int" offset="4" size="4" bit_size="32"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="empty_struct">
+        <members></members>
+        <total_size>0</total_size>
+        <expected_layout></expected_layout>
+    </test_case>
+    <test_case name="short_hex_struct">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+            <member name="b" type="int" bit_size="0"/>
+        </members>
+        <total_size>8</total_size>
+        <expected_layout>
+            <item name="a" type="int" offset="0" size="4"/>
+            <item name="b" type="int" offset="4" size="4"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="long_hex_struct">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+            <member name="b" type="int" bit_size="0"/>
+        </members>
+        <total_size>8</total_size>
+        <expected_layout>
+            <item name="a" type="int" offset="0" size="4"/>
+            <item name="b" type="int" offset="4" size="4"/>
+        </expected_layout>
+    </test_case>
 </manual_struct_tests> 

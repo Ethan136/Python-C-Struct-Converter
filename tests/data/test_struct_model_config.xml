@@ -331,4 +331,22 @@
             <member name="c" hex_raw="0000000004567890"/>
         </expected_results>
     </test_case>
+    <test_case name="nd_array_struct" description="Test struct with N-D array">
+        <struct_definition><![CDATA[
+            struct NDArrayTest {
+                int arr[2][3];
+            };
+        ]]></struct_definition>
+        <expected_total_size>24</expected_total_size>
+        <expected_struct_align>4</expected_struct_align>
+        <expected_layout_len>6</expected_layout_len>
+        <expected_results>
+            <member name="arr[0][0]" type="int" size="4" offset="0"/>
+            <member name="arr[0][1]" type="int" size="4" offset="4"/>
+            <member name="arr[0][2]" type="int" size="4" offset="8"/>
+            <member name="arr[1][0]" type="int" size="4" offset="12"/>
+            <member name="arr[1][1]" type="int" size="4" offset="16"/>
+            <member name="arr[1][2]" type="int" size="4" offset="20"/>
+        </expected_results>
+    </test_case>
 </struct_model_tests> 

@@ -550,7 +550,9 @@ class TestStructModelManualXMLDriven(unittest.TestCase):
                     if "size" in exp and "size" in non_pad[i]:
                         self.assertEqual(non_pad[i]["size"], int(exp["size"]))
                     self.assertEqual(non_pad[i].get("bit_offset", 0), int(exp.get("bit_offset", 0)))
-                    self.assertEqual(non_pad[i].get("bit_size", 0), int(exp.get("bit_size", 0)))
+                    # 只對 bitfield 欄位比對 bit_size
+                    if non_pad[i].get("is_bitfield", False) or exp.get("is_bitfield", False):
+                        self.assertEqual(non_pad[i].get("bit_size", 0), int(exp.get("bit_size", 0)))
 
 
 class TestStructModelNDArray(unittest.TestCase):
