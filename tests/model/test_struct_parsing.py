@@ -24,7 +24,9 @@ def _assert_ast_matches_xml(member_ast, member_xml):
         debug_write(f"member_xml: {ET.tostring(member_xml, encoding='unicode')}")
         raise
     try:
-        assert member_ast.name == member_xml.get('name')
+        n1 = member_ast.name if member_ast.name is not None else ''
+        n2 = member_xml.get('name') if member_xml.get('name') is not None else ''
+        assert n1 == n2
     except AssertionError:
         debug_write(f"name mismatch: ast={member_ast.name}, xml={member_xml.get('name')}")
         debug_write(f"member_xml: {ET.tostring(member_xml, encoding='unicode')}")
@@ -116,7 +118,9 @@ class TestStructParsing(unittest.TestCase):
                                 raise
                         else:
                             self.assertEqual(m['type'], exp['type'])
-                            self.assertEqual(m['name'], exp['name'])
+                            n1 = m['name'] if m['name'] is not None else ''
+                            n2 = exp['name'] if exp['name'] is not None else ''
+                            self.assertEqual(n1, n2)
                             if exp.get('is_bitfield'):
                                 self.assertTrue(m.get('is_bitfield'))
                                 self.assertEqual(m['bit_size'], exp['bit_size'])

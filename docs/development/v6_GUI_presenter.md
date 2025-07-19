@@ -150,7 +150,7 @@ def reset_context(self):
 
 ## 9. 權限控管與安全性
 
-- 根據 context 欄位 can_edit, can_delete, user_role 決定允許/拒絕操作。
+- 根據 context 欄位 can_edit, can_delete 決定允許/拒絕操作。
 - 權限不足時，Presenter 應回傳標準錯誤格式，並於 context["error"]、debug_info["last_error"] 填寫。
 - 範例：
 ```python
@@ -184,3 +184,78 @@ def push_context(self):
         })
     self.view.update_display(self.get_display_nodes(self.context["display_mode"]), self.context)
 ``` 
+
+---
+
+## 11. 現有 Presenter 實作現況與優先建議（2024/07 補充）
+
+### 1. 現有 Presenter 架構與功能
+- `src/presenter/struct_presenter.py` 已有 `StructPresenter` 類別，涵蓋：
+  - context 狀態管理（含 display_mode, expanded_nodes, selected_node, error, debug_info 等）
+  - 事件處理（on_node_click, on_expand, on_switch_display_mode, on_undo, on_delete_node, on_refresh, on_collapse, set_readonly 等）
+  - LRU layout cache 機制
+  - 權限控管（如 on_delete_node）
+  - 與 View 的互動（update_display）
+  - 例外處理與 debug_info 更新
+- `src/presenter/context_schema.py` 有 context schema 驗證工具。
+- `src/view/struct_view.py` 為 tkinter GUI，與 Presenter 互動，負責 UI 呈現與事件 callback。
+- 單元測試（`tests/presenter/test_struct_presenter.py`）覆蓋：
+  - cache hit/miss/失效/極端情境
+  - 事件處理（如 on_manual_struct_change, on_export_manual_struct, parse_manual_hex_data, browse_file 等）
+  - 權限控管、例外處理
+  - LRU cache 動態調整與自動清空
+  - Model/View mock 驗證
+
+### 2. 與本文件規劃的對照
+- 文件規劃的 Presenter API、context 結構、事件處理、權限控管、debug_info、單元測試，大多已在現有 code 中落實。
+- 事件流程、狀態流、cache、錯誤處理、View 互動、測試覆蓋度都很高。
+- context 初始化與 reset、mock View、debug_info 策略、權限控管等也有實作。
+
+### 3. 建議優先處理方向
+1. 確認 context 初始化/重置與 schema 驗證是否在所有事件流程中都有呼叫與測試（如 reset_context、get_default_context）。
+   - **開發細節**：
+     - 檢查 Presenter 是否有 get_default_context/reset_context 方法，並於初始化、重置、重大狀態切換時呼叫。
+     - 建議所有事件處理（如 on_switch_display_mode, on_load_file, on_undo, on_refresh）都應考慮 context 的正確初始化或重置。
+     - 可於 context 更新後自動呼叫 context_schema 驗證，確保結構正確。
+     - 單元測試應覆蓋 context 初始化、重置、異常情境。
+2. AST 轉換與顯示模式切換：確認 `get_display_nodes`、AST 轉換邏輯是否完整支援文件規劃的 tree/flat 模式與巢狀 struct/union/bitfield。
+   - **開發細節**：
+     - 檢查 Presenter 是否有 get_display_nodes(mode) 方法，並能根據 mode='tree'|'flat' 正確遞迴轉換 AST。
+     - 測試巢狀 struct/union/array/bitfield 範例，確保顯示正確。
+     - 若有新型態（如 bitfield info），需同步 AST 結構與轉換邏輯。
+     - 單元測試應覆蓋各種巢狀結構與顯示模式切換。
+3. 事件鏈路與 context 推送：檢查所有事件（如 on_node_click, on_expand, on_switch_display_mode, on_load_file, on_undo）是否都會正確推送 context 並更新 debug_info。
+   - **開發細節**：
+     - 每個事件處理方法結尾應呼叫 push_context 或 update_display，確保 View 能即時取得最新 context。
+     - debug_info 應記錄 last_event, last_event_args, context_history, api_trace 等。
+     - 建議用 decorator 或 helper function 統一事件推送與 debug_info 更新。
+     - 單元測試應驗證事件觸發後 context、debug_info 是否正確。
+4. 權限控管與錯誤格式：確認所有需權限的操作（如刪除、編輯）都會正確回傳標準錯誤格式，並於 context["error"]、debug_info["last_error"] 填寫。
+   - **開發細節**：
+     - 檢查 on_delete_node、on_edit_node 等方法，是否有 can_edit/can_delete 權限判斷。
+     - 權限不足時，應回傳 {success: False, error_code, error_message}，並於 context["error"]、debug_info["last_error"] 填寫。
+     - 建議統一權限檢查與錯誤格式 helper，方便擴充。
+     - 單元測試應覆蓋權限不足、錯誤格式、context/error/debug_info 更新。
+5. 單元測試覆蓋：如有新事件或 context 欄位，需補齊測試。
+   - **開發細節**：
+     - 每新增/修改一個事件或 context 欄位，應同步新增/修改對應單元測試。
+     - 覆蓋正常、異常、極端情境（如 cache 滿、權限不足、格式錯誤等）。
+     - 測試 Presenter 與 View/Model 的 mock 互動。
+     - 可用 coverage 工具檢查測試覆蓋率。
+6. View/Presenter API 對接：如有新 API 或 context 欄位，需同步 View 端 callback 與顯示。
+   - **開發細節**：
+     - 每新增/修改 Presenter API 或 context 欄位，應同步檢查 View 是否有正確 callback 與顯示。
+     - 建議用 interface 文件或型別提示（如 dataclass/schema）同步維護 API。
+     - 單元測試可 mock View 驗證 update_display、錯誤顯示、狀態同步。
+
+--- 
+
+---
+
+## 9. Codebase 對齊狀態
+
+- 所有 Presenter 事件方法（on_node_click, on_expand, on_collapse, on_switch_display_mode, on_refresh, set_readonly, on_delete_node, on_undo, on_redo）皆已依 API 文件完整實作。
+- context 欄位、contract test、mock View、權限控制、錯誤格式、debug_info、undo/redo、readonly 狀態皆有單元測試覆蓋。
+- contract test 路徑：`tests/presenter/test_v2p_contract.py`
+- context schema 驗證路徑：`src/presenter/context_schema.py`
+- 若有 API/欄位/事件異動，請先更新本文件並同步調整 codebase 與測試。 

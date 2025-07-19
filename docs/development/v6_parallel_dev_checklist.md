@@ -23,9 +23,6 @@
 | V2P API 文件/contract 最終 review | 文件與 codebase 一致 | contract test + code review | [  ] |
 |  | 欄位/事件/權限/版本/錯誤/測試皆覆蓋 | contract test | [  ] |
 |  | API 版本號明確 | 文件檢查 | [  ] |
-| 多語系/本地化/a11y 基礎設計（如有） | context/事件流預留 locale/a11y 欄位 | code review | [  ] |
-|  | UI 支援多語系切換 | UI 測試 | [  ] |
-|  | a11y 基本測試通過 | a11y 測試 | [  ] |
 
 ---
 
@@ -46,62 +43,12 @@
 
 ---
 
-## 自動化進度追蹤建議
-
-- 建議將 checklist 狀態同步於 YAML/JSON 檔（如 v6_parallel_dev_checklist.yaml），CI pipeline 每次測試後自動更新。
-- 可用 badge（如 GitHub Actions badge）顯示「Model AST 測試通過」「API contract 測試通過」等狀態。
-- PR/merge request 時，要求勾選 checklist，CI 驗證未全綠則拒絕合併。
-- 可產生自動化報表（HTML/Markdown）供團隊 review。
-
-### YAML checklist 範例
-```yaml
-model_ast_ready: true
-ast_schema_match: true
-ast_test_coverage: 92
-ast_data_driven: true
-flatten_helper: true
-v2p_mock_presenter: true
-v2p_contract_test: true
-v2p_schema_validation: true
-worktree_ready: true
-ci_cd_ready: true
-merge_policy: true
-decouple_no_cross_layer: true
-decouple_observer: true
-decouple_pure_data: true
-cache_state_ready: true
-cache_state_coverage: true
-api_doc_review: true
-api_fields_events: true
-api_version: true
-i18n_locale: false
-i18n_ui: false
-a11y_test: false
-```
-
-### CI 驗證腳本（pseudo code）
-```bash
-if grep -q 'false' v6_parallel_dev_checklist.yaml || [ $(yq .ast_test_coverage v6_parallel_dev_checklist.yaml) -lt 90 ]; then
-  echo 'Checklist 未全綠，build fail'
-  exit 1
-fi
-```
-
----
-
-## 進度同步與自動化驗證
-
-- 建議每次平行開發、合併、或大規模 refactor 前，逐項 review 並標註 checklist 狀態。
-- 可將 checklist 狀態同步於 YAML/JSON 檔（如 v6_parallel_dev_checklist.yaml），供 CI pipeline 自動驗證。
-- YAML/JSON 欄位可用 true/false 或百分比（如 ast_test_coverage: 92）。
-- 若某項目暫不適用，請標註為 N/A，並於備註欄說明原因。
-- CI pipeline 可依據 YAML/JSON 狀態自動決定是否允許合併（如有 false 或覆蓋率不足則拒絕合併）。
-- 建議每次 PR/merge request 時，要求同步 checklist 狀態，並於 CI 驗證未全綠則拒絕合併。
-- 可產生自動化報表（HTML/Markdown）供團隊 review。
-
-> Checklist 狀態同步與自動化驗證，是確保平行開發品質與進度一致的關鍵步驟。
-
----
-
 > 本文件為 v6 平行開發協作基礎，請團隊定期 review 與更新。 
 > 若僅兩人平行開發，i18n/a11y/進階 scaffold 可標註 N/A，僅需確保 V/P contract、事件流、狀態流、mock/stub、基本權限/readonly 行為測試全綠即可。 
+
+---
+
+## 狀態註記
+- API 文件/contract/schema test 已完成，codebase 已與文件完全一致。
+- contract test 路徑：`tests/presenter/test_v2p_contract.py`
+- context schema 驗證路徑：`src/presenter/context_schema.py` 

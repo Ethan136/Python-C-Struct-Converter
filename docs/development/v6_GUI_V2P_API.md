@@ -695,3 +695,13 @@ context = {
 - debug_info 預設僅在開發/測試模式下啟用，正式環境可過濾敏感資訊或完全關閉。
 - 若需正式環境 debug，建議僅允許管理員/開發人員存取。
 - debug_info 不應包含用戶敏感資料，避免洩漏風險。 
+
+---
+
+## 30. Codebase 對齊狀態與測試路徑
+
+- 本 API 文件所有欄位、事件、錯誤格式、context 結構、權限、debug_info、undo/redo/readonly 狀態，皆已於 codebase 完全實作。
+- contract test 路徑：`tests/presenter/test_v2p_contract.py`
+- context schema 驗證路徑：`src/presenter/context_schema.py`
+- 欄位、事件、contract test、mock/stub、權限、debug、undo/redo、readonly 狀態皆有單元測試覆蓋。
+- 若有 API/欄位/事件異動，請先更新本文件並同步調整 codebase 與測試。 
