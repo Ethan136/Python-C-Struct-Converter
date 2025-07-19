@@ -44,6 +44,11 @@ class StructPresenter:
             self.model.add_observer(self)
         # context 初始化
         self.context = self.get_default_context()
+        self._debounce_timer = None
+        self._debounce_lock = threading.Lock()
+        self._debounce_interval = 0.1  # 100ms
+        self._pending_context = None
+        self._history_maxlen = 200
 
     def update(self, event_type, model, **kwargs):
         """Observer callback: 當 model 狀態變更時自動呼叫。"""
@@ -375,24 +380,51 @@ class StructPresenter:
         self.context = self.get_default_context()
         self.push_context()
 
-    def push_context(self):
+    def push_context(self, immediate=False):
         import time
         self.context["last_update_time"] = time.time()
         # 更新 context_history, api_trace
         if "debug_info" in self.context:
-            # 深拷貝避免 reference 問題
-            self.context["debug_info"].setdefault("context_history", []).append(copy.deepcopy(self.context))
-            self.context["debug_info"].setdefault("api_trace", []).append({
+            import copy
+            history = self.context["debug_info"].setdefault("context_history", [])
+            # --- 避免 reference loop ---
+            ctx_copy = copy.deepcopy(self.context)
+            if "debug_info" in ctx_copy:
+                ctx_copy["debug_info"]["context_history"] = []
+                ctx_copy["debug_info"]["api_trace"] = []
+            history.append(ctx_copy)
+            if len(history) > self._history_maxlen:
+                del history[0:len(history)-self._history_maxlen]
+            api_trace = self.context["debug_info"].setdefault("api_trace", [])
+            api_trace.append({
                 "api": self.context["debug_info"].get("last_event"),
                 "args": self.context["debug_info"].get("last_event_args"),
                 "timestamp": time.time()
             })
-        # schema 驗證
+            if len(api_trace) > self._history_maxlen:
+                del api_trace[0:len(api_trace)-self._history_maxlen]
+        from src.presenter.context_schema import validate_presenter_context
         validate_presenter_context(self.context)
-        # 推送給 View
-        if self.view and hasattr(self.view, "update_display"):
-            nodes = self.model.get_display_nodes(self.context["display_mode"]) if hasattr(self.model, "get_display_nodes") else None
-            self.view.update_display(nodes, self.context)
+        # Debounce/throttle 推送
+        if immediate or self._debounce_interval == 0:
+            if self.view and hasattr(self.view, "update_display"):
+                nodes = self.model.get_display_nodes(self.context["display_mode"]) if self.model and hasattr(self.model, "get_display_nodes") else None
+                self.view.update_display(nodes, self.context.copy())
+            return
+        with self._debounce_lock:
+            self._pending_context = (self.model.get_display_nodes(self.context["display_mode"]) if self.model and hasattr(self.model, "get_display_nodes") else None, self.context.copy())
+            if self._debounce_timer is None:
+                self._debounce_timer = threading.Timer(self._debounce_interval, self._debounce_push)
+                self._debounce_timer.daemon = True
+                self._debounce_timer.start()
+
+    def _debounce_push(self):
+        with self._debounce_lock:
+            if self.view and hasattr(self.view, "update_display") and self._pending_context:
+                nodes, context = self._pending_context
+                self.view.update_display(nodes, context)
+            self._debounce_timer = None
+            self._pending_context = None
 
     # --- 事件處理統一呼叫 push_context ---
     def on_node_click(self, node_id):

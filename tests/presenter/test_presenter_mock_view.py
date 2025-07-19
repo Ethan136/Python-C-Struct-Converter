@@ -25,6 +25,12 @@ class TestPresenterMockView(unittest.TestCase):
         '''
         self.view = MockView()
         self.presenter = StructPresenter(self.model, self.view)
+        # 讓 push_context 立即執行，避免 debounce 影響
+        self.presenter._debounce_interval = 0
+        orig_push_context = self.presenter.push_context
+        def sync_push_context(*args, **kwargs):
+            return orig_push_context(immediate=True)
+        self.presenter.push_context = sync_push_context
         self.presenter.context = {
             "display_mode": "tree",
             "expanded_nodes": ["root"],

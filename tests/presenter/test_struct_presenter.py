@@ -8,12 +8,19 @@ from src.presenter.struct_presenter import StructPresenter, HexProcessingError
 import time
 import threading
 import asyncio
+import pytest
 
 class TestStructPresenter(unittest.TestCase):
     def setUp(self):
         self.model = MagicMock()
         self.view = MagicMock()
         self.presenter = StructPresenter(self.model, self.view)
+        self.presenter._debounce_interval = 0  # 測試時立即推送
+        # monkeypatch push_context 為同步
+        orig_push_context = self.presenter.push_context
+        def sync_push_context(*args, **kwargs):
+            return orig_push_context(immediate=True)
+        self.presenter.push_context = sync_push_context
 
     def tearDown(self):
         # 確保每次測試後都停用自動 cache 清空，避免 timer 殘留
@@ -720,6 +727,32 @@ class TestStructPresenter(unittest.TestCase):
             delattr(self.presenter.model, "get_struct_ast")
         ast = self.presenter.get_struct_ast()
         self.assertIsNone(ast)
+
+    def test_history_maxlen_limit(self):
+        self.presenter._history_maxlen = 10
+        for i in range(25):
+            self.presenter.context["debug_info"]["last_event"] = f"event_{i}"
+            self.presenter.context["debug_info"]["last_event_args"] = {"i": i}
+            self.presenter.push_context()
+        history = self.presenter.context["debug_info"]["context_history"]
+        api_trace = self.presenter.context["debug_info"]["api_trace"]
+        self.assertLessEqual(len(history), 10)
+        self.assertLessEqual(len(api_trace), 10)
+        # 應只保留最後 10 筆
+        self.assertEqual(history[-1]["debug_info"]["last_event"], "event_24")
+        self.assertEqual(history[0]["debug_info"]["last_event"], "event_15")
+        self.assertEqual(api_trace[-1]["api"], "event_24")
+        self.assertEqual(api_trace[0]["api"], "event_15")
+
+# 為每個測試方法加上 timeout 與 debug print
+for name, method in list(TestStructPresenter.__dict__.items()):
+    if name.startswith('test_') and callable(method):
+        def make_wrapped(meth, n):
+            @pytest.mark.timeout(15)
+            def wrapper(self, *args, **kwargs):
+                return meth(self, *args, **kwargs)
+            return wrapper
+        setattr(TestStructPresenter, name, make_wrapped(method, name))
 
 if __name__ == "__main__":
     unittest.main() 
