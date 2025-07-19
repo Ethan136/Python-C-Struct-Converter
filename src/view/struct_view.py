@@ -952,18 +952,56 @@ class StructView(tk.Tk):
 
     def show_treeview_nodes(self, nodes, context, icon_map=None):
         tree = self.member_tree
+        # 依據 user_settings 設定 columns
+        columns = ("name", "value", "hex_value", "hex_raw")
+        col_settings = context.get("user_settings", {}).get("treeview_columns")
+        if col_settings:
+            # 只取 visible=True 並依 order 排序
+            visible_cols = [c for c in sorted(col_settings, key=lambda x: x.get("order", 0)) if c.get("visible", True)]
+            columns = tuple(c["name"] for c in visible_cols)
+            tree["columns"] = columns
+            # 設定標題
+            for c in columns:
+                tree.heading(c, text=c)
+        else:
+            tree["columns"] = ("name", "value", "hex_value", "hex_raw")
+            for c in ("name", "value", "hex_value", "hex_raw"):
+                tree.heading(c, text=c)
         for item in tree.get_children(""):
             tree.delete(item)
         # 設定高亮 tag 樣式
         tree.tag_configure("highlighted", background="yellow")
+        # 設定型別 tag 樣式
+        tree.tag_configure("struct", foreground="blue", font="Arial 10 bold")
+        tree.tag_configure("union", foreground="purple", font="Arial 10 bold")
+        tree.tag_configure("bitfield", foreground="#008000")
+        tree.tag_configure("array", foreground="#B8860B")
         highlighted = set(context.get("highlighted_nodes", []))
         def insert_with_highlight(tree, parent_id, node):
             if parent_id in (None, "", 0):
                 parent_id = ""
-            values = (node.get("label", ""), node.get("type", ""))
+            node_type = node.get("type", "")
+            label = node.get("label", "")
+            tags = []
+            if node_type == "struct":
+                label = f"{label} [struct]"
+                tags.append("struct")
+            elif node_type == "union":
+                label = f"{label} [union]"
+                tags.append("union")
+            elif node_type == "bitfield":
+                tags.append("bitfield")
+            elif node_type == "array":
+                tags.append("array")
+            if node["id"] in highlighted:
+                tags.append("highlighted")
+            # 動態組 values
+            values = tuple(
+                label if col == "label" else node.get(col, "")
+                for col in columns
+            )
             icon = icon_map.get(node["icon"]) if icon_map and node.get("icon") else ""
-            tags = ("highlighted",) if node["id"] in highlighted else ()
-            item_id = tree.insert(parent_id, 'end', iid=node['id'], text=node['label'], values=values, image=icon, tags=tags)
+            item_id = tree.insert(parent_id, 'end', iid=node['id'], text=label, values=values, image=icon, tags=tuple(tags))
             for child in node.get('children', []):
                 insert_with_highlight(tree, item_id, child)
             return item_id
@@ -973,7 +1011,6 @@ class StructView(tk.Tk):
         # 多選高亮
         selected_nodes = context.get("selected_nodes")
         if selected_nodes:
-            # 取得所有現有 id
             def collect_all_ids(tree, parent=""):
                 ids = list(tree.get_children(parent))
                 for i in list(ids):

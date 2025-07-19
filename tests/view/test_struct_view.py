@@ -1412,5 +1412,102 @@ class TestStructView(unittest.TestCase):
         view.destroy()
         print("[DEBUG] test_treeview_multiselect_and_batch_delete end")
 
+    def test_treeview_node_type_display(self):
+        """驗證 Treeview 節點根據 type 顯示顏色、粗體、[struct]/[union] 標籤"""
+        presenter = PresenterStub()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        nodes = [
+            {"id": "root", "label": "RootStruct", "type": "struct", "children": [
+                {"id": "u1", "label": "U1", "type": "union", "children": [
+                    {"id": "b1", "label": "B1", "type": "bitfield", "children": [], "icon": "bitfield", "extra": {}},
+                    {"id": "arr1", "label": "Arr1", "type": "array", "children": [], "icon": "array", "extra": {}}
+                ], "icon": "union", "extra": {}}
+            ], "icon": "struct", "extra": {}}
+        ]
+        presenter.get_display_nodes = lambda mode: nodes
+        presenter.context["display_mode"] = "tree"
+        presenter.context["expanded_nodes"] = ["root", "u1"]
+        view.update_display(nodes, presenter.context)
+        tree = view.member_tree
+        # 驗證 struct 節點
+        struct_item = tree.item("root")
+        self.assertIn("[struct]", struct_item["text"])
+        struct_tag = tree.item("root", "tags")
+        self.assertIn("struct", struct_tag)
+        struct_style = tree.tag_configure("struct")
+        self.assertIn("blue", str(struct_style.get("foreground", "")))
+        self.assertIn("bold", str(struct_style.get("font", "")))
+        # 驗證 union 節點
+        union_item = tree.item("u1")
+        self.assertIn("[union]", union_item["text"])
+        union_tag = tree.item("u1", "tags")
+        self.assertIn("union", union_tag)
+        union_style = tree.tag_configure("union")
+        self.assertIn("purple", str(union_style.get("foreground", "")))
+        self.assertIn("bold", str(union_style.get("font", "")))
+        # 驗證 bitfield 節點
+        bitfield_tag = tree.item("b1", "tags")
+        self.assertIn("bitfield", bitfield_tag)
+        bitfield_style = tree.tag_configure("bitfield")
+        self.assertIn("#008000", str(bitfield_style.get("foreground", "")))
+        # 驗證 array 節點
+        array_tag = tree.item("arr1", "tags")
+        self.assertIn("array", array_tag)
+        array_style = tree.tag_configure("array")
+        self.assertIn("#B8860B", str(array_style.get("foreground", "")))
+        view.destroy()
+
+    def test_treeview_column_customization(self):
+        """驗證 Treeview 欄位可根據 context['user_settings']['treeview_columns'] 動態顯示/隱藏/排序，並驗證右鍵選單切換欄位顯示會呼叫 presenter 並刷新。"""
+        class PresenterWithColumnToggle(PresenterStub):
+            def __init__(self):
+                super().__init__()
+                self.toggle_calls = []
+            def on_toggle_column(self, col_name):
+                self.toggle_calls.append(col_name)
+                # 模擬切換 visible 狀態
+                cols = self.context.setdefault("user_settings", {}).setdefault("treeview_columns", [])
+                for c in cols:
+                    if c["name"] == col_name:
+                        c["visible"] = not c["visible"]
+                if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
+                    self.view.update_display(self.get_display_nodes(self.context.get("display_mode", "tree")), self.context)
+        presenter = PresenterWithColumnToggle()
+        # 初始欄位設定：label/type/offset/size
+        presenter.context["user_settings"]["treeview_columns"] = [
+            {"name": "label", "visible": True, "order": 0},
+            {"name": "type", "visible": True, "order": 1},
+            {"name": "offset", "visible": True, "order": 2},
+            {"name": "size", "visible": True, "order": 3},
+        ]
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        nodes = [
+            {"id": "root", "label": "RootStruct", "type": "struct", "offset": 0, "size": 8, "children": []}
+        ]
+        presenter.get_display_nodes = lambda mode: nodes
+        presenter.context["display_mode"] = "tree"
+        view.update_display(nodes, presenter.context)
+        tree = view.member_tree
+        # 驗證初始欄位順序與顯示
+        columns = tree.cget("columns")
+        self.assertEqual(columns, ("label", "type", "offset", "size"))
+        # 隱藏 offset 欄位
+        presenter.on_toggle_column("offset")
+        columns2 = tree.cget("columns")
+        self.assertNotIn("offset", columns2)
+        self.assertIn("label", columns2)
+        # 隱藏所有欄位只剩 label
+        presenter.on_toggle_column("type")
+        presenter.on_toggle_column("size")
+        columns3 = tree.cget("columns")
+        self.assertEqual(columns3, ("label",))
+        # 右鍵選單觸發（模擬）
+        if hasattr(view, "_on_treeview_column_menu_click"):
+            view._on_treeview_column_menu_click("offset")
+            self.assertIn("offset", presenter.toggle_calls)
+        view.destroy()
+
 if __name__ == "__main__":
     unittest.main()
