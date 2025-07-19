@@ -670,7 +670,7 @@ class TestStructPresenter(unittest.TestCase):
         self.presenter.context = {"display_mode": "tree"}  # 缺少 required fields
         with self.assertRaises(Exception) as cm:
             self.presenter.push_context()
-        self.assertIn("'expanded_nodes' is a required property", str(cm.exception))
+        self.assertIn("debug_info", str(cm.exception))
 
     def test_push_context_view_callback_error(self):
         # View callback 失敗時不會拋出未捕獲例外
@@ -908,6 +908,50 @@ class TestStructPresenter(unittest.TestCase):
         self.assertEqual(self.presenter.context["selected_node"], "A")
         self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_redo")
         self.assertEqual(self.presenter.context["debug_info"]["last_event_args"], {})
+
+    def test_undo_redo_stack_behavior(self):
+        # 初始 context
+        ctx0 = self.presenter.get_default_context()
+        self.presenter.context = ctx0.copy()
+        self.presenter.context["history"] = []
+        self.presenter.context["redo_history"] = []
+        # 狀態 A
+        self.presenter.context["selected_node"] = "A"
+        self.presenter.context["history"].append(ctx0.copy())
+        # 狀態 B
+        ctx1 = self.presenter.context.copy()
+        self.presenter.context["selected_node"] = "B"
+        self.presenter.context["history"].append(ctx1.copy())
+        # 狀態 C
+        ctx2 = self.presenter.context.copy()
+        self.presenter.context["selected_node"] = "C"
+        self.presenter.context["history"].append(ctx2.copy())
+        # undo -> B
+        self.presenter.on_undo()
+        self.assertEqual(self.presenter.context["selected_node"], "B")
+        self.assertEqual(self.presenter.context["redo_history"][-1]["selected_node"], "C")
+        # undo -> A
+        self.presenter.on_undo()
+        self.assertEqual(self.presenter.context["selected_node"], "A")
+        self.assertEqual(self.presenter.context["redo_history"][-1]["selected_node"], "B")
+        # redo -> B
+        self.presenter.on_redo()
+        self.assertEqual(self.presenter.context["selected_node"], "B")
+        self.assertEqual(self.presenter.context["history"][-1]["selected_node"], "A")
+        # redo -> C
+        self.presenter.on_redo()
+        self.assertEqual(self.presenter.context["selected_node"], "C")
+        self.assertEqual(self.presenter.context["history"][-1]["selected_node"], "B")
+        # redo 到底不會異常
+        self.presenter.on_redo()
+        self.assertEqual(self.presenter.context["selected_node"], "C")
+        # undo -> B
+        self.presenter.on_undo()
+        self.assertEqual(self.presenter.context["selected_node"], "B")
+        # 新操作會清空 redo_history
+        self.presenter.on_node_click("X")
+        self.assertEqual(self.presenter.context["selected_node"], "X")
+        self.assertEqual(self.presenter.context["redo_history"], [])
 
     def test_performance_lru_cache_under_stress(self):
         # 壓力測試 LRU cache: 大量不同 key

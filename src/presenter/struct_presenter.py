@@ -383,6 +383,9 @@ class StructPresenter:
 
     def push_context(self, immediate=False):
         import time
+        # 非 undo/redo 事件時，push context 前清空 redo_history
+        if self.context["debug_info"].get("last_event") not in ("on_undo", "on_redo"):
+            self.context["redo_history"] = []
         self.context["last_update_time"] = time.time()
         # 更新 context_history, api_trace
         if "debug_info" in self.context:
@@ -498,7 +501,11 @@ class StructPresenter:
         return {"success": True}
 
     def on_undo(self):
+        # 將當前 context 推入 redo_history
         if self.context.get("history") and len(self.context["history"]):
+            if "redo_history" not in self.context:
+                self.context["redo_history"] = []
+            self.context["redo_history"].append(self.context.copy())
             self.context = self.context["history"].pop()
         # 補寫 last_event/last_event_args，確保 contract 一致
         self.context["debug_info"]["last_event"] = "on_undo"
@@ -508,6 +515,9 @@ class StructPresenter:
     def on_redo(self):
         # 支援 redo_history，與 undo 對稱
         if self.context.get("redo_history") and len(self.context["redo_history"]):
+            if "history" not in self.context:
+                self.context["history"] = []
+            self.context["history"].append(self.context.copy())
             self.context = self.context["redo_history"].pop()
         # 補寫 last_event/last_event_args，確保 contract 一致
         self.context["debug_info"]["last_event"] = "on_redo"
