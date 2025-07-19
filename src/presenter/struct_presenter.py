@@ -572,3 +572,9 @@ class StructPresenter:
 
     def get_debug_api_trace(self):
         return self.context.get("debug_info", {}).get("api_trace", [])
+
+    def get_display_nodes(self, mode):
+        """對外 API：根據 mode 回傳顯示用 node tree，符合 contract 測試與文件規範。"""
+        if hasattr(self.model, "get_display_nodes"):
+            return self.model.get_display_nodes(mode)
+        return []
