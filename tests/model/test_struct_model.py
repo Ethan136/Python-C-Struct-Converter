@@ -665,10 +665,10 @@ class TestStructModelASTAPI(unittest.TestCase):
         self.assertEqual(ast_dict['name'], 'Simple')
         nodes_tree = model.get_display_nodes('tree')
         self.assertIsInstance(nodes_tree, list)
-        self.assertEqual(nodes_tree[0]['name'], 'Simple')
+        self.assertEqual(nodes_tree[0]['label'], 'Simple [struct]')
         nodes_flat = model.get_display_nodes('flat')
-        self.assertTrue(any(n['name'] == 'a' for n in nodes_flat))
-        self.assertTrue(any(n['name'] == 'b' for n in nodes_flat))
+        self.assertTrue(any(n['label'] == 'a' for n in nodes_flat))
+        self.assertTrue(any(n['label'] == 'b' for n in nodes_flat))
 
 
 if __name__ == "__main__":
