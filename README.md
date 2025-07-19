@@ -350,3 +350,9 @@ All test files should:
 - Do **not** use relative imports (e.g., `from ..model import ...` or `from . import ...`).
 
 This ensures that tests run correctly both locally and in GitHub Actions CI/CD, regardless of the working directory or test runner.
+
+## v6 Checklist 與 CI/CD 驗證
+- v6 checklist 狀態請見 `v6_parallel_dev_checklist.yaml`，每次合併/PR 前請同步更新。
+- 合併策略與流程請見 [docs/merge_policy.md](docs/merge_policy.md)。
+- CI/CD 會自動執行 pytest、contract test、tools/check_checklist.py，未全綠不得合併。
+- 本地可用 `python tools/check_checklist.py` 驗證 checklist 狀態。
