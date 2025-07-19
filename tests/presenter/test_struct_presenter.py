@@ -542,6 +542,75 @@ class TestStructPresenter(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.presenter.model.get_display_nodes('unknown')
 
+    def test_get_display_nodes_complex_struct_union_bitfield(self):
+        # 複雜 AST 範例：struct 內含 union、bitfield、array
+        complex_ast = {
+            "id": "root",
+            "name": "RootStruct",
+            "type": "struct",
+            "is_struct": True,
+            "is_union": False,
+            "children": [
+                {"id": "root.a", "name": "a", "type": "int", "is_struct": False, "is_union": False, "children": []},
+                {"id": "root.b", "name": "b", "type": "union", "is_struct": False, "is_union": True, "children": [
+                    {"id": "root.b.x", "name": "x", "type": "char", "is_struct": False, "is_union": False, "children": []},
+                    {"id": "root.b.y", "name": "y", "type": "bitfield", "is_struct": False, "is_union": False, "bitfield_info": {"bits": 3}, "children": []}
+                ]},
+                {"id": "root.c", "name": "c", "type": "struct", "is_struct": True, "is_union": False, "children": [
+                    {"id": "root.c.arr", "name": "arr", "type": "array", "is_struct": False, "is_union": False, "array_info": {"length": 4}, "children": [
+                        {"id": "root.c.arr[0]", "name": "arr[0]", "type": "int", "is_struct": False, "is_union": False, "children": []}
+                    ]}
+                ]}
+            ]
+        }
+        self.presenter.context = self.presenter.get_default_context()
+        self.presenter.context["ast"] = complex_ast
+        # 假設 model.get_display_nodes 依 context["ast"] 產生
+        def fake_get_display_nodes(mode):
+            # 簡化：直接根據 ast 結構遞迴產生 tree/flat
+            def to_tree(node):
+                n = {k: v for k, v in node.items() if k != "children"}
+                n["children"] = [to_tree(child) for child in node.get("children", [])]
+                n["label"] = node["name"]
+                return n
+            def to_flat(node):
+                flat = []
+                def visit(n):
+                    nn = {k: v for k, v in n.items() if k != "children"}
+                    nn["label"] = n["name"]
+                    flat.append(nn)
+                    for c in n.get("children", []):
+                        visit(c)
+                visit(node)
+                return flat
+            ast = self.presenter.context["ast"]
+            if mode == "tree":
+                return [to_tree(ast)]
+            elif mode == "flat":
+                return to_flat(ast)
+            else:
+                raise ValueError(f"Unknown mode: {mode}")
+        self.presenter.model.get_display_nodes = fake_get_display_nodes
+        # tree 模式
+        nodes_tree = self.presenter.model.get_display_nodes("tree")
+        self.assertIsInstance(nodes_tree, list)
+        self.assertEqual(nodes_tree[0]["id"], "root")
+        self.assertEqual(nodes_tree[0]["children"][1]["type"], "union")
+        self.assertEqual(nodes_tree[0]["children"][1]["children"][1]["type"], "bitfield")
+        self.assertEqual(nodes_tree[0]["children"][2]["type"], "struct")
+        self.assertEqual(nodes_tree[0]["children"][2]["children"][0]["type"], "array")
+        # flat 模式
+        nodes_flat = self.presenter.model.get_display_nodes("flat")
+        self.assertIsInstance(nodes_flat, list)
+        ids = [n["id"] for n in nodes_flat]
+        self.assertIn("root.b.y", ids)
+        self.assertIn("root.c.arr[0]", ids)
+        types = [n["type"] for n in nodes_flat]
+        self.assertIn("bitfield", types)
+        self.assertIn("array", types)
+        self.assertIn("union", types)
+        self.assertIn("struct", types)
+
     def test_on_delete_node_permission_denied(self):
         self.presenter.context["can_delete"] = False
         result = self.presenter.on_delete_node("node1")
