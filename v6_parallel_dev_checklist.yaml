@@ -17,6 +17,6 @@ cache_state_coverage: false
 api_doc_review: true
 api_fields_events: true
 api_version: true
-i18n_locale: N/A
-i18n_ui: N/A
-a11y_test: N/A 
+i18n_locale: N/A  # 僅兩人平行開發，暫不需多語系 scaffold
+i18n_ui: N/A      # 僅兩人平行開發，暫不需多語系 UI
+a11y_test: N/A    # 僅兩人平行開發，暫不需 a11y scaffold 

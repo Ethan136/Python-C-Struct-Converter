@@ -104,3 +104,4 @@ fi
 ---
 
 > 本文件為 v6 平行開發協作基礎，請團隊定期 review 與更新。 
+> 若僅兩人平行開發，i18n/a11y/進階 scaffold 可標註 N/A，僅需確保 V/P contract、事件流、狀態流、mock/stub、基本權限/readonly 行為測試全綠即可。 
