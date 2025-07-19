@@ -637,6 +637,34 @@ class TestStructPresenter(unittest.TestCase):
         self.assertEqual(self.presenter.context["error"], "Permission denied")
         self.assertEqual(self.presenter.context["debug_info"]["last_error"], "PERMISSION_DENIED")
 
+    def test_permission_check_and_error_format(self):
+        # 權限不足: can_delete=False
+        self.presenter.context = self.presenter.get_default_context()
+        self.presenter.context["can_delete"] = False
+        result = self.presenter.on_delete_node("n1")
+        self.assertFalse(result["success"])
+        self.assertEqual(result["error_code"], "PERMISSION_DENIED")
+        self.assertIn("No permission", result["error_message"])
+        self.assertEqual(self.presenter.context["error"], "Permission denied")
+        self.assertEqual(self.presenter.context["debug_info"]["last_error"], "PERMISSION_DENIED")
+        # 權限不足: can_edit=False
+        self.presenter.context["can_edit"] = False
+        self.presenter.on_edit_node = lambda node_id, new_value: self.presenter._check_permission("edit")
+        result2 = self.presenter.on_edit_node("n2", 123)
+        self.assertFalse(result2["success"])
+        self.assertEqual(result2["error_code"], "PERMISSION_DENIED")
+        self.assertIn("No permission", result2["error_message"])
+        self.assertEqual(self.presenter.context["error"], "Permission denied")
+        self.assertEqual(self.presenter.context["debug_info"]["last_error"], "PERMISSION_DENIED")
+        # 權限足夠: can_delete/can_edit=True
+        self.presenter.context["can_delete"] = True
+        self.presenter.context["can_edit"] = True
+        # on_delete_node 應回傳 success
+        self.presenter._check_permission = lambda action: None
+        self.presenter.push_context = lambda *a, **k: None  # 避免 side effect
+        result3 = self.presenter.on_delete_node("n3")
+        self.assertTrue(result3["success"])
+
     def test_push_context_schema_validation_error(self):
         # context 缺少必要欄位
         self.presenter.context = {"display_mode": "tree"}  # 缺少 required fields

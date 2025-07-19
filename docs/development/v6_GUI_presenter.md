@@ -150,7 +150,7 @@ def reset_context(self):
 
 ## 9. 權限控管與安全性
 
-- 根據 context 欄位 can_edit, can_delete, user_role 決定允許/拒絕操作。
+- 根據 context 欄位 can_edit, can_delete 決定允許/拒絕操作。
 - 權限不足時，Presenter 應回傳標準錯誤格式，並於 context["error"]、debug_info["last_error"] 填寫。
 - 範例：
 ```python
@@ -232,7 +232,7 @@ def push_context(self):
      - 單元測試應驗證事件觸發後 context、debug_info 是否正確。
 4. 權限控管與錯誤格式：確認所有需權限的操作（如刪除、編輯）都會正確回傳標準錯誤格式，並於 context["error"]、debug_info["last_error"] 填寫。
    - **開發細節**：
-     - 檢查 on_delete_node、on_edit_node 等方法，是否有 can_edit/can_delete/user_role 權限判斷。
+     - 檢查 on_delete_node、on_edit_node 等方法，是否有 can_edit/can_delete 權限判斷。
      - 權限不足時，應回傳 {success: False, error_code, error_message}，並於 context["error"]、debug_info["last_error"] 填寫。
      - 建議統一權限檢查與錯誤格式 helper，方便擴充。
      - 單元測試應覆蓋權限不足、錯誤格式、context/error/debug_info 更新。
