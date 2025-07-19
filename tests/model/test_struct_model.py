@@ -24,6 +24,7 @@ from tests.data_driven.xml_struct_model_loader import load_struct_model_tests
 from tests.data_driven.xml_struct_parse_definition_loader import load_struct_parse_definition_tests
 from tests.data_driven.xml_struct_model_manual_loader import load_struct_model_manual_tests
 from tests.data_driven.xml_struct_model_export_h_loader import load_struct_model_export_h_tests
+from tests.data_driven.xml_struct_model_manual_error_loader import load_struct_model_manual_error_tests
 
 
 class TestParseStructDefinition(unittest.TestCase):
@@ -616,6 +617,23 @@ class TestStructModelExportHXMLDriven(unittest.TestCase):
                     h_content = model.export_manual_struct_to_h()
                 for line in case['expected_h_contains']:
                     self.assertIn(line, h_content)
+
+
+class TestStructModelManualErrorXMLDriven(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_struct_model_manual_error_config.xml')
+        cls.cases = load_struct_model_manual_error_tests(config_path)
+
+    def test_manual_error_cases(self):
+        model = StructModel()
+        for case in self.cases:
+            with self.subTest(name=case['name']):
+                members = case['members']
+                total_size = case['total_size']
+                expect_error = case['expect_error']
+                errors = model.validate_manual_struct(members, total_size)
+                self.assertTrue(any(expect_error in err for err in errors), f"未找到預期錯誤: {expect_error}, 實際: {errors}")
 
 
 if __name__ == "__main__":
