@@ -7,6 +7,8 @@ import time
 from collections import OrderedDict
 import os
 import threading
+from src.presenter.context_schema import validate_presenter_context
+import copy
 
 
 class HexProcessingError(Exception):
@@ -40,6 +42,8 @@ class StructPresenter:
         # Observer pattern: 註冊自己為 model observer
         if hasattr(self.model, "add_observer"):
             self.model.add_observer(self)
+        # context 初始化
+        self.context = self.get_default_context()
 
     def update(self, event_type, model, **kwargs):
         """Observer callback: 當 model 狀態變更時自動呼叫。"""
@@ -122,6 +126,21 @@ class StructPresenter:
             }
         except Exception as e:
             return {'type': 'error', 'message': f"載入檔案時發生錯誤: {e}"}
+
+    async def on_load_file(self, file_path):
+        self.context["loading"] = True
+        self.context["debug_info"]["last_event"] = "on_load_file"
+        self.context["debug_info"]["last_event_args"] = {"file_path": file_path}
+        self.push_context()
+        try:
+            ast = await self.parse_file(file_path)
+            self.context["ast"] = ast
+            self.context["error"] = None
+        except Exception as e:
+            self.context["error"] = str(e)
+            self.context["debug_info"]["last_error"] = str(e)
+        self.context["loading"] = False
+        self.push_context()
 
     def on_unit_size_change(self, *args):
         # This method is called when the unit size dropdown changes
@@ -320,65 +339,168 @@ class StructPresenter:
         with self._auto_cache_clear_lock:
             return self._auto_cache_clear_enabled
 
-    def on_switch_display_mode(self, mode):
-        self.context["display_mode"] = mode
-        self.context["expanded_nodes"] = ["root"]
-        self.context["selected_node"] = None
-        self.context["debug_info"]["last_event"] = "on_switch_display_mode"
-        self.context["debug_info"]["last_event_args"] = {"mode": mode}
-        # 推送 context 給 view（如有）
+    @staticmethod
+    def get_default_context():
+        import time
+        return {
+            "display_mode": "tree",
+            "expanded_nodes": ["root"],
+            "selected_node": None,
+            "error": None,
+            "filter": None,
+            "search": None,
+            "version": "1.0",
+            "extra": {},
+            "loading": False,
+            "history": [],
+            "user_settings": {},
+            "last_update_time": time.time(),
+            "readonly": False,
+            "pending_action": None,
+            "debug_info": {
+                "last_event": None,
+                "last_event_args": {},
+                "last_error": None,
+                "context_history": [],
+                "api_trace": [],
+                "version": "1.0",
+                "extra": {}
+            },
+            "can_edit": True,
+            "can_delete": True,
+            "user_role": "admin"
+        }
+
+    def reset_context(self):
+        self.context = self.get_default_context()
+        self.push_context()
+
+    def push_context(self):
+        import time
+        self.context["last_update_time"] = time.time()
+        # 更新 context_history, api_trace
+        if "debug_info" in self.context:
+            # 深拷貝避免 reference 問題
+            self.context["debug_info"].setdefault("context_history", []).append(copy.deepcopy(self.context))
+            self.context["debug_info"].setdefault("api_trace", []).append({
+                "api": self.context["debug_info"].get("last_event"),
+                "args": self.context["debug_info"].get("last_event_args"),
+                "timestamp": time.time()
+            })
+        # schema 驗證
+        validate_presenter_context(self.context)
+        # 推送給 View
         if self.view and hasattr(self.view, "update_display"):
-            self.view.update_display(self.model.get_display_nodes(mode), self.context)
+            nodes = self.model.get_display_nodes(self.context["display_mode"]) if hasattr(self.model, "get_display_nodes") else None
+            self.view.update_display(nodes, self.context)
 
-    def on_delete_node(self, node_id):
-        if not self.context.get("can_delete", False):
-            self.context["error"] = "Permission denied"
-            self.context["debug_info"]["last_error"] = "PERMISSION_DENIED"
-            if self.view and hasattr(self.view, "update_display"):
-                self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
-            return {"success": False, "error_code": "PERMISSION_DENIED", "error_message": "No permission to delete."}
-        # ...實際刪除邏輯略...
-        return {"success": True}
-
+    # --- 事件處理統一呼叫 push_context ---
     def on_node_click(self, node_id):
         self.context["selected_node"] = node_id
         self.context["debug_info"]["last_event"] = "on_node_click"
         self.context["debug_info"]["last_event_args"] = {"node_id": node_id}
-        if self.view and hasattr(self.view, "update_display"):
-            self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+        self.push_context()
 
     def on_expand(self, node_id):
         if node_id not in self.context["expanded_nodes"]:
             self.context["expanded_nodes"].append(node_id)
         self.context["debug_info"]["last_event"] = "on_expand"
         self.context["debug_info"]["last_event_args"] = {"node_id": node_id}
-        if self.view and hasattr(self.view, "update_display"):
-            self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+        self.push_context()
+
+    def on_switch_display_mode(self, mode):
+        self.context["display_mode"] = mode
+        self.context["expanded_nodes"] = ["root"]
+        self.context["selected_node"] = None
+        self.context["debug_info"]["last_event"] = "on_switch_display_mode"
+        self.context["debug_info"]["last_event_args"] = {"mode": mode}
+        self.push_context()
+
+    def on_undo(self):
+        if self.context.get("history") and len(self.context["history"]):
+            self.context = self.context["history"].pop()
+            self.context["debug_info"]["last_event"] = "on_undo"
+            self.push_context()
+        # 若 history 為空，什麼都不做
+
+    def _check_permission(self, action):
+        # action: "delete"、"edit"、... 依 context 欄位 can_delete/can_edit/user_role 判斷
+        if action == "delete" and not self.context.get("can_delete", False):
+            self.context["error"] = "Permission denied"
+            self.context["debug_info"]["last_error"] = "PERMISSION_DENIED"
+            self.push_context()
+            return {"success": False, "error_code": "PERMISSION_DENIED", "error_message": "No permission to delete."}
+        if action == "edit" and not self.context.get("can_edit", False):
+            self.context["error"] = "Permission denied"
+            self.context["debug_info"]["last_error"] = "PERMISSION_DENIED"
+            self.push_context()
+            return {"success": False, "error_code": "PERMISSION_DENIED", "error_message": "No permission to edit."}
+        # 其他權限可擴充
+        return None
+
+    def on_delete_node(self, node_id):
+        perm = self._check_permission("delete")
+        if perm is not None:
+            return perm
+        # ...實際刪除邏輯略...
+        self.push_context()
+        return {"success": True}
+
+    def on_edit_node(self, node_id, new_value):
+        perm = self._check_permission("edit")
+        if perm is not None:
+            return perm
+        # ...實際編輯邏輯略...
+        self.context["debug_info"]["last_event"] = "on_edit_node"
+        self.context["debug_info"]["last_event_args"] = {"node_id": node_id, "new_value": new_value}
+        self.push_context()
+        return {"success": True}
 
     def on_refresh(self):
         self.context["debug_info"]["last_event"] = "on_refresh"
         self.context["debug_info"]["last_event_args"] = {}
-        if self.view and hasattr(self.view, "update_display"):
-            self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+        self.push_context()
 
     def on_collapse(self, node_id):
         if node_id in self.context["expanded_nodes"]:
             self.context["expanded_nodes"].remove(node_id)
         self.context["debug_info"]["last_event"] = "on_collapse"
         self.context["debug_info"]["last_event_args"] = {"node_id": node_id}
-        if self.view and hasattr(self.view, "update_display"):
-            self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
-
-    def on_undo(self):
-        if self.context["history"]:
-            self.context = self.context["history"].pop()
-            self.context["debug_info"]["last_event"] = "on_undo"
-            if self.view and hasattr(self.view, "update_display"):
-                self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+        self.push_context()
 
     def set_readonly(self, readonly: bool):
         self.context["readonly"] = readonly
         self.context["debug_info"]["last_event"] = "set_readonly"
         self.context["debug_info"]["last_event_args"] = {"readonly": readonly}
-        if self.view and hasattr(self.view, "update_display"):
-            self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+        self.push_context()
+
+    def get_member_value(self, node_id):
+        def _find(node):
+            if node.get("id") == node_id:
+                return node.get("value")
+            for child in node.get("children", []):
+                v = _find(child)
+                if v is not None:
+                    return v
+            return None
+        ast = self.context.get("ast")
+        if not ast:
+            return None
+        return _find(ast)
+
+    def get_struct_ast(self):
+        # 若 context 已有 ast，直接回傳
+        if "ast" in self.context:
+            return self.context["ast"]
+        # 否則呼叫 model 取得
+        if hasattr(self.model, "get_struct_ast"):
+            ast = self.model.get_struct_ast()
+            self.context["ast"] = ast
+            return ast
+        return None
+
+    def get_debug_context_history(self):
+        return self.context.get("debug_info", {}).get("context_history", [])
+
+    def get_debug_api_trace(self):
+        return self.context.get("debug_info", {}).get("api_trace", [])

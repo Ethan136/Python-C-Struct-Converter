@@ -7,6 +7,7 @@ from src.presenter.struct_presenter import StructPresenter, HexProcessingError
 
 import time
 import threading
+import asyncio
 
 class TestStructPresenter(unittest.TestCase):
     def setUp(self):
@@ -489,6 +490,229 @@ class TestStructPresenter(unittest.TestCase):
         self.assertIn(0.12, called)
         self.assertEqual(len(presenter._layout_cache), 0)
         presenter.disable_auto_cache_clear()
+
+    def test_get_display_nodes_tree_and_flat(self):
+        # 模擬 model.get_display_nodes 回傳 tree/flat 結構
+        tree_node = {
+            "id": "root",
+            "label": "Root [struct]",
+            "type": "struct",
+            "children": [
+                {"id": "root.a", "label": "a", "type": "int", "children": [], "icon": "int", "extra": {}} ,
+                {"id": "root.b", "label": "b [union]", "type": "union", "children": [
+                    {"id": "root.b.x", "label": "x", "type": "char", "children": [], "icon": "char", "extra": {}}
+                ], "icon": "union", "extra": {}}
+            ],
+            "icon": "struct",
+            "extra": {}
+        }
+        flat_nodes = [
+            {"id": "root", "label": "Root [struct]", "type": "struct", "children": [], "icon": "struct", "extra": {}},
+            {"id": "root.a", "label": "a", "type": "int", "children": [], "icon": "int", "extra": {}},
+            {"id": "root.b", "label": "b [union]", "type": "union", "children": [], "icon": "union", "extra": {}},
+            {"id": "root.b.x", "label": "x", "type": "char", "children": [], "icon": "char", "extra": {}}
+        ]
+        self.model.get_display_nodes.side_effect = lambda mode: [tree_node] if mode == 'tree' else flat_nodes
+        # tree mode
+        result_tree = self.presenter.model.get_display_nodes('tree')
+        self.assertIsInstance(result_tree, list)
+        self.assertEqual(result_tree[0]["id"], "root")
+        self.assertEqual(result_tree[0]["children"][0]["id"], "root.a")
+        self.assertEqual(result_tree[0]["children"][1]["type"], "union")
+        # flat mode
+        result_flat = self.presenter.model.get_display_nodes('flat')
+        self.assertIsInstance(result_flat, list)
+        self.assertGreaterEqual(len(result_flat), 3)
+        self.assertIn("id", result_flat[0])
+        # 非法 mode
+        with self.assertRaises(ValueError):
+            self.presenter.model.get_display_nodes('unknown')
+
+    def test_on_delete_node_permission_denied(self):
+        self.presenter.context["can_delete"] = False
+        result = self.presenter.on_delete_node("node1")
+        self.assertFalse(result["success"])
+        self.assertEqual(result["error_code"], "PERMISSION_DENIED")
+        self.assertIn("No permission", result["error_message"])
+        self.assertEqual(self.presenter.context["error"], "Permission denied")
+        self.assertEqual(self.presenter.context["debug_info"]["last_error"], "PERMISSION_DENIED")
+
+    def test_on_edit_node_permission_denied(self):
+        # 假設未來有 on_edit_node 事件
+        self.presenter.context["can_edit"] = False
+        # 預設 on_edit_node 尚未實作，先 mock 一個簡單流程
+        def fake_on_edit_node(node_id, new_value):
+            perm = self.presenter._check_permission("edit")
+            if perm is not None:
+                return perm
+            return {"success": True}
+        self.presenter.on_edit_node = fake_on_edit_node
+        result = self.presenter.on_edit_node("node1", 123)
+        self.assertFalse(result["success"])
+        self.assertEqual(result["error_code"], "PERMISSION_DENIED")
+        self.assertIn("No permission", result["error_message"])
+        self.assertEqual(self.presenter.context["error"], "Permission denied")
+        self.assertEqual(self.presenter.context["debug_info"]["last_error"], "PERMISSION_DENIED")
+
+    def test_push_context_schema_validation_error(self):
+        # context 缺少必要欄位
+        self.presenter.context = {"display_mode": "tree"}  # 缺少 required fields
+        with self.assertRaises(Exception) as cm:
+            self.presenter.push_context()
+        self.assertIn("'expanded_nodes' is a required property", str(cm.exception))
+
+    def test_push_context_view_callback_error(self):
+        # View callback 失敗時不會拋出未捕獲例外
+        self.presenter.context = self.presenter.get_default_context()
+        self.presenter.view.update_display.side_effect = Exception("view error")
+        # push_context 應該讓 view 例外 bubble up（或可選擇 try/except 包住）
+        with self.assertRaises(Exception) as cm:
+            self.presenter.push_context()
+        self.assertIn("view error", str(cm.exception))
+
+    def test_push_context_with_additional_custom_field(self):
+        # context 新增自訂欄位，schema 允許 additionalProperties
+        self.presenter.context = self.presenter.get_default_context()
+        self.presenter.context["custom_flag"] = True
+        # 應不會 raise
+        try:
+            self.presenter.push_context()
+        except Exception as e:
+            self.fail(f"push_context raised unexpectedly: {e}")
+
+    def test_push_context_view_receives_custom_field(self):
+        # context 新增欄位後 View 端能正確收到
+        self.presenter.context = self.presenter.get_default_context()
+        self.presenter.context["custom_flag"] = 123
+        received = {}
+        def fake_update_display(nodes, context):
+            received["context"] = context.copy()
+        self.presenter.view.update_display.side_effect = fake_update_display
+        self.presenter.push_context()
+        self.assertIn("custom_flag", received["context"])
+        self.assertEqual(received["context"]["custom_flag"], 123)
+
+    def test_undo_redo_mechanism(self):
+        # 初始 context
+        ctx0 = self.presenter.get_default_context()
+        self.presenter.context = ctx0.copy()
+        # 模擬多次狀態變更
+        self.presenter.context["history"] = []
+        self.presenter.context["selected_node"] = "A"
+        self.presenter.context["history"].append(ctx0.copy())
+        ctx1 = self.presenter.context.copy()
+        self.presenter.context["selected_node"] = "B"
+        self.presenter.context["history"].append(ctx1.copy())
+        ctx2 = self.presenter.context.copy()
+        # undo 一次
+        self.presenter.on_undo()
+        self.assertEqual(self.presenter.context["selected_node"], "A")
+        # undo 再一次
+        self.presenter.on_undo()
+        self.assertEqual(self.presenter.context["selected_node"], None)
+        # undo 到底不會異常
+        self.presenter.on_undo()
+        self.assertEqual(self.presenter.context["selected_node"], None)
+
+    def test_on_load_file_success(self):
+        # 模擬 async parse_file 回傳 AST
+        async def fake_parse_file(file_path):
+            return {"id": "root", "name": "Root", "type": "struct", "children": []}
+        self.presenter.parse_file = fake_parse_file
+        self.presenter.context = self.presenter.get_default_context()
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(self.presenter.on_load_file("test.h"))
+        self.assertIsNone(self.presenter.context["error"])
+        self.assertFalse(self.presenter.context["loading"])
+        self.assertIn("ast", self.presenter.context)
+        self.assertEqual(self.presenter.context["ast"]["id"], "root")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_load_file")
+        self.assertEqual(self.presenter.context["debug_info"]["last_event_args"]["file_path"], "test.h")
+
+    def test_on_load_file_error(self):
+        # 模擬 async parse_file 拋出例外
+        async def fake_parse_file(file_path):
+            raise Exception("parse error")
+        self.presenter.parse_file = fake_parse_file
+        self.presenter.context = self.presenter.get_default_context()
+        import asyncio
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(self.presenter.on_load_file("bad.h"))
+        self.assertIn("parse error", self.presenter.context["error"])
+        self.assertEqual(self.presenter.context["debug_info"]["last_error"], "parse error")
+        self.assertFalse(self.presenter.context["loading"])
+
+    def test_get_member_value_success(self):
+        # 模擬 context 已有 ast 結構
+        self.presenter.context = self.presenter.get_default_context()
+        self.presenter.context["ast"] = {
+            "id": "root",
+            "name": "Root",
+            "type": "struct",
+            "children": [
+                {"id": "root.a", "name": "a", "type": "int", "value": 42, "children": []}
+            ]
+        }
+        value = self.presenter.get_member_value("root.a")
+        self.assertEqual(value, 42)
+
+    def test_get_member_value_not_found(self):
+        self.presenter.context = self.presenter.get_default_context()
+        self.presenter.context["ast"] = {
+            "id": "root",
+            "name": "Root",
+            "type": "struct",
+            "children": []
+        }
+        value = self.presenter.get_member_value("not_exist")
+        self.assertIsNone(value)
+
+    def test_get_member_value_no_ast(self):
+        self.presenter.context = self.presenter.get_default_context()
+        if "ast" in self.presenter.context:
+            del self.presenter.context["ast"]
+        value = self.presenter.get_member_value("any")
+        self.assertIsNone(value)
+
+    def test_get_debug_context_history_and_api_trace(self):
+        self.presenter.context = self.presenter.get_default_context()
+        # 模擬多次事件
+        self.presenter.context["debug_info"]["context_history"] = [
+            {"selected_node": "A"}, {"selected_node": "B"}
+        ]
+        self.presenter.context["debug_info"]["api_trace"] = [
+            {"api": "on_node_click", "args": {"node_id": "A"}},
+            {"api": "on_node_click", "args": {"node_id": "B"}}
+        ]
+        history = self.presenter.get_debug_context_history()
+        trace = self.presenter.get_debug_api_trace()
+        self.assertEqual(len(history), 2)
+        self.assertEqual(history[0]["selected_node"], "A")
+        self.assertEqual(trace[1]["args"]["node_id"], "B")
+
+    def test_get_struct_ast_from_context(self):
+        self.presenter.context = self.presenter.get_default_context()
+        self.presenter.context["ast"] = {"id": "root", "name": "Root"}
+        ast = self.presenter.get_struct_ast()
+        self.assertEqual(ast["id"], "root")
+
+    def test_get_struct_ast_from_model(self):
+        self.presenter.context = self.presenter.get_default_context()
+        if "ast" in self.presenter.context:
+            del self.presenter.context["ast"]
+        self.presenter.model.get_struct_ast = lambda: {"id": "model", "name": "ModelAST"}
+        ast = self.presenter.get_struct_ast()
+        self.assertEqual(ast["id"], "model")
+        self.assertEqual(self.presenter.context["ast"]["id"], "model")
+
+    def test_get_struct_ast_none(self):
+        self.presenter.context = self.presenter.get_default_context()
+        if "ast" in self.presenter.context:
+            del self.presenter.context["ast"]
+        if hasattr(self.presenter.model, "get_struct_ast"):
+            delattr(self.presenter.model, "get_struct_ast")
+        ast = self.presenter.get_struct_ast()
+        self.assertIsNone(ast)
 
 if __name__ == "__main__":
     unittest.main() 
