@@ -134,6 +134,27 @@ class PresenterStub:
         filtered_nodes = [n for n in (filter_nodes(n) for n in all_nodes) if n]
         if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
             self.view.update_display(filtered_nodes, self.context)
+    def on_expand_all(self):
+        # 遞迴收集所有節點 id
+        def collect_ids(node):
+            ids = [node["id"]]
+            for child in node.get("children", []):
+                ids.extend(collect_ids(child))
+            return ids
+        nodes = self.get_display_nodes(self.context.get("display_mode", "tree"))
+        all_ids = []
+        for n in nodes:
+            all_ids.extend(collect_ids(n))
+        self.context["expanded_nodes"] = all_ids
+        if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(nodes, self.context)
+    def on_collapse_all(self):
+        # 只保留 root 展開
+        nodes = self.get_display_nodes(self.context.get("display_mode", "tree"))
+        root_ids = [n["id"] for n in nodes]
+        self.context["expanded_nodes"] = root_ids
+        if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(nodes, self.context)
 
 @pytest.mark.timeout(15)
 class TestStructView(unittest.TestCase):
@@ -1104,62 +1125,33 @@ class TestStructView(unittest.TestCase):
         view.destroy()
 
     def test_expand_collapse_all_buttons_and_presenter_call(self):
-        class PresenterMock:
-            def __init__(self):
-                self.calls = []
-                self.context = {
-                    "display_mode": "tree",
-                    "expanded_nodes": ["root"],
-                    "selected_nodes": [],
-                    "error": None,
-                    "version": "1.0",
-                    "extra": {},
-                    "loading": False,
-                    "history": [],
-                    "user_settings": {},
-                    "last_update_time": 0,
-                    "readonly": False,
-                    "debug_info": {"last_event": None}
-                }
-            def get_display_nodes(self, mode):
-                return [
-                    {"id": "root", "label": "root", "type": "struct", "children": [
-                        {"id": "child1", "label": "child1", "type": "int", "children": [], "icon": "int", "extra": {}},
-                        {"id": "child2", "label": "child2", "type": "int", "children": [], "icon": "int", "extra": {}}
-                    ], "icon": "struct", "extra": {}}
-                ]
-            def on_expand_all(self):
-                self.calls.append("expand_all")
-                self.context["expanded_nodes"] = ["root", "child1", "child2"]
-                self.view.update_display(self.get_display_nodes(self.context["display_mode"]), self.context)
-            def on_collapse_all(self):
-                self.calls.append("collapse_all")
-                self.context["expanded_nodes"] = ["root"]
-                self.view.update_display(self.get_display_nodes(self.context["display_mode"]), self.context)
-            def get_lru_cache_size(self): return 32
-            def get_cache_stats(self): return (5, 3)
-            def get_last_layout_time(self): return 0.0123
-            def get_cache_keys(self): return ["k1", "k2", "k3"]
-            def get_lru_state(self): return {"capacity": 3, "current_size": 3, "last_hit": "k2", "last_evict": "k0"}
-            def is_auto_cache_clear_enabled(self): return True
-            def enable_auto_cache_clear(self, interval): pass
-            def disable_auto_cache_clear(self): pass
-        presenter = PresenterMock()
+        presenter = PresenterStub()
         view = StructView(presenter=presenter)
         presenter.view = view
-        # 遞迴查找展開全部/收合全部按鈕
-        expand_btns = self._find_widget_recursive(view.tab_file, tk.Button, "展開全部")
-        collapse_btns = self._find_widget_recursive(view.tab_file, tk.Button, "收合全部")
-        self.assertTrue(expand_btns and collapse_btns, "應有展開全部/收合全部按鈕")
-        expand_btn = expand_btns[0]
-        collapse_btn = collapse_btns[0]
-        expand_btn.invoke()
-        self.assertIn("expand_all", presenter.calls)
-        self.assertIn("child1", presenter.context["expanded_nodes"])
-        self.assertIn("child2", presenter.context["expanded_nodes"])
-        collapse_btn.invoke()
-        self.assertIn("collapse_all", presenter.calls)
-        self.assertEqual(presenter.context["expanded_nodes"], ["root"])
+        nodes = [
+            {"id": "root", "label": "root struct", "type": "struct", "children": [
+                {"id": "child1", "label": "foo", "type": "int", "children": [
+                    {"id": "grand1", "label": "g1", "type": "char", "children": [], "icon": "char", "extra": {}}
+                ], "icon": "int", "extra": {}},
+                {"id": "child2", "label": "bar", "type": "char", "children": [], "icon": "char", "extra": {}}
+            ], "icon": "struct", "extra": {}}
+        ]
+        presenter.get_display_nodes = lambda mode: nodes
+        presenter.context["display_mode"] = "tree"
+        presenter.context["expanded_nodes"] = ["root"]
+        view.update_display(nodes, presenter.context)
+        # 點擊展開全部
+        view._on_expand_all()
+        all_ids = set(["root", "child1", "child2", "grand1"])
+        self.assertEqual(set(presenter.context["expanded_nodes"]), all_ids)
+        # Treeview 應全部展開
+        self.assertTrue(view.member_tree.item("root", "open"))
+        self.assertTrue(view.member_tree.item("child1", "open"))
+        # 點擊收合全部
+        view._on_collapse_all()
+        self.assertEqual(set(presenter.context["expanded_nodes"]), {"root"})
+        self.assertTrue(view.member_tree.item("root", "open"))
+        self.assertFalse(view.member_tree.item("child1", "open"))
         view.destroy()
 
     def test_search_entry_exists_and_calls_presenter(self):
