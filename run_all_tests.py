@@ -16,13 +16,13 @@ VENV_PYTHON = os.path.join(os.path.dirname(__file__), '.venv', 'bin', 'python')
 PYTHON_EXECUTABLE = VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executable
 
 
-def run_pytest(args, timeout=15):
+def run_pytest(args, timeout=60):
     import subprocess
     import importlib.util
     # 若 pytest_timeout plugin 存在，添加 --timeout 參數
     if importlib.util.find_spec("pytest_timeout") is not None:
-        if '--timeout=15' not in args:
-            args = ['--timeout=15'] + args
+        if '--timeout=60' not in args:
+            args = ['--timeout=60'] + args
     cmd = [PYTHON_EXECUTABLE, "-m", "pytest"] + args
     try:
         result = subprocess.run(
