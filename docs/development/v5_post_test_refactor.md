@@ -327,9 +327,27 @@ pytest --maxfail=10 --cov=src tests/
 ### 7.7 已完成/待辦 checklist
 - [x] struct/AST/layout 測試 XML 驅動化
 - [x] 設計手動 struct/bitfield 及 .h 匯出驗證 XML schema（如上）
-- [ ] 手動 struct/bitfield 測試資料驅動化（搬移 hardcode 測試）
-- [ ] 匯出 .h 驗證資料驅動化（搬移 hardcode 測試）
+- [ ] 手動 struct/bitfield 測試資料驅動化（**部分 hardcode 測試尚未搬移**，如 test_manual_struct_byte_bit_size_layout、test_anonymous_bitfield_layout、test_export_manual_struct_to_h 等，建議逐步搬移到 XML 驅動）
+- [ ] 匯出 .h 驗證資料驅動化（**部分 hardcode 測試尚未搬移**，如 test_export_manual_struct_to_h、test_export_manual_struct_to_h_with_custom_name，建議逐步搬移到 XML 驅動）
 - [x] 文件同步規劃與說明
+
+#### 7.7.1 盤點現有 hardcode 測試
+- `tests/model/test_struct_model.py` 內 hardcode manual struct/bitfield/.h 匯出相關測試：
+    - test_manual_struct_byte_bit_size_layout
+    - test_anonymous_bitfield_layout
+    - test_export_manual_struct_to_h
+    - test_export_manual_struct_to_h_with_custom_name
+    - test_parse_manual_hex_data_uses_file_parsing_logic
+    - test_parse_manual_hex_data_preserves_original_layout
+- 這些測試多數可搬移到 XML 驅動（如 test_struct_model_manual_config.xml、test_struct_model_export_h_config.xml），僅保留極端例外/初始化等 hardcode 測試。
+
+#### 7.7.2 盤點現有 XML 驅動測試
+- `tests/data_driven/` 目錄下 loader 已支援：
+    - struct/AST/layout 驗證
+    - manual struct/bitfield 驗證
+    - .h 匯出驗證
+    - 錯誤情境驗證
+- 但部分 hardcode 測試尚未完全搬移，建議依 checklist 持續精煉。
 
 ### 7.8 Loader 實作建議
 - 針對上述 XML schema，建議新增 loader 解析 <members>、<total_size>、<expected_layout>、<expected_h_contains>、<expect_error> 等欄位。
