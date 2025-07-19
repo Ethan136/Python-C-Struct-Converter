@@ -83,5 +83,53 @@ class ContractPresenterAPITest(unittest.TestCase):
         self.presenter.push_context()
         self.assertIsNone(self.presenter.context["error"])
 
+    def test_context_version_backward_compatibility(self):
+        # 舊版 context 不含新欄位，Presenter 應能兼容
+        ctx = self.presenter.get_default_context()
+        ctx.pop("pending_action", None)
+        ctx["version"] = "1.0"
+        self.presenter.context = ctx
+        try:
+            self.presenter.push_context()
+        except Exception as e:
+            self.fail(f"push_context failed on old version context: {e}")
+
+    def test_context_missing_required_field(self):
+        # 缺少 required 欄位應拋出 schema 驗證錯誤
+        ctx = self.presenter.get_default_context()
+        ctx.pop("debug_info", None)
+        self.presenter.context = ctx
+        with self.assertRaises(Exception):
+            self.presenter.push_context()
+
+    def test_context_field_type_error(self):
+        # 欄位型別錯誤應拋出 schema 驗證錯誤
+        ctx = self.presenter.get_default_context()
+        ctx["expanded_nodes"] = "not_a_list"
+        self.presenter.context = ctx
+        with self.assertRaises(Exception):
+            self.presenter.push_context()
+
+    def test_extreme_history_redo_stack(self):
+        # 超大 history/redo stack
+        ctx = self.presenter.get_default_context()
+        ctx["history"] = [ctx.copy() for _ in range(500)]
+        ctx["redo_history"] = [ctx.copy() for _ in range(500)]
+        self.presenter.context = ctx
+        try:
+            self.presenter.on_undo()
+            self.presenter.on_redo()
+        except Exception as e:
+            self.fail(f"undo/redo failed on large stack: {e}")
+
+    def test_context_reset_and_fallback(self):
+        # context reset/fallback 行為
+        self.presenter.context["selected_node"] = "n999"
+        self.presenter.reset_context()
+        ctx = self.presenter.context
+        self.assertEqual(ctx["display_mode"], "tree")
+        self.assertEqual(ctx["expanded_nodes"], ["root"])
+        self.assertIsNone(ctx["selected_node"])
+
 if __name__ == "__main__":
     unittest.main() 
