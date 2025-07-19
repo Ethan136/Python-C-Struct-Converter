@@ -404,3 +404,21 @@ class StructPresenter:
         self.context["debug_info"]["last_event_args"] = {"search": search_str}
         if self.view and hasattr(self.view, "update_display"):
             self.view.update_display(nodes, self.context)
+
+    def on_save_struct(self):
+        """模擬長時間儲存操作，流轉 pending_action 狀態，完成後自動清除。"""
+        import threading
+        self.context["pending_action"] = "saving"
+        self.context["debug_info"]["last_event"] = "on_save_struct"
+        self.context["debug_info"]["last_event_args"] = {}
+        if self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(self.model.get_display_nodes(self.context.get("display_mode", "tree")), self.context)
+        # 模擬 1.5 秒後完成儲存
+        def finish_save():
+            self.context["pending_action"] = None
+            self.context["debug_info"]["last_event"] = "save_struct_done"
+            if self.view and hasattr(self.view, "update_display"):
+                self.view.update_display(self.model.get_display_nodes(self.context.get("display_mode", "tree")), self.context)
+        t = threading.Timer(1.5, finish_save)
+        t.daemon = True
+        t.start()

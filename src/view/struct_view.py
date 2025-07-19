@@ -951,11 +951,28 @@ class StructView(tk.Tk):
         if context.get("error"):
             from tkinter import messagebox
             messagebox.showerror("錯誤", str(context["error"]))
-        # loading/readonly 狀態禁用 Treeview
-        # if context.get("loading") or context.get("readonly"):
-        #     self.member_tree.config(state="disabled")
-        # else:
-        #     self.member_tree.config(state="normal")
+        # pending_action 狀態顯示進度與禁用互動
+        pending = context.get("pending_action")
+        if pending:
+            # 顯示進度提示
+            if not hasattr(self, "pending_label"):
+                self.pending_label = tk.Label(self, text="", fg="blue", font=("Arial", 14, "bold"))
+                self.pending_label.pack(side="top", fill="x", pady=4)
+            self.pending_label.config(text=f"進行中：{pending}... 請稍候")
+            # 禁用主要互動元件
+            if hasattr(self, "parse_button"): self.parse_button.config(state="disabled")
+            if hasattr(self, "expand_all_btn"): self.expand_all_btn.config(state="disabled")
+            if hasattr(self, "collapse_all_btn"): self.collapse_all_btn.config(state="disabled")
+            if hasattr(self, "member_tree"): self.member_tree.unbind('<<TreeviewOpen>>'); self.member_tree.unbind('<<TreeviewClose>>'); self.member_tree.unbind('<<TreeviewSelect>>')
+        else:
+            # 移除進度提示
+            if hasattr(self, "pending_label") and self.pending_label.winfo_exists():
+                self.pending_label.config(text="")
+            # 恢復互動
+            if hasattr(self, "parse_button"): self.parse_button.config(state="normal")
+            if hasattr(self, "expand_all_btn"): self.expand_all_btn.config(state="normal")
+            if hasattr(self, "collapse_all_btn"): self.collapse_all_btn.config(state="normal")
+            if hasattr(self, "member_tree"): self._bind_member_tree_events()
         # 顯示 debug_info
         debug_info = context.get("debug_info", {})
         debug_lines = []

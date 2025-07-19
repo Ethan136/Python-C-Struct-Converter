@@ -1239,5 +1239,34 @@ class TestStructView(unittest.TestCase):
         self.assertIn("root", presenter.context["highlighted_nodes"])
         view.destroy()
 
+    def test_pending_action_disables_ui_and_shows_progress(self):
+        presenter = PresenterStub()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        # 模擬有節點
+        nodes = presenter.get_display_nodes("tree")
+        presenter.context["display_mode"] = "tree"
+        presenter.context["pending_action"] = None
+        # 先正常顯示
+        view.update_display(nodes, presenter.context)
+        self.assertFalse(hasattr(view, "pending_label") and view.pending_label.cget("text"))
+        self.assertEqual(view.parse_button["state"], "normal")
+        # 進入 pending_action 狀態
+        presenter.context["pending_action"] = "saving"
+        view.update_display(nodes, presenter.context)
+        self.assertIn("saving", view.pending_label.cget("text"))
+        self.assertEqual(view.parse_button["state"], "disabled")
+        self.assertEqual(view.expand_all_btn["state"], "disabled")
+        self.assertEqual(view.collapse_all_btn["state"], "disabled")
+        # Treeview 事件應被 unbind（測試 _bind_member_tree_events 會恢復）
+        # 結束 pending_action
+        presenter.context["pending_action"] = None
+        view.update_display(nodes, presenter.context)
+        self.assertFalse(view.pending_label.cget("text"))
+        self.assertEqual(view.parse_button["state"], "normal")
+        self.assertEqual(view.expand_all_btn["state"], "normal")
+        self.assertEqual(view.collapse_all_btn["state"], "normal")
+        view.destroy()
+
 if __name__ == "__main__":
     unittest.main()
