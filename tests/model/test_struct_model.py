@@ -22,6 +22,7 @@ from src.model.struct_model import (
 )
 from tests.data_driven.xml_struct_model_loader import load_struct_model_tests
 from tests.data_driven.xml_struct_parse_definition_loader import load_struct_parse_definition_tests
+from tests.data_driven.xml_struct_model_manual_loader import load_struct_model_manual_tests
 
 
 class TestParseStructDefinition(unittest.TestCase):
@@ -522,6 +523,28 @@ class TestStructModelXMLDriven(unittest.TestCase):
                                 self.assertEqual(item['type'], val)
                             elif key in ('offset', 'size', 'bit_offset', 'bit_size'):
                                 self.assertEqual(item[key], val)
+
+
+class TestStructModelManualXMLDriven(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_struct_model_manual_config.xml')
+        cls.cases = load_struct_model_manual_tests(config_path)
+
+    def test_manual_layout_cases(self):
+        model = StructModel()
+        for case in self.cases:
+            with self.subTest(name=case['name']):
+                members = case['members']
+                total_size = case['total_size']
+                layout = model.calculate_manual_layout(members, total_size)
+                for i, exp in enumerate(case['expected_layout']):
+                    self.assertEqual(layout[i]["name"], exp["name"])
+                    self.assertEqual(layout[i]["type"], exp["type"])
+                    self.assertEqual(layout[i]["offset"], exp["offset"])
+                    self.assertEqual(layout[i]["size"], exp["size"])
+                    self.assertEqual(layout[i].get("bit_offset", 0), exp.get("bit_offset", 0))
+                    self.assertEqual(layout[i].get("bit_size", 0), exp.get("bit_size", 0))
 
 
 class TestStructModelNDArray(unittest.TestCase):
