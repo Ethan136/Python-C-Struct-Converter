@@ -82,6 +82,9 @@ def create_scrollable_tab_frame(parent):
 class StructView(tk.Tk):
     def __init__(self, presenter=None):
         super().__init__()
+        self._member_table_refresh_count = 0
+        self._hex_grid_refresh_count = 0
+        self._treeview_refresh_count = 0
         self.presenter = presenter
         self.title("C Struct GUI")
         self.geometry("1200x800")
@@ -94,6 +97,13 @@ class StructView(tk.Tk):
             self._bind_member_tree_events()
         # 新增 presenter/view 綁定與初始顯示
         self._init_presenter_view_binding()
+
+    def get_member_table_refresh_count(self):
+        return self._member_table_refresh_count
+    def get_hex_grid_refresh_count(self):
+        return self._hex_grid_refresh_count
+    def get_treeview_refresh_count(self):
+        return self._treeview_refresh_count
 
     def _create_tab_control(self):
         self.tab_control = ttk.Notebook(self)
@@ -338,29 +348,19 @@ class StructView(tk.Tk):
 
         name_var = tk.StringVar(value=member.get("name", ""))
         name_entry = tk.Entry(self.member_frame, textvariable=name_var, width=10)
-        name_entry.grid(row=row, column=1, padx=2, pady=1)
-
         type_var = tk.StringVar(value=member.get("type", ""))
         type_options = self._get_type_options(member.get("bit_size", 0) > 0)
         type_menu = tk.OptionMenu(self.member_frame, type_var, *type_options)
-        type_menu.grid(row=row, column=2, padx=2, pady=1)
-
         bit_var = tk.IntVar(value=member.get("bit_size", 0))
         bit_entry = tk.Entry(self.member_frame, textvariable=bit_var, width=6)
-        bit_entry.grid(row=row, column=3, padx=2, pady=1)
-
         size_val = name2size.get(member.get("name", ""), "-")
         size_label = tk.Label(self.member_frame, text=size_val)
-        size_label.grid(row=row, column=4, padx=2, pady=1)
         size_label.is_size_label = True
-
         op_frame = tk.Frame(self.member_frame)
-        op_frame.grid(row=row, column=5, padx=2, pady=1)
         tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i), width=4).pack(side=tk.LEFT, padx=1)
         tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i), width=4).pack(side=tk.LEFT, padx=1)
         tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i), width=4).pack(side=tk.LEFT, padx=1)
         tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4).pack(side=tk.LEFT, padx=1)
-
         name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
         type_var.trace_add("write", lambda *_, i=idx, v=type_var: self._update_member_type(i, v))
         bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
@@ -373,19 +373,85 @@ class StructView(tk.Tk):
         self.member_entries.append((name_entry, type_menu, bit_entry, size_label, op_frame))
 
     def _render_member_table(self):
-        # 清空現有表格
-        for widget in self.member_frame.winfo_children():
-            widget.destroy()
-        self.member_entries = []  # 清空 row widget 記錄
-        # Member 編輯表格
-        if self.members:
-            self._build_member_header(True)
-            name2size = self._compute_member_layout(True)
-            for idx, m in enumerate(self.members):
-                self._render_member_row(idx, m, True, name2size)
-        else:
+        self._member_table_refresh_count += 1
+        members = self.members
+        # 初始化 row widget cache
+        if not hasattr(self, "_member_row_widgets") or self._member_row_widgets is None:
+            self._member_row_widgets = {}
+        row_widgets = self._member_row_widgets
+        # 若 members 為空，清空所有 row widget
+        if not members:
+            for widgets in row_widgets.values():
+                for w in widgets:
+                    w.destroy()
+            row_widgets.clear()
+            for widget in self.member_frame.winfo_children():
+                widget.destroy()
             tk.Label(self.member_frame, text="無成員資料", fg="gray").grid(row=0, column=0, columnspan=6, pady=10)
-        # 更新下方標準 struct layout treeview
+            self.member_entries = []
+            self._update_manual_layout_tree()
+            return
+        # 若 header 不存在或被清空，重建 header
+        if not hasattr(self, "_member_header_widgets") or self._member_header_widgets is None or not self._member_header_widgets:
+            for widget in self.member_frame.winfo_children():
+                widget.destroy()
+            self._member_header_widgets = [
+                tk.Label(self.member_frame, text="#", font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text="成員名稱", font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text="型別", font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text="bit size", font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text="size", font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text="操作", font=("Arial", 9, "bold")),
+            ]
+            for col, w in enumerate(self._member_header_widgets):
+                w.grid(row=0, column=col, padx=2, pady=2)
+        name2size = self._compute_member_layout(True)
+        # 刪除多餘 row widget
+        for idx in list(row_widgets.keys()):
+            if idx >= len(members):
+                for w in row_widgets[idx]:
+                    w.destroy()
+                del row_widgets[idx]
+        # 更新/新增 row widget
+        self.member_entries = []
+        for idx, m in enumerate(members):
+            if idx in row_widgets:
+                widgets = row_widgets[idx]
+                # 更新值
+                widgets[0].config(text=str(idx + 1))  # row number
+                widgets[1].delete(0, "end"); widgets[1].insert(0, m.get("name", ""))
+                widgets[2].setvar(widgets[2].cget("textvariable"), m.get("type", ""))
+                widgets[3].delete(0, "end"); widgets[3].insert(0, m.get("bit_size", 0))
+                widgets[4].config(text=name2size.get(m.get("name", ""), "-"))
+                # 操作按鈕無需更新
+            else:
+                # 新增 row widget
+                name_var = tk.StringVar(value=m.get("name", ""))
+                name_entry = tk.Entry(self.member_frame, textvariable=name_var, width=10)
+                type_var = tk.StringVar(value=m.get("type", ""))
+                type_options = self._get_type_options(m.get("bit_size", 0) > 0)
+                type_menu = tk.OptionMenu(self.member_frame, type_var, *type_options)
+                bit_var = tk.IntVar(value=m.get("bit_size", 0))
+                bit_entry = tk.Entry(self.member_frame, textvariable=bit_var, width=6)
+                size_val = name2size.get(m.get("name", ""), "-")
+                size_label = tk.Label(self.member_frame, text=size_val)
+                size_label.is_size_label = True
+                op_frame = tk.Frame(self.member_frame)
+                tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i), width=4).pack(side=tk.LEFT, padx=1)
+                tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i), width=4).pack(side=tk.LEFT, padx=1)
+                tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i), width=4).pack(side=tk.LEFT, padx=1)
+                tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4).pack(side=tk.LEFT, padx=1)
+                name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
+                type_var.trace_add("write", lambda *_, i=idx, v=type_var: self._update_member_type(i, v))
+                bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
+                widgets = [
+                    tk.Label(self.member_frame, text=str(idx + 1)),
+                    name_entry, type_menu, bit_entry, size_label, op_frame
+                ]
+                for col, w in enumerate(widgets):
+                    w.grid(row=idx + 1, column=col, padx=2, pady=1)
+                row_widgets[idx] = widgets
+            self.member_entries.append(tuple(row_widgets[idx][1:6]))
         self._update_manual_layout_tree()
 
     def _update_manual_layout_tree(self):
@@ -692,29 +758,47 @@ class StructView(tk.Tk):
         return int(self.manual_unit_size_var.get().split()[0])
 
     def _build_hex_grid(self, frame, entry_list, total_size, unit_size):
-        """建立十六進位輸入格的共用函式"""
-        for widget in frame.winfo_children():
-            widget.destroy()
-        entry_list.clear()
+        self._hex_grid_refresh_count += 1
+        # 增量更新 Entry widget
+        if not hasattr(frame, "_hex_entry_widgets") or frame._hex_entry_widgets is None:
+            frame._hex_entry_widgets = []
+        widgets = frame._hex_entry_widgets
+        # 計算應有的 box 數
         if total_size == 0:
+            for w, _ in widgets:
+                w.destroy()
+            widgets.clear()
+            entry_list.clear()
             return
-
         chars_per_box = unit_size * 2
         num_boxes = (total_size + unit_size - 1) // unit_size
         cols = max(1, 16 // unit_size)
-
+        # 刪除多餘 Entry
+        while len(widgets) > num_boxes:
+            w, _ = widgets.pop()
+            w.destroy()
+        # 新增缺少的 Entry
+        while len(widgets) < num_boxes:
+            entry = tk.Entry(frame, font=("Courier", 10))
+            widgets.append((entry, chars_per_box))
+        # 更新/配置 Entry
         for i in range(num_boxes):
             if i == num_boxes - 1:
                 remain_bytes = total_size - (unit_size * (num_boxes - 1))
                 box_chars = remain_bytes * 2 if remain_bytes > 0 else chars_per_box
             else:
                 box_chars = chars_per_box
-
-            entry = tk.Entry(frame, width=box_chars + 2, font=("Courier", 10))
+            entry, _ = widgets[i]
+            entry.config(width=box_chars + 2)
             entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
-            entry_list.append((entry, box_chars))
+            # 綁定事件
             entry.bind("<KeyPress>", lambda e, length=box_chars: self._validate_input(e, length))
             entry.bind("<Key>", lambda e, length=box_chars: self._limit_input_length(e, length))
+            widgets[i] = (entry, box_chars)
+        # 更新 entry_list
+        entry_list.clear()
+        entry_list.extend(widgets[:num_boxes])
+        frame._hex_entry_widgets = widgets[:num_boxes]
 
     def rebuild_hex_grid(self, total_size, unit_size):
         self._build_hex_grid(self.hex_grid_frame, self.hex_entries, total_size, unit_size)
@@ -1050,6 +1134,7 @@ class StructView(tk.Tk):
             self.presenter.on_node_select(list(selected))
 
     def show_treeview_nodes(self, nodes, context, icon_map=None):
+        self._treeview_refresh_count += 1
         # 依據 user_settings 設定 displaycolumns
         all_columns = tuple(c["name"] for c in MEMBER_TREEVIEW_COLUMNS)
         columns = all_columns
