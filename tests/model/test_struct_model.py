@@ -23,7 +23,7 @@ from src.model.struct_model import (
 from tests.data_driven.xml_struct_model_loader import load_struct_model_tests
 from tests.data_driven.xml_struct_parse_definition_loader import load_struct_parse_definition_tests
 from src.model.struct_parser import parse_struct_definition_ast
-from src.model.struct_model import ast_to_dict
+from src.model.struct_model import ast_to_dict, flatten_ast_nodes
 
 
 class TestParseStructDefinition(unittest.TestCase):
@@ -572,6 +572,49 @@ class TestStructModelNDArray(unittest.TestCase):
         self.assertEqual(len(actual), 4, "巢狀 struct 多維陣列應展開為 4 個元素 (2x2)")
         for idx, exp in enumerate(expected):
             self.assertEqual(actual[idx]["name"], exp["name"], f"第 {idx} 個元素名稱錯誤")
+
+
+class TestFlattenASTNodes(unittest.TestCase):
+    def test_flatten_ast_nodes_simple(self):
+        # 單層 AST
+        ast = {
+            "id": "root",
+            "name": "root",
+            "type": "struct",
+            "children": [
+                {"id": "a", "name": "a", "type": "int", "children": []},
+                {"id": "b", "name": "b", "type": "char", "children": []}
+            ]
+        }
+        flat = flatten_ast_nodes(ast)
+        self.assertEqual(len(flat), 3)
+        self.assertEqual(flat[0]["id"], "root")
+        self.assertEqual(flat[1]["id"], "a")
+        self.assertEqual(flat[2]["id"], "b")
+
+    def test_flatten_ast_nodes_nested(self):
+        # 巢狀 AST
+        ast = {
+            "id": "root",
+            "name": "root",
+            "type": "struct",
+            "children": [
+                {
+                    "id": "nested",
+                    "name": "nested",
+                    "type": "struct",
+                    "children": [
+                        {"id": "x", "name": "x", "type": "int", "children": []},
+                        {"id": "y", "name": "y", "type": "char", "children": []}
+                    ]
+                },
+                {"id": "tail", "name": "tail", "type": "char", "children": []}
+            ]
+        }
+        flat = flatten_ast_nodes(ast)
+        ids = [n["id"] for n in flat]
+        self.assertEqual(ids, ["root", "nested", "x", "y", "tail"])
+        self.assertEqual(len(flat), 5)
 
 
 class TestStructModelASTAPI(unittest.TestCase):
