@@ -62,7 +62,6 @@ jobs:
         with:
           name: CppStructParser-macOS
           path: dist
-      - uses: actions/checkout@v4
       - name: List dist directory
         run: ls -lh ./dist/
       - name: Create Release
