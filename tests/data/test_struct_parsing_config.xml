@@ -235,6 +235,22 @@
         </expected_members>
     </test_case>
 
+    <test_case name="anonymous_bitfield_struct" type="parse">
+        <struct_definition><![CDATA[
+            struct AnonBitfield {
+                int a : 3;
+                int : 2;
+                int b : 5;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>AnonBitfield</expected_struct_name>
+        <expected_members>
+            <member type="int" name="a" is_bitfield="true" bit_size="3" />
+            <member type="int" name="" is_bitfield="true" bit_size="2" />
+            <member type="int" name="b" is_bitfield="true" bit_size="5" />
+        </expected_members>
+    </test_case>
+
     <!-- Layout calculation tests -->
     <test_case name="simple_struct_no_padding" type="layout">
         <struct_definition><![CDATA[

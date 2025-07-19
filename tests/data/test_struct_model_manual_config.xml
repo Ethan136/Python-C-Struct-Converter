@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manual_struct_tests>
+    <test_case name="bitfield_layout">
+        <members>
+            <member name="a" type="unsigned int" bit_size="3"/>
+            <member name="b" type="unsigned int" bit_size="5"/>
+            <member name="c" type="unsigned int" bit_size="8"/>
+        </members>
+        <total_size>4</total_size>
+        <expected_layout>
+            <item name="a" type="unsigned int" offset="0" size="4" bit_offset="0" bit_size="3"/>
+            <item name="b" type="unsigned int" offset="0" size="4" bit_offset="3" bit_size="5"/>
+            <item name="c" type="unsigned int" offset="0" size="4" bit_offset="8" bit_size="8"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="manual_struct_byte_bit_size">
+        <members>
+            <member name="a" type="char" bit_size="8"/>
+            <member name="b" type="unsigned int" bit_size="12"/>
+            <member name="c" type="short" bit_size="8"/>
+            <member name="d" type="unsigned int" bit_size="4"/>
+        </members>
+        <total_size>16</total_size>
+        <expected_layout>
+            <item name="a" type="char" offset="0" size="1" bit_size="8"/>
+            <item name="b" type="unsigned int" offset="4" bit_offset="0" bit_size="12"/>
+            <item name="c" type="short" offset="8" size="2" bit_size="8"/>
+            <item name="(padding)" type="padding" offset="10" size="2" bit_size="16"/>
+            <item name="d" type="unsigned int" offset="12" bit_offset="0" bit_size="4"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="anonymous_bitfield">
+        <members>
+            <member name="a" type="int" bit_size="3"/>
+            <member name="" type="int" bit_size="2"/>
+            <member name="b" type="int" bit_size="5"/>
+        </members>
+        <total_size>4</total_size>
+        <expected_layout>
+            <item name="a" type="int" offset="0" size="4" bit_offset="0" bit_size="3"/>
+            <item name="" type="int" offset="0" size="4" bit_offset="3" bit_size="2"/>
+            <item name="b" type="int" offset="0" size="4" bit_offset="5" bit_size="5"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="anonymous_bitfield_layout">
+        <members>
+            <member type="int" name="a" bit_size="3"/>
+            <member type="int" name="" bit_size="2"/>
+            <member type="int" name="b" bit_size="5"/>
+        </members>
+        <total_size>4</total_size>
+        <expected_layout>
+            <item name="a" type="int" offset="0" size="4" bit_offset="0" bit_size="3"/>
+            <item name="" type="int" offset="0" size="4" bit_offset="3" bit_size="2"/>
+            <item name="b" type="int" offset="0" size="4" bit_offset="5" bit_size="5"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="manual_struct_error">
+        <members>
+            <member name="a" type="char" bit_size="-1"/>
+            <member name="b" type="short" bit_size="0"/>
+        </members>
+        <total_size>10</total_size>
+        <expect_error>bit_size 需為 0 或正整數</expect_error>
+    </test_case>
+    <test_case name="duplicate_member_name">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+            <member name="a" type="char" bit_size="0"/>
+        </members>
+        <total_size>8</total_size>
+        <expect_error>成員名稱 'a' 重複</expect_error>
+    </test_case>
+    <test_case name="invalid_bit_size">
+        <members>
+            <member name="a" type="int" bit_size="-1"/>
+        </members>
+        <total_size>4</total_size>
+        <expect_error>bit_size 需為 0 或正整數</expect_error>
+    </test_case>
+    <test_case name="invalid_total_size">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+        </members>
+        <total_size>-1</total_size>
+        <expect_error>結構體大小需為正整數</expect_error>
+    </test_case>
+    <test_case name="padding_and_final_padding">
+        <members>
+            <member name="a" type="char" bit_size="8"/>
+            <member name="b" type="int" bit_size="32"/>
+        </members>
+        <total_size>8</total_size>
+        <expected_layout>
+            <item name="a" type="char" offset="0" size="1" bit_size="8"/>
+            <item name="(padding)" type="padding" offset="1" size="3"/>
+            <item name="b" type="int" offset="4" size="4" bit_size="32"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="empty_struct">
+        <members></members>
+        <total_size>0</total_size>
+        <expected_layout></expected_layout>
+    </test_case>
+    <test_case name="short_hex_struct">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+            <member name="b" type="int" bit_size="0"/>
+        </members>
+        <total_size>8</total_size>
+        <expected_layout>
+            <item name="a" type="int" offset="0" size="4"/>
+            <item name="b" type="int" offset="4" size="4"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="long_hex_struct">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+            <member name="b" type="int" bit_size="0"/>
+        </members>
+        <total_size>8</total_size>
+        <expected_layout>
+            <item name="a" type="int" offset="0" size="4"/>
+            <item name="b" type="int" offset="4" size="4"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="manual_struct_byte_bit_size_layout">
+        <members>
+            <member name="a" type="char" bit_size="0"/>
+            <member name="b" type="unsigned int" bit_size="12"/>
+            <member name="c" type="short" bit_size="0"/>
+            <member name="d" type="unsigned int" bit_size="4"/>
+        </members>
+        <total_size>16</total_size>
+        <expected_layout>
+            <item name="a" type="char" offset="0" size="1"/>
+            <item name="b" type="unsigned int" offset="4" bit_offset="0" bit_size="12"/>
+            <item name="c" type="short" offset="8" size="2"/>
+            <item name="d" type="unsigned int" offset="12" bit_offset="0" bit_size="4"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="parse_manual_hex_data_uses_file_parsing_logic">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+            <member name="b" type="char" bit_size="0"/>
+        </members>
+        <total_size>5</total_size>
+        <input_data>
+            <hex>0403020141</hex>
+        </input_data>
+        <expected_results>
+            <member name="a" value="16909060" hex_raw="04030201"/>
+            <member name="b" value="65" hex_raw="41"/>
+        </expected_results>
+    </test_case>
+    <test_case name="parse_manual_hex_data_preserves_original_layout">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+        </members>
+        <total_size>4</total_size>
+        <input_data>
+            <hex>01000000</hex>
+        </input_data>
+        <expected_results>
+            <member name="a" value="1" hex_raw="01000000"/>
+        </expected_results>
+    </test_case>
+</manual_struct_tests> 

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manual_struct_error_tests>
+    <test_case name="duplicate_member_name">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+            <member name="a" type="char" bit_size="0"/>
+        </members>
+        <total_size>8</total_size>
+        <expect_error>成員名稱 'a' 重複</expect_error>
+    </test_case>
+    <test_case name="invalid_bit_size">
+        <members>
+            <member name="a" type="int" bit_size="-1"/>
+        </members>
+        <total_size>4</total_size>
+        <expect_error>bit_size 需為 0 或正整數</expect_error>
+    </test_case>
+    <test_case name="invalid_total_size">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+        </members>
+        <total_size>-1</total_size>
+        <expect_error>結構體大小需為正整數</expect_error>
+    </test_case>
+</manual_struct_error_tests> 
