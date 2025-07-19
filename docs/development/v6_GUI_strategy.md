@@ -17,6 +17,21 @@
 - 主線僅接受單一大步驟的合併，減少衝突。
 - 新舊顯示機制並存，切換框架可隨時回退。
 
+## 3.1 平行開發前事前準備（詳見 v6_parallel_dev_checklist.md）
+
+在進行 View (V) / Presenter (P) 平行開發前，必須完成以下事前準備，確保協作順暢：
+
+- Model 層 AST/資料結構已支援巢狀/遞迴，格式與 V2P API 一致
+- AST/資料結構有單元測試與資料驅動測試覆蓋
+- V2P API/Context/事件流的 mock/stub/contract test 雙邊驗證通過
+- Worktree/分支/CI/CD 準備好，能平行開發與測試
+- 現有 GUI/Presenter/Model 已 decouple/refactor，無跨層耦合
+- 現有測試/快取/狀態管理機制已 review，方便新舊 GUI 共用
+- V2P API 文件/contract 已最終 review，欄位、事件、錯誤、權限、debug、版本一致
+- （如有）多語系/本地化/a11y 基礎設計已預留
+
+> 詳細 checklist 與進度追蹤，請見 [v6_parallel_dev_checklist.md](./v6_parallel_dev_checklist.md)
+
 ## 4. 注意事項與風險控管
 - 資料同步與狀態一致性：切換新舊顯示時，資料 context 必須同步。
 - 單元測試與 CI/CD：每個元件、切換機制、AST 轉換皆需測試覆蓋。
