@@ -25,6 +25,8 @@ from tests.data_driven.xml_struct_parse_definition_loader import load_struct_par
 from tests.data_driven.xml_struct_model_manual_loader import load_struct_model_manual_tests
 from tests.data_driven.xml_struct_model_export_h_loader import load_struct_model_export_h_tests
 from tests.data_driven.xml_struct_model_manual_error_loader import load_struct_model_manual_error_tests
+from src.model.struct_parser import parse_struct_definition_ast
+from src.model.struct_model import ast_to_dict, flatten_ast_nodes
 
 
 class TestParseStructDefinition(unittest.TestCase):
@@ -636,6 +638,101 @@ class TestStructModelManualErrorXMLDriven(unittest.TestCase):
                 expect_error = case['expect_error']
                 errors = model.validate_manual_struct(members, total_size)
                 self.assertTrue(any(expect_error in err for err in errors), f"未找到預期錯誤: {expect_error}, 實際: {errors}")
+class TestFlattenASTNodes(unittest.TestCase):
+    def test_flatten_ast_nodes_simple(self):
+        # 單層 AST
+        ast = {
+            "id": "root",
+            "name": "root",
+            "type": "struct",
+            "children": [
+                {"id": "a", "name": "a", "type": "int", "children": []},
+                {"id": "b", "name": "b", "type": "char", "children": []}
+            ]
+        }
+        flat = flatten_ast_nodes(ast)
+        self.assertEqual(len(flat), 3)
+        self.assertEqual(flat[0]["id"], "root")
+        self.assertEqual(flat[1]["id"], "a")
+        self.assertEqual(flat[2]["id"], "b")
+
+    def test_flatten_ast_nodes_nested(self):
+        # 巢狀 AST
+        ast = {
+            "id": "root",
+            "name": "root",
+            "type": "struct",
+            "children": [
+                {
+                    "id": "nested",
+                    "name": "nested",
+                    "type": "struct",
+                    "children": [
+                        {"id": "x", "name": "x", "type": "int", "children": []},
+                        {"id": "y", "name": "y", "type": "char", "children": []}
+                    ]
+                },
+                {"id": "tail", "name": "tail", "type": "char", "children": []}
+            ]
+        }
+        flat = flatten_ast_nodes(ast)
+        ids = [n["id"] for n in flat]
+        self.assertEqual(ids, ["root", "nested", "x", "y", "tail"])
+        self.assertEqual(len(flat), 5)
+
+
+class TestStructModelASTAPI(unittest.TestCase):
+    def test_parse_struct_definition_ast_and_to_dict(self):
+        code = '''
+        struct V6Test {
+            int a;
+            struct Inner {
+                char b;
+                union {
+                    short c;
+                    float d;
+                } u;
+            } inner;
+            int arr[2][3];
+            unsigned int x : 3;
+            unsigned int   : 2;
+            unsigned int y : 5;
+        };
+        '''
+        ast = parse_struct_definition_ast(code)
+        ast_dict = ast_to_dict(ast)
+        self.assertEqual(ast_dict['name'], 'V6Test')
+        self.assertTrue(ast_dict['is_struct'])
+        self.assertTrue(any(child['name'] == 'inner' for child in ast_dict['children']))
+        inner = next(child for child in ast_dict['children'] if child['name'] == 'inner')
+        self.assertTrue(inner['is_struct'])
+        union = next(child for child in inner['children'] if child['is_union'])
+        self.assertEqual(len(union['children']), 2)
+        arr = next(child for child in ast_dict['children'] if child['name'] == 'arr')
+        self.assertEqual(arr['type'], 'int')
+        self.assertIn('children', arr)
+        x = next(child for child in ast_dict['children'] if child['name'] == 'x')
+        self.assertTrue(x['is_bitfield'])
+        y = next(child for child in ast_dict['children'] if child['name'] == 'y')
+        self.assertTrue(y['is_bitfield'])
+
+    def test_struct_model_get_struct_ast_and_display_nodes(self):
+        code = '''
+        struct Simple {
+            int a;
+            char b;
+        };
+        '''
+        model = StructModel()
+        model.struct_content = code
+        ast_dict = model.get_struct_ast()
+        self.assertEqual(ast_dict['name'], 'Simple')
+        nodes_tree = model.get_display_nodes('tree')
+        self.assertIsInstance(nodes_tree, list)
+        self.assertEqual(nodes_tree[0]['label'], 'Simple [struct]')
+        nodes_flat = model.get_display_nodes('flat')
+        self.assertTrue(any(n['label'] == 'a' for n in nodes_flat))
+        self.assertTrue(any(n['label'] == 'b' for n in nodes_flat))
 
 
 if __name__ == "__main__":

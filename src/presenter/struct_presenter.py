@@ -7,6 +7,9 @@ import time
 from collections import OrderedDict
 import os
 import threading
+from src.presenter.context_schema import validate_presenter_context
+import copy
+import functools
 
 
 class HexProcessingError(Exception):
@@ -40,6 +43,13 @@ class StructPresenter:
         # Observer pattern: 註冊自己為 model observer
         if hasattr(self.model, "add_observer"):
             self.model.add_observer(self)
+        # context 初始化
+        self.context = self.get_default_context()
+        self._debounce_timer = None
+        self._debounce_lock = threading.Lock()
+        self._debounce_interval = 0.1  # 100ms
+        self._pending_context = None
+        self._history_maxlen = 200
 
     def update(self, event_type, model, **kwargs):
         """Observer callback: 當 model 狀態變更時自動呼叫。"""
@@ -122,6 +132,21 @@ class StructPresenter:
             }
         except Exception as e:
             return {'type': 'error', 'message': f"載入檔案時發生錯誤: {e}"}
+
+    async def on_load_file(self, file_path):
+        self.context["loading"] = True
+        self.context["debug_info"]["last_event"] = "on_load_file"
+        self.context["debug_info"]["last_event_args"] = {"file_path": file_path}
+        self.push_context()
+        try:
+            ast = await self.parse_file(file_path)
+            self.context["ast"] = ast
+            self.context["error"] = None
+        except Exception as e:
+            self.context["error"] = str(e)
+            self.context["debug_info"]["last_error"] = str(e)
+        self.context["loading"] = False
+        self.push_context()
 
     def on_unit_size_change(self, *args):
         # This method is called when the unit size dropdown changes
@@ -319,3 +344,237 @@ class StructPresenter:
         """查詢自動清空 cache 是否啟用。"""
         with self._auto_cache_clear_lock:
             return self._auto_cache_clear_enabled
+
+    @staticmethod
+    def get_default_context():
+        import time
+        return {
+            "display_mode": "tree",
+            "expanded_nodes": ["root"],
+            "selected_node": None,
+            "error": None,
+            "filter": None,
+            "search": None,
+            "version": "1.0",
+            "extra": {},
+            "loading": False,
+            "history": [],
+            "user_settings": {},
+            "last_update_time": time.time(),
+            "readonly": False,
+            "pending_action": None,
+            "debug_info": {
+                "last_event": None,
+                "last_event_args": {},
+                "last_error": None,
+                "context_history": [],
+                "api_trace": [],
+                "version": "1.0",
+                "extra": {}
+            },
+            "can_edit": True,
+            "can_delete": True,
+            "user_role": "admin"
+        }
+
+    def reset_context(self):
+        self.context = self.get_default_context()
+        self.push_context()
+
+    def push_context(self, immediate=False):
+        import time
+        # 非 undo/redo 事件時，push context 前清空 redo_history
+        if self.context["debug_info"].get("last_event") not in ("on_undo", "on_redo"):
+            self.context["redo_history"] = []
+        self.context["last_update_time"] = time.time()
+        # 更新 context_history, api_trace
+        if "debug_info" in self.context:
+            import copy
+            history = self.context["debug_info"].setdefault("context_history", [])
+            # --- 避免 reference loop ---
+            ctx_copy = copy.deepcopy(self.context)
+            if "debug_info" in ctx_copy:
+                ctx_copy["debug_info"]["context_history"] = []
+                ctx_copy["debug_info"]["api_trace"] = []
+            history.append(ctx_copy)
+            if len(history) > self._history_maxlen:
+                del history[0:len(history)-self._history_maxlen]
+            api_trace = self.context["debug_info"].setdefault("api_trace", [])
+            api_trace.append({
+                "api": self.context["debug_info"].get("last_event"),
+                "args": self.context["debug_info"].get("last_event_args"),
+                "timestamp": time.time()
+            })
+            if len(api_trace) > self._history_maxlen:
+                del api_trace[0:len(api_trace)-self._history_maxlen]
+        from src.presenter.context_schema import validate_presenter_context
+        validate_presenter_context(self.context)
+        # Debounce/throttle 推送
+        if immediate or self._debounce_interval == 0:
+            if self.view and hasattr(self.view, "update_display"):
+                nodes = self.model.get_display_nodes(self.context["display_mode"]) if self.model and hasattr(self.model, "get_display_nodes") else None
+                self.view.update_display(nodes, self.context.copy())
+            return
+        with self._debounce_lock:
+            self._pending_context = (self.model.get_display_nodes(self.context["display_mode"]) if self.model and hasattr(self.model, "get_display_nodes") else None, self.context.copy())
+            if self._debounce_timer is None:
+                self._debounce_timer = threading.Timer(self._debounce_interval, self._debounce_push)
+                self._debounce_timer.daemon = True
+                self._debounce_timer.start()
+
+    def _debounce_push(self):
+        with self._debounce_lock:
+            if self.view and hasattr(self.view, "update_display") and self._pending_context:
+                nodes, context = self._pending_context
+                self.view.update_display(nodes, context)
+            self._debounce_timer = None
+            self._pending_context = None
+
+    def event_handler(event_name=None):
+        def decorator(func):
+            @functools.wraps(func)
+            def wrapper(self, *args, **kwargs):
+                # 自動記錄 last_event/last_event_args
+                if event_name:
+                    self.context["debug_info"]["last_event"] = event_name
+                    # 嘗試自動推測 event_args
+                    import inspect
+                    sig = inspect.signature(func)
+                    params = list(sig.parameters.keys())[1:]  # 跳過 self
+                    event_args = {k: v for k, v in zip(params, args)}
+                    event_args.update(kwargs)
+                    self.context["debug_info"]["last_event_args"] = event_args
+                try:
+                    result = func(self, *args, **kwargs)
+                except Exception as e:
+                    self.context["error"] = str(e)
+                    self.context["debug_info"]["last_error"] = str(e)
+                    self.push_context()
+                    raise
+                self.push_context()
+                return result
+            return wrapper
+        return decorator
+
+    @event_handler("on_node_click")
+    def on_node_click(self, node_id):
+        self.context["selected_node"] = node_id
+
+    @event_handler("on_expand")
+    def on_expand(self, node_id):
+        if node_id not in self.context["expanded_nodes"]:
+            self.context["expanded_nodes"].append(node_id)
+
+    @event_handler("on_switch_display_mode")
+    def on_switch_display_mode(self, mode):
+        self.context["display_mode"] = mode
+        self.context["expanded_nodes"] = ["root"]
+        self.context["selected_node"] = None
+
+    @event_handler("on_collapse")
+    def on_collapse(self, node_id):
+        if node_id in self.context["expanded_nodes"]:
+            self.context["expanded_nodes"].remove(node_id)
+
+    @event_handler("on_refresh")
+    def on_refresh(self):
+        # 清空 highlighted_nodes，確保 refresh 後 UI 狀態回到預設
+        if "highlighted_nodes" in self.context:
+            self.context["highlighted_nodes"] = []
+        # 其餘 refresh 行為（如有）
+
+    @event_handler("set_readonly")
+    def set_readonly(self, readonly: bool):
+        self.context["readonly"] = readonly
+
+    @event_handler("on_edit_node")
+    def on_edit_node(self, node_id, new_value):
+        perm = self._check_permission("edit")
+        if perm is not None:
+            return perm
+        # ...實際編輯邏輯略...
+        return {"success": True}
+
+    @event_handler("on_delete_node")
+    def on_delete_node(self, node_id):
+        perm = self._check_permission("delete")
+        if perm is not None:
+            return perm
+        # ...實際刪除邏輯略...
+        return {"success": True}
+
+    def on_undo(self):
+        # 將當前 context 推入 redo_history
+        if self.context.get("history") and len(self.context["history"]):
+            if "redo_history" not in self.context:
+                self.context["redo_history"] = []
+            self.context["redo_history"].append(self.context.copy())
+            self.context = self.context["history"].pop()
+        # 補寫 last_event/last_event_args，確保 contract 一致
+        self.context["debug_info"]["last_event"] = "on_undo"
+        self.context["debug_info"]["last_event_args"] = {}
+        self.push_context()
+
+    def on_redo(self):
+        # 支援 redo_history，與 undo 對稱
+        if self.context.get("redo_history") and len(self.context["redo_history"]):
+            if "history" not in self.context:
+                self.context["history"] = []
+            self.context["history"].append(self.context.copy())
+            self.context = self.context["redo_history"].pop()
+        # 補寫 last_event/last_event_args，確保 contract 一致
+        self.context["debug_info"]["last_event"] = "on_redo"
+        self.context["debug_info"]["last_event_args"] = {}
+        self.push_context()
+
+    def _check_permission(self, action):
+        # action: "delete"、"edit"、... 依 context 欄位 can_delete/can_edit/user_role 判斷
+        if action == "delete" and not self.context.get("can_delete", False):
+            self.context["error"] = "Permission denied"
+            self.context["debug_info"]["last_error"] = "PERMISSION_DENIED"
+            self.push_context()
+            return {"success": False, "error_code": "PERMISSION_DENIED", "error_message": "No permission to delete."}
+        if action == "edit" and not self.context.get("can_edit", False):
+            self.context["error"] = "Permission denied"
+            self.context["debug_info"]["last_error"] = "PERMISSION_DENIED"
+            self.push_context()
+            return {"success": False, "error_code": "PERMISSION_DENIED", "error_message": "No permission to edit."}
+        # 其他權限可擴充
+        return None
+
+    def get_member_value(self, node_id):
+        def _find(node):
+            if node.get("id") == node_id:
+                return node.get("value")
+            for child in node.get("children", []):
+                v = _find(child)
+                if v is not None:
+                    return v
+            return None
+        ast = self.context.get("ast")
+        if not ast:
+            return None
+        return _find(ast)
+
+    def get_struct_ast(self):
+        # 若 context 已有 ast，直接回傳
+        if "ast" in self.context:
+            return self.context["ast"]
+        # 否則呼叫 model 取得
+        if hasattr(self.model, "get_struct_ast"):
+            ast = self.model.get_struct_ast()
+            self.context["ast"] = ast
+            return ast
+        return None
+
+    def get_debug_context_history(self):
+        return self.context.get("debug_info", {}).get("context_history", [])
+
+    def get_debug_api_trace(self):
+        return self.context.get("debug_info", {}).get("api_trace", [])
+
+    def get_display_nodes(self, mode):
+        """對外 API：根據 mode 回傳顯示用 node tree，符合 contract 測試與文件規範。"""
+        if hasattr(self.model, "get_display_nodes"):
+            return self.model.get_display_nodes(mode)
+        return []

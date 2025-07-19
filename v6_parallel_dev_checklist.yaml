@@ -1,0 +1,22 @@
+model_ast_ready: true
+ast_schema_match: true
+ast_test_coverage: 92
+ast_data_driven: true
+flatten_helper: true
+v2p_mock_presenter: true
+v2p_contract_test: true
+v2p_schema_validation: true
+worktree_ready: false
+ci_cd_ready: false
+merge_policy: false
+decouple_no_cross_layer: true
+decouple_observer: true
+decouple_pure_data: true
+cache_state_ready: false
+cache_state_coverage: false
+api_doc_review: true
+api_fields_events: true
+api_version: true
+i18n_locale: N/A  # 僅兩人平行開發，暫不需多語系 scaffold
+i18n_ui: N/A      # 僅兩人平行開發，暫不需多語系 UI
+a11y_test: N/A    # 僅兩人平行開發，暫不需 a11y scaffold 

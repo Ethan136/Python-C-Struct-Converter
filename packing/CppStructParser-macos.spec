@@ -27,6 +27,7 @@ a = Analysis(
         'xml',
         'xml.etree',
         'xml.etree.ElementTree',
+        'jsonschema',
     ],
     hookspath=[],
     hooksconfig={},
