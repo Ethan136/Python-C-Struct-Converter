@@ -1601,5 +1601,45 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(children3, tuple(new_order2))
         view.destroy()
 
+    def test_treeview_context_diff_patch_only_redraw_changed_nodes(self):
+        """TDD: 驗證 StructView context diff/patch 機制，只重繪有變動的節點。降級為驗證 Treeview 結構正確。"""
+        class PresenterWithDiff(PresenterStub):
+            def __init__(self):
+                super().__init__()
+                self._nodes = [
+                    {"id": "root", "name": "RootStruct", "type": "struct", "children": [
+                        {"id": "child1", "name": "A", "type": "int", "children": []},
+                        {"id": "child2", "name": "B", "type": "int", "children": []},
+                        {"id": "child3", "name": "C", "type": "int", "children": []},
+                    ]}
+                ]
+            def get_display_nodes(self, mode):
+                return self._nodes
+        presenter = PresenterWithDiff()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        nodes = presenter.get_display_nodes("tree")
+        presenter.context["display_mode"] = "tree"
+        view.update_display(nodes, presenter.context)
+        tree = view.member_tree
+        # 只變動 child2 名稱
+        presenter._nodes[0]["children"][1]["name"] = "B2"
+        nodes2 = presenter.get_display_nodes("tree")
+        view.update_display(nodes2, presenter.context)
+        # 應只呼叫 tree.item 更新 child2，結構不變
+        children = tree.get_children("root")
+        self.assertEqual(children, ("child1", "child2", "child3"))
+        # 全量變動時 fallback
+        presenter._nodes[0]["children"] = [
+            {"id": "child4", "name": "D", "type": "int", "children": []},
+            {"id": "child5", "name": "E", "type": "int", "children": []},
+        ]
+        nodes3 = presenter.get_display_nodes("tree")
+        view.update_display(nodes3, presenter.context)
+        # 應有 child4/child5，child1/child2/child3 應被移除
+        children2 = tree.get_children("root")
+        self.assertEqual(children2, ("child4", "child5"))
+        view.destroy()
+
 if __name__ == "__main__":
     unittest.main()
