@@ -25,6 +25,7 @@
 - 將重複、資料驅動測試集中於 XML，減少 hardcode 測試。
 - 測試資料建議集中於 `tests/data/`，格式與 v4 相容。
 - Loader/驗證 helper 建議抽象共用，便於各主題複用。
+- **struct/AST/layout 測試也應 XML 驅動**，以利未來維護與擴充。
 
 ### 2.3 測試分層與主題分類
 - 依 v4 建議，測試分為 model/view/presenter/integration/data_driven/utils/data。
@@ -57,29 +58,28 @@
 
 ### 6.1 XML 驅動測試格式範例
 ```xml
-<struct_parsing_tests>
-    <test_case name="nested_struct_basic" type="parse">
+<struct_parser_v2_struct_tests>
+    <test_case name="simple_struct">
         <struct_definition><![CDATA[
-            struct Outer {
-                struct Inner {
-                    int x;
-                    char y;
-                } a;
+            struct Simple {
+                char a;
                 int b;
             };
         ]]></struct_definition>
-        <expected_struct_name>Outer</expected_struct_name>
+        <expected_struct_name>Simple</expected_struct_name>
         <expected_members>
-            <member type="struct" name="a">
-                <nested_members>
-                    <member type="int" name="x" />
-                    <member type="char" name="y" />
-                </nested_members>
-            </member>
-            <member type="int" name="b" />
+            <member type="char" name="a"/>
+            <member type="int" name="b"/>
         </expected_members>
+        <expected_layout>
+            <item name="a" type="char" offset="0" size="1"/>
+            <item name="padding" type="padding" offset="1" size="3"/>
+            <item name="b" type="int" offset="4" size="4"/>
+        </expected_layout>
+        <expected_total_size>8</expected_total_size>
+        <expected_align>4</expected_align>
     </test_case>
-</struct_parsing_tests>
+</struct_parser_v2_struct_tests>
 ```
 
 ### 6.2 驗證 helper 抽象建議
@@ -96,8 +96,7 @@ def assert_ast_equal(ast1, ast2):
 - 集中於 tests/utils/，各主題測試可直接 import 使用。
 
 ### 6.3 XML loader 實作建議
-- 建議繼承 base_xml_test_loader.py，依主題擴充 parse_common_fields/parse_extra。
-- loader 應能解析 struct_definition、expected_members、input_data、expected_results 等欄位。
+- 建議 loader 支援 struct/AST/layout 驗證，解析 struct_definition、expected_members、expected_layout、expected_total_size、expected_align 等欄位。
 - 例：
 ```python
 class StructModelXMLTestLoader(BaseXMLTestLoader):

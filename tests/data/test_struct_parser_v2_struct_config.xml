@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<struct_parser_v2_struct_tests>
+    <test_case name="simple_struct">
+        <struct_definition><![CDATA[
+            struct Simple {
+                char a;
+                int b;
+            };
+        ]]></struct_definition>
+        <expected_struct_name>Simple</expected_struct_name>
+        <expected_members>
+            <member type="char" name="a"/>
+            <member type="int" name="b"/>
+        </expected_members>
+        <expected_layout>
+            <item name="a" type="char" offset="0" size="1"/>
+            <item name="(padding)" type="padding" offset="1" size="3"/>
+            <item name="b" type="int" offset="4" size="4"/>
+        </expected_layout>
+        <expected_total_size>8</expected_total_size>
+        <expected_align>4</expected_align>
+    </test_case>
+</struct_parser_v2_struct_tests> 
