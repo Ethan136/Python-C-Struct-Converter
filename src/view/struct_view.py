@@ -586,8 +586,26 @@ class StructView(tk.Tk):
         }
 
     def show_manual_struct_validation(self, errors):
+        # 先全部恢復預設顏色
+        if hasattr(self, "member_entries"):
+            for entry_tuple in self.member_entries:
+                entry = entry_tuple[0]  # name_entry
+                try:
+                    entry.config(highlightbackground="systemWindowBackgroundColor", highlightcolor="systemWindowBackgroundColor")
+                except Exception:
+                    entry.config(highlightbackground="white", highlightcolor="white")
         if errors:
             self.validation_label.config(text="; ".join(errors), fg="red")
+            # 若有名稱相關錯誤，將對應 Entry 設紅框
+            if hasattr(self, "member_entries"):
+                for idx, entry_tuple in enumerate(self.member_entries):
+                    entry = entry_tuple[0]
+                    name = self.members[idx].get("name", "")
+                    for err in errors:
+                        if name and name in err:
+                            entry.config(highlightbackground="red", highlightcolor="red")
+                        elif "名稱不可為空" in err and not name:
+                            entry.config(highlightbackground="red", highlightcolor="red")
         else:
             # 改為呼叫 presenter 計算剩餘空間
             struct_data = self.get_manual_struct_definition()

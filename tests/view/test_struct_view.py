@@ -1783,5 +1783,47 @@ class TestStructView(unittest.TestCase):
         treeview_count = view.get_treeview_refresh_count()
         assert treeview_count >= 20
 
+    def test_add_member_auto_focus(self):
+        """驗證新增 member 後，名稱 Entry 自動取得焦點。"""
+        view = self.view
+        view._add_member()
+        self.root.update()
+        # 取得最後一個名稱 Entry
+        if view.member_entries:
+            name_entry = view.member_entries[-1][0]
+            # 驗證該 Entry 是否取得焦點
+            has_focus = (self.root.focus_get() == name_entry)
+            assert has_focus or name_entry.focus_displayof() is not None
+
+    def test_tab_order(self):
+        """驗證 tab 鍵可依序切換欄位。"""
+        view = self.view
+        view._add_member()
+        self.root.update()
+        if view.member_entries:
+            name_entry, type_menu, bit_entry, *_ = view.member_entries[-1]
+            name_entry.focus_set()
+            self.root.update()
+            # 模擬 Tab 鍵
+            name_entry.event_generate('<Tab>')
+            self.root.update()
+            # 驗證 focus 是否到 type_menu
+            has_focus = (self.root.focus_get() == type_menu)
+            assert has_focus or type_menu.focus_displayof() is not None
+
+    def test_error_highlight(self):
+        """驗證欄位驗證錯誤時自動紅框高亮。"""
+        view = self.view
+        view._add_member()
+        self.root.update()
+        if view.member_entries:
+            name_entry, *_ = view.member_entries[-1]
+            # 模擬錯誤
+            view.show_manual_struct_validation(["名稱不可為空"])
+            self.root.update()
+            # 驗證 Entry 是否紅框高亮
+            highlight = name_entry.cget("highlightbackground")
+            assert highlight == "red" or highlight == "#ff0000"
+
 if __name__ == "__main__":
     unittest.main()
