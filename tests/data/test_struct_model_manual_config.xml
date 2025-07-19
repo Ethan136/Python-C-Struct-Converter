@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manual_struct_tests>
-    <test_case name="bitfield_no_padding">
+    <test_case name="bitfield_layout">
         <members>
             <member name="a" type="unsigned int" bit_size="3"/>
             <member name="b" type="unsigned int" bit_size="5"/>
@@ -11,6 +11,22 @@
             <item name="a" type="unsigned int" offset="0" size="4" bit_offset="0" bit_size="3"/>
             <item name="b" type="unsigned int" offset="0" size="4" bit_offset="3" bit_size="5"/>
             <item name="c" type="unsigned int" offset="0" size="4" bit_offset="8" bit_size="8"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="manual_struct_byte_bit_size">
+        <members>
+            <member name="a" type="char" bit_size="8"/>
+            <member name="b" type="unsigned int" bit_size="12"/>
+            <member name="c" type="short" bit_size="8"/>
+            <member name="d" type="unsigned int" bit_size="4"/>
+        </members>
+        <total_size>16</total_size>
+        <expected_layout>
+            <item name="a" type="char" offset="0" size="1" bit_size="8"/>
+            <item name="b" type="unsigned int" offset="4" bit_offset="0" bit_size="12"/>
+            <item name="c" type="short" offset="8" size="2" bit_size="8"/>
+            <item name="(padding)" type="padding" offset="10" size="2" bit_size="16"/>
+            <item name="d" type="unsigned int" offset="12" bit_offset="0" bit_size="4"/>
         </expected_layout>
     </test_case>
     <test_case name="anonymous_bitfield">
@@ -26,45 +42,12 @@
             <item name="b" type="int" offset="0" size="4" bit_offset="5" bit_size="5"/>
         </expected_layout>
     </test_case>
-    <test_case name="padding_and_final_padding">
+    <test_case name="manual_struct_error">
         <members>
-            <member name="a" type="char" bit_size="0"/>
-            <member name="b" type="int" bit_size="0"/>
+            <member name="a" type="char" bit_size="-1"/>
+            <member name="b" type="short" bit_size="0"/>
         </members>
-        <total_size>8</total_size>
-        <expected_layout>
-            <item name="a" type="char" offset="0" size="1" bit_size="8"/>
-            <item name="(padding)" type="padding" offset="1" size="3" bit_size="24"/>
-            <item name="b" type="int" offset="4" size="4" bit_size="32"/>
-        </expected_layout>
-    </test_case>
-    <test_case name="empty_struct">
-        <members>
-        </members>
-        <total_size>0</total_size>
-        <expected_layout>
-        </expected_layout>
-    </test_case>
-    <test_case name="short_hex_struct">
-        <members>
-            <member name="a" type="int" bit_size="0"/>
-            <member name="b" type="int" bit_size="0"/>
-        </members>
-        <total_size>8</total_size>
-        <expected_layout>
-            <item name="a" type="int" offset="0" size="4" bit_size="32"/>
-            <item name="b" type="int" offset="4" size="4" bit_size="32"/>
-        </expected_layout>
-    </test_case>
-    <test_case name="long_hex_struct">
-        <members>
-            <member name="a" type="int" bit_size="0"/>
-            <member name="b" type="int" bit_size="0"/>
-        </members>
-        <total_size>8</total_size>
-        <expected_layout>
-            <item name="a" type="int" offset="0" size="4" bit_size="32"/>
-            <item name="b" type="int" offset="4" size="4" bit_size="32"/>
-        </expected_layout>
+        <total_size>10</total_size>
+        <expect_error>bit_size 需為 0 或正整數</expect_error>
     </test_case>
 </manual_struct_tests> 

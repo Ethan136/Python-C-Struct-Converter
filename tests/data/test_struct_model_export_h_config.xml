@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<export_h_tests>
+<manual_struct_export_h_tests>
     <test_case name="bitfield_export">
         <members>
             <member name="a" type="unsigned int" bit_size="3"/>
@@ -42,4 +42,4 @@
             <line>int b : 5;</line>
         </expected_h_contains>
     </test_case>
-</export_h_tests> 
+</manual_struct_export_h_tests> 

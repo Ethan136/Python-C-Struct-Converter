@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+from tests.data_driven.base_xml_test_loader import BaseXMLTestLoader
 
 def parse_members(members_elem):
     members = []
@@ -23,25 +24,34 @@ def parse_expected_layout(layout_elem):
         })
     return layout
 
-class StructModelManualXMLTestLoader:
-    def __init__(self, xml_path):
-        self.tree = ET.parse(xml_path)
-        self.root = self.tree.getroot()
-        self.cases = self._parse_cases()
-
-    def _parse_cases(self):
-        cases = []
-        for case in self.root.findall('test_case'):
-            members = parse_members(case.find('members'))
-            total_size = int(case.find('total_size').text.strip())
-            expected_layout = parse_expected_layout(case.find('expected_layout'))
-            cases.append({
-                'name': case.get('name', ''),
-                'members': members,
-                'total_size': total_size,
-                'expected_layout': expected_layout
-            })
-        return cases
+class StructModelManualXMLTestLoader(BaseXMLTestLoader):
+    def parse_common_fields(self, case):
+        data = super().parse_common_fields(case)
+        members_elem = case.find('members')
+        members = []
+        if members_elem is not None:
+            for m in members_elem.findall('member'):
+                members.append({
+                    'name': m.get('name'),
+                    'type': m.get('type'),
+                    'bit_size': int(m.get('bit_size', '0'))
+                })
+        data['members'] = members
+        total_size_elem = case.find('total_size')
+        if total_size_elem is not None:
+            data['total_size'] = int(total_size_elem.text)
+        # 解析 expected_layout
+        expected_layout = []
+        layout_elem = case.find('expected_layout')
+        if layout_elem is not None:
+            for item in layout_elem.findall('item'):
+                expected_layout.append({k: item.get(k) for k in item.keys()})
+        data['expected_layout'] = expected_layout
+        # 解析 expect_error
+        expect_error_elem = case.find('expect_error')
+        if expect_error_elem is not None:
+            data['expect_error'] = expect_error_elem.text
+        return data
 
 def load_struct_model_manual_tests(xml_path):
     return StructModelManualXMLTestLoader(xml_path).cases 

@@ -237,94 +237,104 @@ pytest --maxfail=10 --cov=src tests/
             <item name="c" type="unsigned int" offset="0" size="4" bit_offset="8" bit_size="8"/>
         </expected_layout>
     </test_case>
-    <test_case name="export_to_h">
+    <test_case name="manual_struct_byte_bit_size">
+        <members>
+            <member name="a" type="char" bit_size="0"/>
+            <member name="b" type="unsigned int" bit_size="12"/>
+            <member name="c" type="short" bit_size="0"/>
+            <member name="d" type="unsigned int" bit_size="4"/>
+        </members>
+        <total_size>16</total_size>
+        <expected_layout>
+            <item name="a" type="char" offset="0" size="1"/>
+            <item name="b" type="unsigned int" offset="4" bit_offset="0" bit_size="12"/>
+            <item name="c" type="short" offset="8" size="2"/>
+            <item name="d" type="unsigned int" offset="12" bit_offset="0" bit_size="4"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="anonymous_bitfield">
+        <members>
+            <member name="a" type="int" bit_size="3"/>
+            <member name="" type="int" bit_size="2"/>
+            <member name="b" type="int" bit_size="5"/>
+        </members>
+        <total_size>4</total_size>
+        <expected_layout>
+            <item name="a" type="int" offset="0" size="4" bit_offset="0" bit_size="3"/>
+            <item name="" type="int" offset="0" size="4" bit_offset="3" bit_size="2"/>
+            <item name="b" type="int" offset="0" size="4" bit_offset="5" bit_size="5"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="manual_struct_error">
+        <members>
+            <member name="a" type="char" bit_size="-1"/>
+            <member name="b" type="short" bit_size="0"/>
+        </members>
+        <total_size>10</total_size>
+        <expect_error>bit_size 需為 0 或正整數</expect_error>
+    </test_case>
+</manual_struct_tests>
+```
+
+#### 匯出 .h 驗證 XML schema
+```xml
+<manual_struct_export_h_tests>
+    <test_case name="bitfield_export">
+        <members>
+            <member name="a" type="unsigned int" bit_size="3"/>
+            <member name="b" type="unsigned int" bit_size="5"/>
+            <member name="c" type="unsigned int" bit_size="8"/>
+        </members>
+        <total_size>2</total_size>
+        <expected_h_contains>
+            <line>struct MyStruct</line>
+            <line>unsigned int a : 3;</line>
+            <line>unsigned int b : 5;</line>
+            <line>unsigned int c : 8;</line>
+            <line>// total size: 2 bytes</line>
+        </expected_h_contains>
+    </test_case>
+    <test_case name="custom_struct_name">
         <members>
             <member name="a" type="unsigned int" bit_size="3"/>
             <member name="b" type="unsigned int" bit_size="5"/>
         </members>
         <total_size>1</total_size>
+        <struct_name>CustomStruct</struct_name>
         <expected_h_contains>
-            <line>struct MyStruct</line>
+            <line>struct CustomStruct</line>
             <line>unsigned int a : 3;</line>
             <line>unsigned int b : 5;</line>
             <line>// total size: 1 bytes</line>
         </expected_h_contains>
     </test_case>
-</manual_struct_tests>
-```
-
-### 7.6.1 驗證重點與 edge case
-- bitfield packing、欄位順序、alignment、padding、pointer、混合欄位、巢狀 struct、N-D array、匿名 bitfield、空 struct、極短/極長 hex 輸入、big/little endian 差異、final padding、layout 計算（offset/size/bit_offset/bit_size）
-- 例外處理：struct 定義錯誤、hex 長度不足、欄位名稱重複、bit_size 非法、total_size 非法等
-
-### 7.6.2 進階 XML schema 範例
-```xml
-<struct_model_tests>
-    <test_case name="bitfield_and_padding">
-        <struct_definition><![CDATA[
-            struct B {
-                int a : 1;
-                int b : 2;
-                int c : 5;
-                char d;
-            };
-        ]]></struct_definition>
-        <input_data>
-            <hex>8d410000</hex>
-        </input_data>
-        <expected_results>
-            <member name="a" value="1"/>
-            <member name="b" value="2"/>
-            <member name="c" value="17"/>
-            <member name="d" value="65"/>
-        </expected_results>
-        <expected_layout>
-            <item name="a" type="int" offset="0" size="4" bit_offset="0" bit_size="1"/>
-            <item name="b" type="int" offset="0" size="4" bit_offset="1" bit_size="2"/>
-            <item name="c" type="int" offset="0" size="4" bit_offset="3" bit_size="5"/>
-            <item name="d" type="char" offset="4" size="1"/>
-            <item name="(final padding)" type="padding" offset="5" size="3"/>
-        </expected_layout>
+    <test_case name="anonymous_bitfield_export">
+        <members>
+            <member name="a" type="int" bit_size="3"/>
+            <member name="" type="int" bit_size="2"/>
+            <member name="b" type="int" bit_size="5"/>
+        </members>
+        <total_size>4</total_size>
+        <expected_h_contains>
+            <line>int a : 3;</line>
+            <line>int : 2;</line>
+            <line>int b : 5;</line>
+        </expected_h_contains>
     </test_case>
-    <test_case name="anonymous_bitfield">
-        <struct_definition><![CDATA[
-            struct C {
-                int a : 3;
-                int : 2;
-                int b : 5;
-            };
-        ]]></struct_definition>
-        <input_data>
-            <hex>f1000000</hex>
-        </input_data>
-        <expected_results>
-            <member name="a" value="5"/>
-            <member name="(anonymous)" value="3"/>
-            <member name="b" value="17"/>
-        </expected_results>
-    </test_case>
-    <test_case name="error_case">
-        <struct_definition><![CDATA[
-            struct D {
-                int a;
-                int a;
-            };
-        ]]></struct_definition>
-        <expect_error>成員名稱 'a' 重複</expect_error>
-    </test_case>
-</struct_model_tests>
+</manual_struct_export_h_tests>
 ```
 
 ### 7.7 已完成/待辦 checklist
 - [x] struct/AST/layout 測試 XML 驅動化
-- [ ] 手動 struct/bitfield 測試資料驅動化
-- [ ] 匯出 .h 驗證資料驅動化
-- [x] 文件同步規劃與說明 
+- [x] 設計手動 struct/bitfield 及 .h 匯出驗證 XML schema（如上）
+- [ ] 手動 struct/bitfield 測試資料驅動化（搬移 hardcode 測試）
+- [ ] 匯出 .h 驗證資料驅動化（搬移 hardcode 測試）
+- [x] 文件同步規劃與說明
 
-### 7.8 測試資料與驗證同步設計建議
-- 測試資料（XML）與驗證邏輯（loader、assert）應同步設計，確保每個欄位都能被驗證到。
-- loader 應支援自動比對 layout、bitfield、padding、匿名欄位、錯誤情境等細節。
-- 每次擴充 edge case，建議先設計 XML 測試資料，再同步補充驗證邏輯。 
+### 7.8 Loader 實作建議
+- 針對上述 XML schema，建議新增 loader 解析 <members>、<total_size>、<expected_layout>、<expected_h_contains>、<expect_error> 等欄位。
+- loader 應能自動比對 layout、bitfield、padding、匿名欄位、錯誤情境等細節。
+- 每次擴充 edge case，建議先設計 XML 測試資料，再同步補充驗證邏輯。
 
 ### 7.9 執行細節與實作步驟
 1. 盤點現有 hardcode 測試，依 7.6.1 條列分類，標註優先精煉項目。
