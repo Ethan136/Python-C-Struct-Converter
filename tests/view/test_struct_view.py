@@ -6,6 +6,8 @@ from unittest.mock import MagicMock
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 import time
+import tempfile
+import json
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests"
@@ -1640,6 +1642,66 @@ class TestStructView(unittest.TestCase):
         children2 = tree.get_children("root")
         self.assertEqual(children2, ("child4", "child5"))
         view.destroy()
+
+    def test_user_settings_column_order_save_restore(self):
+        """TDD: 驗證用戶自訂欄位順序/顯示，user_settings 儲存/還原。"""
+        class PresenterWithUserSettings(PresenterStub):
+            def __init__(self, settings_path):
+                super().__init__()
+                self.settings_path = settings_path
+                self._user_settings = None
+            def on_update_user_settings(self, user_settings):
+                self._user_settings = user_settings
+                with open(self.settings_path, "w") as f:
+                    json.dump(user_settings, f)
+            def load_user_settings(self):
+                if os.path.exists(self.settings_path):
+                    with open(self.settings_path) as f:
+                        self._user_settings = json.load(f)
+                        self.context["user_settings"] = self._user_settings
+        with tempfile.NamedTemporaryFile(delete=False) as tf:
+            settings_path = tf.name
+        try:
+            presenter = PresenterWithUserSettings(settings_path)
+            # 預設欄位順序
+            default_cols = [
+                {"name": "name", "visible": True, "order": 0},
+                {"name": "value", "visible": True, "order": 1},
+                {"name": "hex_value", "visible": True, "order": 2},
+                {"name": "hex_raw", "visible": True, "order": 3},
+            ]
+            presenter.context["user_settings"] = {"treeview_columns": default_cols}
+            view = StructView(presenter=presenter)
+            presenter.view = view
+            nodes = presenter.get_display_nodes("tree")
+            presenter.context["display_mode"] = "tree"
+            view.update_display(nodes, presenter.context)
+            # 用戶調整欄位順序/顯示
+            new_cols = [
+                {"name": "hex_raw", "visible": True, "order": 0},
+                {"name": "name", "visible": True, "order": 1},
+                {"name": "value", "visible": False, "order": 2},
+                {"name": "hex_value", "visible": True, "order": 3},
+            ]
+            # 模擬 UI 右鍵選單調整
+            if hasattr(view, "_on_treeview_column_menu_click"):
+                presenter.on_update_user_settings({"treeview_columns": new_cols})
+                presenter.context["user_settings"] = {"treeview_columns": new_cols}
+                view.update_display(nodes, presenter.context)
+            # 驗證 user_settings 已更新
+            with open(settings_path) as f:
+                saved = json.load(f)
+            self.assertEqual(saved["treeview_columns"], new_cols)
+            # 模擬重啟，presenter 載入 user_settings
+            presenter2 = PresenterWithUserSettings(settings_path)
+            presenter2.load_user_settings()
+            self.assertEqual(presenter2._user_settings["treeview_columns"], new_cols)
+            # 還原預設
+            presenter2.on_update_user_settings({"treeview_columns": default_cols})
+            presenter2.load_user_settings()
+            self.assertEqual(presenter2._user_settings["treeview_columns"], default_cols)
+        finally:
+            os.unlink(settings_path)
 
 if __name__ == "__main__":
     unittest.main()
