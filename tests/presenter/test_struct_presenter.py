@@ -993,6 +993,36 @@ class TestStructPresenter(unittest.TestCase):
         history = self.presenter.context["debug_info"]["context_history"]
         self.assertGreaterEqual(len(history), 1)
 
+    def test_context_fields_flow_and_events(self):
+        # 準備 context 欄位
+        ctx = self.presenter.get_default_context()
+        ctx["pending_action"] = None
+        ctx["highlighted_nodes"] = []
+        ctx["filter"] = ""
+        ctx["user_settings"] = {"theme": "dark", "font_size": 14}
+        ctx["readonly"] = False
+        self.presenter.context = ctx.copy()
+        # on_node_click 應不影響 user_settings, readonly, filter
+        self.presenter.on_node_click("n1")
+        self.assertEqual(self.presenter.context["user_settings"], {"theme": "dark", "font_size": 14})
+        self.assertFalse(self.presenter.context["readonly"])
+        self.assertEqual(self.presenter.context["filter"], "")
+        # set_readonly 事件
+        self.presenter.set_readonly(True)
+        self.assertTrue(self.presenter.context["readonly"])
+        # on_switch_display_mode 不影響 pending_action
+        self.presenter.context["pending_action"] = "edit"
+        self.presenter.on_switch_display_mode("flat")
+        self.assertEqual(self.presenter.context["pending_action"], "edit")
+        # on_refresh 清空 highlighted_nodes
+        self.presenter.context["highlighted_nodes"] = ["n1", "n2"]
+        self.presenter.on_refresh()
+        self.assertEqual(self.presenter.context["highlighted_nodes"], [])
+        # on_expand 不影響 user_settings
+        self.presenter.context["user_settings"] = {"theme": "light"}
+        self.presenter.on_expand("n2")
+        self.assertEqual(self.presenter.context["user_settings"], {"theme": "light"})
+
 # 為每個測試方法加上 timeout 與 debug print
 for name, method in list(TestStructPresenter.__dict__.items()):
     if name.startswith('test_') and callable(method):

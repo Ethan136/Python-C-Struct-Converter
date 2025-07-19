@@ -478,7 +478,10 @@ class StructPresenter:
 
     @event_handler("on_refresh")
     def on_refresh(self):
-        pass
+        # 清空 highlighted_nodes，確保 refresh 後 UI 狀態回到預設
+        if "highlighted_nodes" in self.context:
+            self.context["highlighted_nodes"] = []
+        # 其餘 refresh 行為（如有）
 
     @event_handler("set_readonly")
     def set_readonly(self, readonly: bool):
