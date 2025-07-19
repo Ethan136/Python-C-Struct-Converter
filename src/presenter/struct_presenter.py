@@ -9,6 +9,7 @@ import os
 import threading
 from src.presenter.context_schema import validate_presenter_context
 import copy
+import functools
 
 
 class HexProcessingError(Exception):
@@ -426,34 +427,83 @@ class StructPresenter:
             self._debounce_timer = None
             self._pending_context = None
 
-    # --- 事件處理統一呼叫 push_context ---
+    def event_handler(event_name=None):
+        def decorator(func):
+            @functools.wraps(func)
+            def wrapper(self, *args, **kwargs):
+                # 自動記錄 last_event/last_event_args
+                if event_name:
+                    self.context["debug_info"]["last_event"] = event_name
+                    # 嘗試自動推測 event_args
+                    import inspect
+                    sig = inspect.signature(func)
+                    params = list(sig.parameters.keys())[1:]  # 跳過 self
+                    event_args = {k: v for k, v in zip(params, args)}
+                    event_args.update(kwargs)
+                    self.context["debug_info"]["last_event_args"] = event_args
+                try:
+                    result = func(self, *args, **kwargs)
+                except Exception as e:
+                    self.context["error"] = str(e)
+                    self.context["debug_info"]["last_error"] = str(e)
+                    self.push_context()
+                    raise
+                self.push_context()
+                return result
+            return wrapper
+        return decorator
+
+    @event_handler("on_node_click")
     def on_node_click(self, node_id):
         self.context["selected_node"] = node_id
-        self.context["debug_info"]["last_event"] = "on_node_click"
-        self.context["debug_info"]["last_event_args"] = {"node_id": node_id}
-        self.push_context()
 
+    @event_handler("on_expand")
     def on_expand(self, node_id):
         if node_id not in self.context["expanded_nodes"]:
             self.context["expanded_nodes"].append(node_id)
-        self.context["debug_info"]["last_event"] = "on_expand"
-        self.context["debug_info"]["last_event_args"] = {"node_id": node_id}
-        self.push_context()
 
+    @event_handler("on_switch_display_mode")
     def on_switch_display_mode(self, mode):
         self.context["display_mode"] = mode
         self.context["expanded_nodes"] = ["root"]
         self.context["selected_node"] = None
-        self.context["debug_info"]["last_event"] = "on_switch_display_mode"
-        self.context["debug_info"]["last_event_args"] = {"mode": mode}
-        self.push_context()
+
+    @event_handler("on_collapse")
+    def on_collapse(self, node_id):
+        if node_id in self.context["expanded_nodes"]:
+            self.context["expanded_nodes"].remove(node_id)
+
+    @event_handler("on_refresh")
+    def on_refresh(self):
+        pass
+
+    @event_handler("set_readonly")
+    def set_readonly(self, readonly: bool):
+        self.context["readonly"] = readonly
+
+    @event_handler("on_edit_node")
+    def on_edit_node(self, node_id, new_value):
+        perm = self._check_permission("edit")
+        if perm is not None:
+            return perm
+        # ...實際編輯邏輯略...
+        return {"success": True}
+
+    @event_handler("on_delete_node")
+    def on_delete_node(self, node_id):
+        perm = self._check_permission("delete")
+        if perm is not None:
+            return perm
+        # ...實際刪除邏輯略...
+        return {"success": True}
 
     def on_undo(self):
         if self.context.get("history") and len(self.context["history"]):
             self.context = self.context["history"].pop()
-            self.context["debug_info"]["last_event"] = "on_undo"
-            self.push_context()
-        # 若 history 為空，什麼都不做
+        # 補寫 last_event/last_event_args，確保 contract 一致
+        self.context["debug_info"]["last_event"] = "on_undo"
+        self.context["debug_info"]["last_event_args"] = {}
+        self.push_context()
 
     def _check_permission(self, action):
         # action: "delete"、"edit"、... 依 context 欄位 can_delete/can_edit/user_role 判斷
@@ -469,42 +519,6 @@ class StructPresenter:
             return {"success": False, "error_code": "PERMISSION_DENIED", "error_message": "No permission to edit."}
         # 其他權限可擴充
         return None
-
-    def on_delete_node(self, node_id):
-        perm = self._check_permission("delete")
-        if perm is not None:
-            return perm
-        # ...實際刪除邏輯略...
-        self.push_context()
-        return {"success": True}
-
-    def on_edit_node(self, node_id, new_value):
-        perm = self._check_permission("edit")
-        if perm is not None:
-            return perm
-        # ...實際編輯邏輯略...
-        self.context["debug_info"]["last_event"] = "on_edit_node"
-        self.context["debug_info"]["last_event_args"] = {"node_id": node_id, "new_value": new_value}
-        self.push_context()
-        return {"success": True}
-
-    def on_refresh(self):
-        self.context["debug_info"]["last_event"] = "on_refresh"
-        self.context["debug_info"]["last_event_args"] = {}
-        self.push_context()
-
-    def on_collapse(self, node_id):
-        if node_id in self.context["expanded_nodes"]:
-            self.context["expanded_nodes"].remove(node_id)
-        self.context["debug_info"]["last_event"] = "on_collapse"
-        self.context["debug_info"]["last_event_args"] = {"node_id": node_id}
-        self.push_context()
-
-    def set_readonly(self, readonly: bool):
-        self.context["readonly"] = readonly
-        self.context["debug_info"]["last_event"] = "set_readonly"
-        self.context["debug_info"]["last_event_args"] = {"readonly": readonly}
-        self.push_context()
 
     def get_member_value(self, node_id):
         def _find(node):
