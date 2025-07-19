@@ -512,7 +512,14 @@ class TestStructPresenter(unittest.TestCase):
             {"id": "root.b", "label": "b [union]", "type": "union", "children": [], "icon": "union", "extra": {}},
             {"id": "root.b.x", "label": "x", "type": "char", "children": [], "icon": "char", "extra": {}}
         ]
-        self.model.get_display_nodes.side_effect = lambda mode: [tree_node] if mode == 'tree' else flat_nodes
+        def mock_get_display_nodes(mode):
+            if mode == 'tree':
+                return [tree_node]
+            elif mode == 'flat':
+                return flat_nodes
+            else:
+                raise ValueError(f"Unknown display mode: {mode}")
+        self.model.get_display_nodes.side_effect = mock_get_display_nodes
         # tree mode
         result_tree = self.presenter.model.get_display_nodes('tree')
         self.assertIsInstance(result_tree, list)
