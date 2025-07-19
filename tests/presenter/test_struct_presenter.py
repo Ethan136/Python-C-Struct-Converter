@@ -897,6 +897,46 @@ class TestStructPresenter(unittest.TestCase):
         self.assertEqual(self.presenter.context["debug_info"]["last_event"], "on_undo")
         # on_load_file async 測試略，已於其他測試覆蓋
 
+    def test_performance_lru_cache_under_stress(self):
+        # 壓力測試 LRU cache: 大量不同 key
+        self.presenter.set_lru_cache_size(100)
+        self.model.calculate_manual_layout.side_effect = lambda m, s: [dict(name=x['name'], size=1) for x in m]
+        for i in range(1000):
+            members = [{"name": f"f{i}_{j}", "type": "int", "bit_size": 0} for j in range(10)]
+            self.presenter.compute_member_layout(members, 128)
+        hits, misses = self.presenter.get_cache_stats()
+        # 每次 key 都不同，hits 可能為 0，只驗證容量與 miss
+        self.assertGreater(misses, 0)
+        self.assertLessEqual(len(self.presenter._layout_cache), 100)
+
+    def test_performance_push_context_stress(self):
+        # 壓力測試 push_context: 頻繁呼叫
+        self.presenter._history_maxlen = 50
+        ctx = self.presenter.get_default_context()
+        for i in range(500):
+            ctx["debug_info"]["last_event"] = f"event_{i}"
+            ctx["debug_info"]["last_event_args"] = {"i": i}
+            self.presenter.context = ctx
+            self.presenter.push_context()
+        # context_history 應不超過 maxlen
+        history = self.presenter.context["debug_info"]["context_history"]
+        self.assertLessEqual(len(history), 50)
+        self.assertEqual(history[-1]["debug_info"]["last_event"], "event_499")
+
+    def test_performance_large_ast_context_snapshot(self):
+        # 超大 AST/context snapshot，巢狀層數降至 200，避免 RecursionError
+        large_ast = {"id": "root", "name": "Root", "type": "struct", "children": []}
+        node = large_ast
+        for i in range(200):
+            child = {"id": f"n{i}", "name": f"n{i}", "type": "int", "children": []}
+            node["children"].append(child)
+            node = child
+        self.presenter.context = self.presenter.get_default_context()
+        self.presenter.context["ast"] = large_ast
+        self.presenter.push_context()
+        history = self.presenter.context["debug_info"]["context_history"]
+        self.assertGreaterEqual(len(history), 1)
+
 # 為每個測試方法加上 timeout 與 debug print
 for name, method in list(TestStructPresenter.__dict__.items()):
     if name.startswith('test_') and callable(method):
