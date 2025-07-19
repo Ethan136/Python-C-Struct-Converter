@@ -159,13 +159,10 @@ class PresenterStub:
         if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
             self.view.update_display(nodes, self.context)
     def on_node_select(self, selected_nodes):
-        print(f"[DEBUG] on_node_select: {selected_nodes}")
         self.context["selected_nodes"] = selected_nodes
         if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
-            print("[DEBUG] PresenterStub.on_node_select: call update_display")
             self.view.update_display(self.get_display_nodes(self.context.get("display_mode", "tree")), self.context)
     def on_batch_delete(self, selected_nodes):
-        print(f"[DEBUG] on_batch_delete: {selected_nodes}")
         def delete_nodes(nodes):
             result = []
             for n in nodes:
@@ -178,7 +175,6 @@ class PresenterStub:
         self._nodes = delete_nodes(self.get_display_nodes(self.context.get("display_mode", "tree")))
         self.get_display_nodes = lambda mode: self._nodes
         if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
-            print("[DEBUG] PresenterStub.on_batch_delete: call update_display")
             self.view.update_display(self._nodes, self.context)
 
 @pytest.mark.timeout(15)
@@ -536,8 +532,6 @@ class TestStructView(unittest.TestCase):
     def test_manual_struct_member_table_position(self):
         self.view.tab_control.select(self.view.tab_manual)
         # 降級驗證：只驗證 UI 功能
-        print('DEBUG member_frame id:', id(self.view.member_frame))
-        print('DEBUG manual_hex_grid_frame id:', id(self.view.manual_hex_grid_frame))
         self.assertTrue(self.view.member_frame.winfo_exists(), "member_frame 應存在且可見")
         self.assertTrue(self.view.manual_hex_grid_frame.winfo_exists(), "manual_hex_grid_frame 應存在且可見")
 
@@ -1390,7 +1384,6 @@ class TestStructView(unittest.TestCase):
         view.destroy()
 
     def test_treeview_multiselect_and_batch_delete(self):
-        print("[DEBUG] test_treeview_multiselect_and_batch_delete start")
         presenter = PresenterStub()
         view = StructView(presenter=presenter)
         presenter.view = view
@@ -1420,7 +1413,6 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(tree.get_children("root"), ())
         self.assertNotIn("child2", tree.get_children("root"))
         view.destroy()
-        print("[DEBUG] test_treeview_multiselect_and_batch_delete end")
 
     def test_treeview_node_type_display(self):
         """驗證 Treeview 節點根據 type 顯示顏色、粗體、[struct]/[union] 標籤"""
