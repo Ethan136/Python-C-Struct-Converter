@@ -1825,5 +1825,48 @@ class TestStructView(unittest.TestCase):
             highlight = name_entry.cget("highlightbackground")
             assert highlight == "red" or highlight == "#ff0000"
 
+    def test_error_tooltip_shown_on_hover(self):
+        """驗證欄位驗證錯誤時，滑鼠懸停於 Entry 會顯示 tooltip。"""
+        view = self.view
+        view._add_member()
+        self.root.update()
+        if view.member_entries:
+            name_entry, *_ = view.member_entries[-1]
+            # 模擬錯誤
+            view.show_manual_struct_validation(["名稱不可為空"])
+            self.root.update()
+            # 模擬滑鼠進入 Entry
+            name_entry.event_generate('<Enter>')
+            self.root.update()
+            # 應有 tooltip widget 顯示
+            tooltip = getattr(name_entry, '_tooltip', None)
+            assert tooltip is not None and tooltip.visible
+            # 離開時 tooltip 消失
+            name_entry.event_generate('<Leave>')
+            self.root.update()
+            assert not tooltip.visible
+
+    def test_full_tab_order(self):
+        """高階驗證：所有 Entry/Button/OptionMenu 及其內部 Button 都設有 takefocus=1，tab order 行為請於 GUI 手動驗證，CI 僅驗證 takefocus 屬性。"""
+        view = self.view
+        for _ in range(3):
+            view._add_member()
+        self.root.update()
+        # Entry/Button/OptionMenu 及其內部 Button 都應有 takefocus=1
+        for entry_tuple in view.member_entries:
+            # name_entry, type_menu, bit_entry, size_label, op_frame
+            for w in entry_tuple[:5]:
+                if isinstance(w, (tk.Entry, tk.OptionMenu)):
+                    assert w.cget('takefocus') == 1
+                # OptionMenu 內部 Button
+                if isinstance(w, tk.OptionMenu):
+                    for child in w.winfo_children():
+                        if isinstance(child, tk.Button):
+                            assert child.cget('takefocus') == 1
+            op_frame = entry_tuple[4]
+            for btn in op_frame.winfo_children():
+                if isinstance(btn, tk.Button):
+                    assert btn.cget('takefocus') == 1
+
 if __name__ == "__main__":
     unittest.main()

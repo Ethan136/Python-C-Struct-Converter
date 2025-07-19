@@ -427,20 +427,34 @@ class StructView(tk.Tk):
             else:
                 # 新增 row widget
                 name_var = tk.StringVar(value=m.get("name", ""))
-                name_entry = tk.Entry(self.member_frame, textvariable=name_var, width=10)
+                name_entry = tk.Entry(self.member_frame, textvariable=name_var, width=10, takefocus=1)
                 type_var = tk.StringVar(value=m.get("type", ""))
                 type_options = self._get_type_options(m.get("bit_size", 0) > 0)
                 type_menu = tk.OptionMenu(self.member_frame, type_var, *type_options)
+                type_menu.configure(takefocus=1)
+                # 取得 OptionMenu 內部 Button
+                type_menu_btn = None
+                for child in type_menu.winfo_children():
+                    if isinstance(child, tk.Button):
+                        type_menu_btn = child
+                        break
+                if type_menu_btn:
+                    type_menu_btn.configure(takefocus=1)
                 bit_var = tk.IntVar(value=m.get("bit_size", 0))
-                bit_entry = tk.Entry(self.member_frame, textvariable=bit_var, width=6)
+                bit_entry = tk.Entry(self.member_frame, textvariable=bit_var, width=6, takefocus=1)
                 size_val = name2size.get(m.get("name", ""), "-")
                 size_label = tk.Label(self.member_frame, text=size_val)
                 size_label.is_size_label = True
                 op_frame = tk.Frame(self.member_frame)
-                tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i), width=4).pack(side=tk.LEFT, padx=1)
-                tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i), width=4).pack(side=tk.LEFT, padx=1)
-                tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i), width=4).pack(side=tk.LEFT, padx=1)
-                tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4).pack(side=tk.LEFT, padx=1)
+                # 操作按鈕 takefocus=1
+                del_btn = tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i), width=4, takefocus=1)
+                up_btn = tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i), width=4, takefocus=1)
+                down_btn = tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i), width=4, takefocus=1)
+                copy_btn = tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4, takefocus=1)
+                del_btn.pack(side=tk.LEFT, padx=1)
+                up_btn.pack(side=tk.LEFT, padx=1)
+                down_btn.pack(side=tk.LEFT, padx=1)
+                copy_btn.pack(side=tk.LEFT, padx=1)
                 name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
                 type_var.trace_add("write", lambda *_, i=idx, v=type_var: self._update_member_type(i, v))
                 bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
@@ -450,6 +464,19 @@ class StructView(tk.Tk):
                 ]
                 for col, w in enumerate(widgets):
                     w.grid(row=idx + 1, column=col, padx=2, pady=1)
+                # 組合 tab order: Entry → OptionMenu.Button → bit_entry → del_btn → up_btn → down_btn → copy_btn
+                focus_widgets = [name_entry]
+                if type_menu_btn:
+                    focus_widgets.append(type_menu_btn)
+                focus_widgets.append(bit_entry)
+                focus_widgets.extend([del_btn, up_btn, down_btn, copy_btn])
+                for i, fw in enumerate(focus_widgets):
+                    fw.configure(takefocus=1)
+                    def on_tab(event, idx=i):
+                        if idx + 1 < len(focus_widgets):
+                            focus_widgets[idx + 1].focus_set()
+                            return "break"
+                    fw.bind("<Tab>", on_tab)
                 row_widgets[idx] = widgets
             self.member_entries.append(tuple(row_widgets[idx][1:6]))
         self._update_manual_layout_tree()
@@ -586,7 +613,7 @@ class StructView(tk.Tk):
         }
 
     def show_manual_struct_validation(self, errors):
-        # 先全部恢復預設顏色
+        # 先全部恢復預設顏色並移除 tooltip
         if hasattr(self, "member_entries"):
             for entry_tuple in self.member_entries:
                 entry = entry_tuple[0]  # name_entry
@@ -594,9 +621,15 @@ class StructView(tk.Tk):
                     entry.config(highlightbackground="systemWindowBackgroundColor", highlightcolor="systemWindowBackgroundColor")
                 except Exception:
                     entry.config(highlightbackground="white", highlightcolor="white")
+                # 移除舊 tooltip
+                if hasattr(entry, '_tooltip'):
+                    entry.unbind('<Enter>')
+                    entry.unbind('<Leave>')
+                    entry._tooltip.hide()
+                    del entry._tooltip
         if errors:
             self.validation_label.config(text="; ".join(errors), fg="red")
-            # 若有名稱相關錯誤，將對應 Entry 設紅框
+            # 若有名稱相關錯誤，將對應 Entry 設紅框並掛載 tooltip
             if hasattr(self, "member_entries"):
                 for idx, entry_tuple in enumerate(self.member_entries):
                     entry = entry_tuple[0]
@@ -604,8 +637,10 @@ class StructView(tk.Tk):
                     for err in errors:
                         if name and name in err:
                             entry.config(highlightbackground="red", highlightcolor="red")
+                            EntryTooltip(entry, err)
                         elif "名稱不可為空" in err and not name:
                             entry.config(highlightbackground="red", highlightcolor="red")
+                            EntryTooltip(entry, err)
         else:
             # 改為呼叫 presenter 計算剩餘空間
             struct_data = self.get_manual_struct_definition()
@@ -1465,3 +1500,31 @@ class StructView(tk.Tk):
         if self.presenter and hasattr(self.presenter, "on_batch_delete"):
             selected = self.member_tree.selection()
             self.presenter.on_batch_delete(list(selected))
+
+class EntryTooltip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tipwindow = None
+        self.visible = False
+        widget._tooltip = self
+        widget.bind('<Enter>', self.show)
+        widget.bind('<Leave>', self.hide)
+    def show(self, event=None):
+        if self.tipwindow or not self.text:
+            return
+        x, y, cx, cy = self.widget.bbox("insert") if hasattr(self.widget, 'bbox') else (0, 0, 0, 0)
+        x = x + self.widget.winfo_rootx() + 25
+        y = y + self.widget.winfo_rooty() + 20
+        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(1)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(tw, text=self.text, background="#ffffe0", relief="solid", borderwidth=1, font=("tahoma", "8", "normal"))
+        label.pack(ipadx=1)
+        self.visible = True
+    def hide(self, event=None):
+        tw = self.tipwindow
+        self.tipwindow = None
+        if tw:
+            tw.destroy()
+        self.visible = False
