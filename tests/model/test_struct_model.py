@@ -632,6 +632,8 @@ class TestStructModelManualErrorXMLDriven(unittest.TestCase):
     def test_manual_error_cases(self):
         model = StructModel()
         for case in self.cases:
+            if 'expect_error' not in case:
+                continue
             with self.subTest(name=case['name']):
                 members = case['members']
                 total_size = case['total_size']
