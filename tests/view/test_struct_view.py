@@ -1756,5 +1756,32 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(presenter.warning, "context version 不明，請檢查")
         view.destroy()
 
+    def test_member_table_and_hex_grid_refresh_count(self):
+        view = self.view
+        # 清空並大量新增 member
+        view.members.clear()
+        for _ in range(50):
+            view._add_member()
+        # 應該呼叫 _render_member_table 50 次以上
+        member_table_count = view.get_member_table_refresh_count()
+        assert member_table_count >= 50
+        # 變更 size/unit size 觸發 hex grid refresh
+        view.size_var.set(100)
+        view.manual_unit_size_var.set("4 Bytes")
+        view._rebuild_manual_hex_grid()
+        hex_grid_count = view.get_hex_grid_refresh_count()
+        assert hex_grid_count >= 1
+
+    def test_treeview_refresh_count(self):
+        view = self.view
+        presenter = view.presenter
+        # 模擬多次 context/nodes 更新
+        for _ in range(20):
+            nodes = [{"id": f"n{_}", "name": f"node{_}", "type": "struct", "children": []}]
+            context = {"user_settings": {}, "highlighted_nodes": []}
+            view.show_treeview_nodes(nodes, context)
+        treeview_count = view.get_treeview_refresh_count()
+        assert treeview_count >= 20
+
 if __name__ == "__main__":
     unittest.main()
