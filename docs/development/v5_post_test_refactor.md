@@ -196,3 +196,142 @@ def test_union_ast():
 pytest --maxfail=10 --cov=src tests/
 ```
 - CI/CD 可設置自動執行 pytest、覆蓋率門檻、artifact 上傳等。 
+
+## 7. Model 層測試精煉/重構規劃
+
+### 7.1 已完成 XML 驅動
+- struct/AST/layout 測試已 XML 驅動，並補充 loader 實作。
+- 主要覆蓋 struct 定義、AST 結構、layout 結果、bitfield、array、巢狀 struct 等情境。
+
+### 7.2 可進一步資料驅動的測試
+- 手動 struct/bitfield 測試（如 set_manual_struct、calculate_manual_layout、bitfield layout 驗證等）可考慮設計 XML/JSON 驅動，提升可維護性。
+- 匯出 .h 檔案內容驗證（如 export_manual_struct_to_h）可將輸入/預期片段資料化。
+
+### 7.3 建議保留 hardcode 的測試
+- 物件初始化、例外處理、極端錯誤情境等，維持 unit test 直觀性。
+- 複雜結構驗證（如 test_combined_example_struct）可視需求資料驅動，但目前 hardcode 便於直接閱讀。
+
+### 7.4 後續建議
+- 若需進一步精煉，建議設計 test_struct_model_manual_config.xml，描述 members、total_size、預期驗證點（如 layout、錯誤訊息、匯出內容），並新增 loader 與 XML 驅動測試類別。 
+
+### 7.5 執行優先順序建議
+1. 先盤點現有 hardcode 測試，分類哪些適合資料驅動、哪些建議保留。
+2. 針對手動 struct/bitfield 測試、.h 匯出驗證，設計 XML schema 並建立測試資料。
+3. 新增 loader 與 XML 驅動測試類別，逐步搬移 hardcode 測試。
+4. 每完成一類型搬移，執行 pytest 並確認覆蓋率。
+5. 文件同步更新，標註已完成/待辦項目。
+
+### 7.6 XML schema 範例
+```xml
+<manual_struct_tests>
+    <test_case name="bitfield_layout">
+        <members>
+            <member name="a" type="unsigned int" bit_size="3"/>
+            <member name="b" type="unsigned int" bit_size="5"/>
+            <member name="c" type="unsigned int" bit_size="8"/>
+        </members>
+        <total_size>4</total_size>
+        <expected_layout>
+            <item name="a" type="unsigned int" offset="0" size="4" bit_offset="0" bit_size="3"/>
+            <item name="b" type="unsigned int" offset="0" size="4" bit_offset="3" bit_size="5"/>
+            <item name="c" type="unsigned int" offset="0" size="4" bit_offset="8" bit_size="8"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="export_to_h">
+        <members>
+            <member name="a" type="unsigned int" bit_size="3"/>
+            <member name="b" type="unsigned int" bit_size="5"/>
+        </members>
+        <total_size>1</total_size>
+        <expected_h_contains>
+            <line>struct MyStruct</line>
+            <line>unsigned int a : 3;</line>
+            <line>unsigned int b : 5;</line>
+            <line>// total size: 1 bytes</line>
+        </expected_h_contains>
+    </test_case>
+</manual_struct_tests>
+```
+
+### 7.6.1 驗證重點與 edge case
+- bitfield packing、欄位順序、alignment、padding、pointer、混合欄位、巢狀 struct、N-D array、匿名 bitfield、空 struct、極短/極長 hex 輸入、big/little endian 差異、final padding、layout 計算（offset/size/bit_offset/bit_size）
+- 例外處理：struct 定義錯誤、hex 長度不足、欄位名稱重複、bit_size 非法、total_size 非法等
+
+### 7.6.2 進階 XML schema 範例
+```xml
+<struct_model_tests>
+    <test_case name="bitfield_and_padding">
+        <struct_definition><![CDATA[
+            struct B {
+                int a : 1;
+                int b : 2;
+                int c : 5;
+                char d;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>8d410000</hex>
+        </input_data>
+        <expected_results>
+            <member name="a" value="1"/>
+            <member name="b" value="2"/>
+            <member name="c" value="17"/>
+            <member name="d" value="65"/>
+        </expected_results>
+        <expected_layout>
+            <item name="a" type="int" offset="0" size="4" bit_offset="0" bit_size="1"/>
+            <item name="b" type="int" offset="0" size="4" bit_offset="1" bit_size="2"/>
+            <item name="c" type="int" offset="0" size="4" bit_offset="3" bit_size="5"/>
+            <item name="d" type="char" offset="4" size="1"/>
+            <item name="(final padding)" type="padding" offset="5" size="3"/>
+        </expected_layout>
+    </test_case>
+    <test_case name="anonymous_bitfield">
+        <struct_definition><![CDATA[
+            struct C {
+                int a : 3;
+                int : 2;
+                int b : 5;
+            };
+        ]]></struct_definition>
+        <input_data>
+            <hex>f1000000</hex>
+        </input_data>
+        <expected_results>
+            <member name="a" value="5"/>
+            <member name="(anonymous)" value="3"/>
+            <member name="b" value="17"/>
+        </expected_results>
+    </test_case>
+    <test_case name="error_case">
+        <struct_definition><![CDATA[
+            struct D {
+                int a;
+                int a;
+            };
+        ]]></struct_definition>
+        <expect_error>成員名稱 'a' 重複</expect_error>
+    </test_case>
+</struct_model_tests>
+```
+
+### 7.7 已完成/待辦 checklist
+- [x] struct/AST/layout 測試 XML 驅動化
+- [ ] 手動 struct/bitfield 測試資料驅動化
+- [ ] 匯出 .h 驗證資料驅動化
+- [x] 文件同步規劃與說明 
+
+### 7.8 測試資料與驗證同步設計建議
+- 測試資料（XML）與驗證邏輯（loader、assert）應同步設計，確保每個欄位都能被驗證到。
+- loader 應支援自動比對 layout、bitfield、padding、匿名欄位、錯誤情境等細節。
+- 每次擴充 edge case，建議先設計 XML 測試資料，再同步補充驗證邏輯。 
+
+### 7.9 執行細節與實作步驟
+1. 盤點現有 hardcode 測試，依 7.6.1 條列分類，標註優先精煉項目。
+2. 針對每一類型（如 bitfield、manual struct、.h 匯出），設計對應 XML schema，並先以最小可行範例建立測試資料。
+3. 新增 loader，確保能正確解析 XML 並支援 layout、bitfield、padding、匿名欄位、錯誤情境等驗證。
+4. 重構/搬移 hardcode 測試，逐步改為 XML 驅動，並保留必要的 hardcode unit test（如例外處理、極端情境）。
+5. 每搬移一類型，執行 pytest，確保所有 edge case 覆蓋且測試全綠。
+6. 文件同步更新，記錄每次搬移的進度、遇到的問題與解法。
+7. 定期 review 測試覆蓋率，補齊尚未資料驅動的 edge case。
+8. 團隊協作時，建議每次 PR 附上對應 XML 測試資料與 loader 變更，確保規格與驗證同步。 
