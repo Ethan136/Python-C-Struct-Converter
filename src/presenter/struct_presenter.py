@@ -382,3 +382,25 @@ class StructPresenter:
         self.context["debug_info"]["last_event_args"] = {"readonly": readonly}
         if self.view and hasattr(self.view, "update_display"):
             self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+
+    def on_search(self, search_str):
+        """處理搜尋事件，更新 context['search'] 與 context['highlighted_nodes']，推送 context 給 View。"""
+        self.context["search"] = search_str
+        # 取得目前顯示模式下的所有 nodes
+        nodes = self.model.get_display_nodes(self.context.get("display_mode", "tree"))
+        highlighted = set()
+        def collect_highlighted(node):
+            label = node.get("label", "")
+            type_ = node.get("type", "")
+            name = node.get("name", "")
+            if search_str and (search_str.lower() in label.lower() or search_str.lower() in type_.lower() or search_str.lower() in name.lower()):
+                highlighted.add(node["id"])
+            for child in node.get("children", []):
+                collect_highlighted(child)
+        for node in nodes:
+            collect_highlighted(node)
+        self.context["highlighted_nodes"] = list(highlighted)
+        self.context["debug_info"]["last_event"] = "on_search"
+        self.context["debug_info"]["last_event_args"] = {"search": search_str}
+        if self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(nodes, self.context)

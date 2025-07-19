@@ -84,6 +84,23 @@ class PresenterStub:
                 {"id": "child2", "label": "child2", "type": "int", "children": [], "icon": "int", "extra": {}}
             ], "icon": "struct", "extra": {}}
         ]
+    def on_search(self, search_str):
+        self.context["search"] = search_str
+        nodes = self.get_display_nodes(self.context.get("display_mode", "tree"))
+        highlighted = set()
+        def collect_highlighted(node):
+            label = node.get("label", "")
+            type_ = node.get("type", "")
+            name = node.get("name", "")
+            if search_str and (search_str.lower() in label.lower() or search_str.lower() in type_.lower() or search_str.lower() in name.lower()):
+                highlighted.add(node["id"])
+            for child in node.get("children", []):
+                collect_highlighted(child)
+        for node in nodes:
+            collect_highlighted(node)
+        self.context["highlighted_nodes"] = list(highlighted)
+        if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(nodes, self.context)
 
 @pytest.mark.timeout(15)
 class TestStructView(unittest.TestCase):
@@ -1188,6 +1205,39 @@ class TestStructView(unittest.TestCase):
         selected = set(tree.selection())
         self.assertIn("child1", selected)
         self.assertIn("child2", selected)
+
+    def test_treeview_search_and_highlight(self):
+        # 準備 presenter/view
+        presenter = PresenterStub()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        # 模擬有多個節點
+        nodes = [
+            {"id": "root", "label": "root struct", "type": "struct", "children": [
+                {"id": "child1", "label": "foo", "type": "int", "children": [], "icon": "int", "extra": {}},
+                {"id": "child2", "label": "bar", "type": "char", "children": [], "icon": "char", "extra": {}}
+            ], "icon": "struct", "extra": {}}
+        ]
+        presenter.get_display_nodes = lambda mode: nodes
+        presenter.context["display_mode"] = "tree"
+        presenter.context["highlighted_nodes"] = []
+        presenter.context["search"] = None
+        # 搜尋 foo
+        presenter.on_search("foo")
+        # 應該有 child1 被高亮
+        self.assertIn("child1", presenter.context["highlighted_nodes"])
+        self.assertEqual(presenter.context["search"], "foo")
+        # View 也應高亮 child1
+        view.update_display(nodes, presenter.context)
+        tag = view.member_tree.item("child1", "tags")
+        self.assertIn("highlighted", tag)
+        # 搜尋 bar
+        presenter.on_search("bar")
+        self.assertIn("child2", presenter.context["highlighted_nodes"])
+        # 搜尋 struct（應高亮 root）
+        presenter.on_search("struct")
+        self.assertIn("root", presenter.context["highlighted_nodes"])
+        view.destroy()
 
 if __name__ == "__main__":
     unittest.main()
