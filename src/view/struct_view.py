@@ -26,10 +26,21 @@ def update_treeview_by_context(tree, context):
     # 高亮選取
     selected = context.get("selected_node")
     selected_nodes = context.get("selected_nodes")
-    # 僅在型別正確時才呼叫 selection_set
+    # 取得所有現有 id
+    def collect_all_ids(tree, parent=""):
+        ids = list(tree.get_children(parent))
+        for i in list(ids):
+            ids.extend(collect_all_ids(tree, i))
+        return ids
+    all_ids = set(collect_all_ids(tree, ""))
+    # 僅在型別正確時才呼叫 selection_set，且只選取存在的 id
     if isinstance(selected_nodes, (list, tuple)) and selected_nodes:
-        tree.selection_set(selected_nodes)
-    elif isinstance(selected, str) and selected:
+        filtered = [i for i in selected_nodes if i in all_ids]
+        if filtered:
+            tree.selection_set(filtered)
+        else:
+            tree.selection_remove(tree.selection())
+    elif isinstance(selected, str) and selected and selected in all_ids:
         tree.selection_set(selected)
     else:
         tree.selection_remove(tree.selection())
@@ -144,6 +155,9 @@ class StructView(tk.Tk):
         self.expand_all_btn.pack(side=tk.LEFT, padx=2)
         self.collapse_all_btn = tk.Button(control_frame, text="收合全部", command=self._on_collapse_all)
         self.collapse_all_btn.pack(side=tk.LEFT, padx=2)
+        # 批次刪除按鈕
+        self.batch_delete_btn = tk.Button(control_frame, text="批次刪除", command=self._on_batch_delete)
+        self.batch_delete_btn.pack(side=tk.LEFT, padx=2)
         # 檔案選擇按鈕
         tk.Button(main_frame, text="選擇 .h 檔", command=self._on_browse_file).pack(anchor="w", pady=2)
         # 檔案路徑顯示
@@ -929,8 +943,12 @@ class StructView(tk.Tk):
 
     def _on_member_tree_select(self, event):
         selected = event.widget.selection()
-        if selected and self.presenter and hasattr(self.presenter, "on_node_click"):
+        if not selected or not self.presenter:
+            return
+        if len(selected) == 1 and hasattr(self.presenter, "on_node_click"):
             self.presenter.on_node_click(selected[0])
+        elif len(selected) > 1 and hasattr(self.presenter, "on_node_select"):
+            self.presenter.on_node_select(list(selected))
 
     def show_treeview_nodes(self, nodes, context, icon_map=None):
         tree = self.member_tree
@@ -955,7 +973,18 @@ class StructView(tk.Tk):
         # 多選高亮
         selected_nodes = context.get("selected_nodes")
         if selected_nodes:
-            tree.selection_set(selected_nodes)
+            # 取得所有現有 id
+            def collect_all_ids(tree, parent=""):
+                ids = list(tree.get_children(parent))
+                for i in list(ids):
+                    ids.extend(collect_all_ids(tree, i))
+                return ids
+            all_ids = set(collect_all_ids(tree, ""))
+            filtered = [i for i in selected_nodes if i in all_ids]
+            if filtered:
+                tree.selection_set(filtered)
+            else:
+                tree.selection_remove(tree.selection())
 
     def update_display(self, nodes, context, icon_map=None):
         self.show_treeview_nodes(nodes, context, icon_map)
@@ -1067,3 +1096,8 @@ class StructView(tk.Tk):
     def _on_redo(self):
         if self.presenter and hasattr(self.presenter, "on_redo"):
             self.presenter.on_redo()
+
+    def _on_batch_delete(self):
+        if self.presenter and hasattr(self.presenter, "on_batch_delete"):
+            selected = self.member_tree.selection()
+            self.presenter.on_batch_delete(list(selected))

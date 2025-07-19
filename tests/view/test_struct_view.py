@@ -155,6 +155,28 @@ class PresenterStub:
         self.context["expanded_nodes"] = root_ids
         if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
             self.view.update_display(nodes, self.context)
+    def on_node_select(self, selected_nodes):
+        print(f"[DEBUG] on_node_select: {selected_nodes}")
+        self.context["selected_nodes"] = selected_nodes
+        if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
+            print("[DEBUG] PresenterStub.on_node_select: call update_display")
+            self.view.update_display(self.get_display_nodes(self.context.get("display_mode", "tree")), self.context)
+    def on_batch_delete(self, selected_nodes):
+        print(f"[DEBUG] on_batch_delete: {selected_nodes}")
+        def delete_nodes(nodes):
+            result = []
+            for n in nodes:
+                if n["id"] in selected_nodes:
+                    continue
+                n2 = n.copy()
+                n2["children"] = delete_nodes(n.get("children", []))
+                result.append(n2)
+            return result
+        self._nodes = delete_nodes(self.get_display_nodes(self.context.get("display_mode", "tree")))
+        self.get_display_nodes = lambda mode: self._nodes
+        if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
+            print("[DEBUG] PresenterStub.on_batch_delete: call update_display")
+            self.view.update_display(self._nodes, self.context)
 
 @pytest.mark.timeout(15)
 class TestStructView(unittest.TestCase):
@@ -1356,6 +1378,39 @@ class TestStructView(unittest.TestCase):
         self.assertNotIn("child1", children)
         self.assertNotIn("child2", children)
         view.destroy()
+
+    def test_treeview_multiselect_and_batch_delete(self):
+        print("[DEBUG] test_treeview_multiselect_and_batch_delete start")
+        presenter = PresenterStub()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        nodes = [
+            {"id": "root", "label": "root struct", "type": "struct", "children": [
+                {"id": "child1", "label": "foo", "type": "int", "children": [
+                    {"id": "grand1", "label": "g1", "type": "char", "children": [], "icon": "char", "extra": {}}
+                ], "icon": "int", "extra": {}},
+                {"id": "child2", "label": "bar", "type": "char", "children": [], "icon": "char", "extra": {}}
+            ], "icon": "struct", "extra": {}}
+        ]
+        presenter._nodes = nodes
+        presenter.get_display_nodes = lambda mode: presenter._nodes
+        presenter.context["display_mode"] = "tree"
+        presenter.context["expanded_nodes"] = ["root", "child1", "child2"]
+        view.update_display(nodes, presenter.context)
+        # 多選 child1, child2
+        view.member_tree.selection_set(["child1", "child2"])
+        # 觸發 TreeviewSelect event 以呼叫 _on_member_tree_select
+        view.member_tree.event_generate('<<TreeviewSelect>>')
+        self.assertEqual(set(presenter.context["selected_nodes"]), {"child1", "child2"})
+        # 批次刪除
+        view._on_batch_delete()
+        # Treeview 只剩 root
+        tree = view.member_tree
+        self.assertEqual(tree.get_children(""), ("root",))
+        self.assertEqual(tree.get_children("root"), ())
+        self.assertNotIn("child2", tree.get_children("root"))
+        view.destroy()
+        print("[DEBUG] test_treeview_multiselect_and_batch_delete end")
 
 if __name__ == "__main__":
     unittest.main()
