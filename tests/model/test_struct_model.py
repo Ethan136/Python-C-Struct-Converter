@@ -22,6 +22,8 @@ from src.model.struct_model import (
 )
 from tests.data_driven.xml_struct_model_loader import load_struct_model_tests
 from tests.data_driven.xml_struct_parse_definition_loader import load_struct_parse_definition_tests
+from src.model.struct_parser import parse_struct_definition_ast
+from src.model.struct_model import ast_to_dict
 
 
 class TestParseStructDefinition(unittest.TestCase):
@@ -570,6 +572,60 @@ class TestStructModelNDArray(unittest.TestCase):
         self.assertEqual(len(actual), 4, "巢狀 struct 多維陣列應展開為 4 個元素 (2x2)")
         for idx, exp in enumerate(expected):
             self.assertEqual(actual[idx]["name"], exp["name"], f"第 {idx} 個元素名稱錯誤")
+
+
+class TestStructModelASTAPI(unittest.TestCase):
+    def test_parse_struct_definition_ast_and_to_dict(self):
+        code = '''
+        struct V6Test {
+            int a;
+            struct Inner {
+                char b;
+                union {
+                    short c;
+                    float d;
+                } u;
+            } inner;
+            int arr[2][3];
+            unsigned int x : 3;
+            unsigned int   : 2;
+            unsigned int y : 5;
+        };
+        '''
+        ast = parse_struct_definition_ast(code)
+        ast_dict = ast_to_dict(ast)
+        self.assertEqual(ast_dict['name'], 'V6Test')
+        self.assertTrue(ast_dict['is_struct'])
+        self.assertTrue(any(child['name'] == 'inner' for child in ast_dict['children']))
+        inner = next(child for child in ast_dict['children'] if child['name'] == 'inner')
+        self.assertTrue(inner['is_struct'])
+        union = next(child for child in inner['children'] if child['is_union'])
+        self.assertEqual(len(union['children']), 2)
+        arr = next(child for child in ast_dict['children'] if child['name'] == 'arr')
+        self.assertEqual(arr['type'], 'int')
+        self.assertIn('children', arr)
+        x = next(child for child in ast_dict['children'] if child['name'] == 'x')
+        self.assertTrue(x['is_bitfield'])
+        y = next(child for child in ast_dict['children'] if child['name'] == 'y')
+        self.assertTrue(y['is_bitfield'])
+
+    def test_struct_model_get_struct_ast_and_display_nodes(self):
+        code = '''
+        struct Simple {
+            int a;
+            char b;
+        };
+        '''
+        model = StructModel()
+        model.struct_content = code
+        ast_dict = model.get_struct_ast()
+        self.assertEqual(ast_dict['name'], 'Simple')
+        nodes_tree = model.get_display_nodes('tree')
+        self.assertIsInstance(nodes_tree, list)
+        self.assertEqual(nodes_tree[0]['name'], 'Simple')
+        nodes_flat = model.get_display_nodes('flat')
+        self.assertTrue(any(n['name'] == 'a' for n in nodes_flat))
+        self.assertTrue(any(n['name'] == 'b' for n in nodes_flat))
 
 
 if __name__ == "__main__":

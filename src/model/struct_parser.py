@@ -269,11 +269,10 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
             pos += 1
         if pos >= length:
             break
-        # 嘗試解析巢狀 struct
-        if struct_body.startswith('struct', pos):
-            m = re.match(r'struct\s+(\w+)\s*\{', struct_body[pos:])
+        # 新增：支援 union { ... } 名稱;
+        if struct_body.startswith('union', pos):
+            m = re.match(r'union\s*\{', struct_body[pos:])
             if m:
-                nested_name = m.group(1)
                 brace_start = pos + m.end(0) - 1
                 brace_count = 1
                 i = brace_start + 1
@@ -292,11 +291,18 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
                 var_match = re.match(r'(\w+)\s*;?', struct_body[j:])
                 if var_match:
                     var_name = var_match.group(1)
-                    nested_struct = parse_struct_definition_ast(f"struct {nested_name} {{{inner_content}}};")
-                    members.append(MemberDef(type="struct", name=var_name, nested=nested_struct))
+                    # 遞迴解析 union 內容
+                    union_members = []
+                    union_lines = inner_content.split(';')
+                    for line in union_lines:
+                        parsed = parse_member_line_v2(line)
+                        if parsed is not None:
+                            union_members.append(parsed)
+                    nested_union = UnionDef(name=var_name, members=union_members)
+                    members.append(MemberDef(type="union", name=var_name, nested=nested_union))
                     pos = j + var_match.end(0)
                     continue
-        # 嘗試解析巢狀 union
+        # 原有：支援 union 名稱 { ... } 名稱;（如有）
         if struct_body.startswith('union', pos):
             m = re.match(r'union\s+(\w+)\s*\{', struct_body[pos:])
             if m:
@@ -328,6 +334,33 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
                             union_members.append(parsed)
                     nested_union = UnionDef(name=nested_name, members=union_members)
                     members.append(MemberDef(type="union", name=var_name, nested=nested_union))
+                    pos = j + var_match.end(0)
+                    continue
+        # 嘗試解析巢狀 struct
+        if struct_body.startswith('struct', pos):
+            m = re.match(r'struct\s+(\w+)\s*\{', struct_body[pos:])
+            if m:
+                nested_name = m.group(1)
+                brace_start = pos + m.end(0) - 1
+                brace_count = 1
+                i = brace_start + 1
+                while i < length and brace_count > 0:
+                    if struct_body[i] == '{':
+                        brace_count += 1
+                    elif struct_body[i] == '}':
+                        brace_count -= 1
+                    i += 1
+                if brace_count != 0:
+                    break
+                inner_content = struct_body[brace_start + 1:i - 1]
+                j = i
+                while j < length and struct_body[j] in ' \n\t':
+                    j += 1
+                var_match = re.match(r'(\w+)\s*;?', struct_body[j:])
+                if var_match:
+                    var_name = var_match.group(1)
+                    nested_struct = parse_struct_definition_ast(f"struct {nested_name} {{{inner_content}}};")
+                    members.append(MemberDef(type="struct", name=var_name, nested=nested_struct))
                     pos = j + var_match.end(0)
                     continue
         # 處理一般欄位

@@ -333,3 +333,20 @@ For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 > - If you have old data or scripts using the legacy format, please migrate to the new format before upgrading.
 
 For migration details and rationale, see [`docs/development/v4_data_type_refactor.md`](docs/development/v4_data_type_refactor.md).
+
+## Test Import Convention (for Local & CI/CD)
+
+All test files should:
+- Add the `src` directory to `sys.path` at the top of the test file:
+  ```python
+  import sys, os
+  sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+  ```
+- Use **absolute imports** (never relative imports):
+  ```python
+  from src.model.struct_model import StructModel
+  from src.model.struct_parser import parse_struct_definition_ast
+  ```
+- Do **not** use relative imports (e.g., `from ..model import ...` or `from . import ...`).
+
+This ensures that tests run correctly both locally and in GitHub Actions CI/CD, regardless of the working directory or test runner.

@@ -59,6 +59,54 @@ def calculate_layout(members, calculator_cls=None, pack_alignment=None):
 
 
 
+import uuid
+
+def ast_to_dict(node, parent_id=None, prefix=""):
+    """遞迴將 AST 物件轉為 V2P API 規範的 dict 結構"""
+    # 修正：根據 class 型別補上 type 欄位
+    node_type = getattr(node, "type", None)
+    if node_type is None:
+        cls_name = node.__class__.__name__
+        if cls_name == "StructDef":
+            node_type = "struct"
+        elif cls_name == "UnionDef":
+            node_type = "union"
+    node_id = f"{prefix}{getattr(node, 'name', None) or str(uuid.uuid4())}"
+    base = {
+        "id": node_id,
+        "name": getattr(node, "name", None),
+        "type": node_type,
+        "is_struct": node_type == "struct",
+        "is_union": node_type == "union",
+        "is_bitfield": getattr(node, "is_bitfield", False),
+        "bit_size": getattr(node, "bit_size", None),
+        "bit_offset": getattr(node, "bit_offset", None),
+        "value": getattr(node, "value", None),
+        "offset": getattr(node, "offset", None),
+        "size": getattr(node, "size", None),
+        "children": [],
+    }
+    # DEBUG: print node info
+    print(f"DEBUG ast_to_dict: node={node}, type={node_type}, name={getattr(node, 'name', None)}, class={node.__class__.__name__}")
+    # 巢狀 struct/union
+    if hasattr(node, "nested") and node.nested:
+        print(f"DEBUG ast_to_dict: node {getattr(node, 'name', None)} has nested: {node.nested}")
+        base["children"] = [ast_to_dict(child, node_id, prefix=node_id+".") for child in getattr(node.nested, "members", [])]
+    elif hasattr(node, "members"):
+        print(f"DEBUG ast_to_dict: node {getattr(node, 'name', None)} has members: {getattr(node, 'members', None)}")
+        base["children"] = [ast_to_dict(child, node_id, prefix=node_id+".") for child in node.members]
+    return base
+
+# 展平 AST node 為 flat list（for flat mode）
+def flatten_ast_nodes(ast_node):
+    result = []
+    def _flatten(node):
+        result.append(node)
+        for child in node.get("children", []):
+            _flatten(child)
+    _flatten(ast_node)
+    return result
+
 class StructModel:
     def __init__(self):
         self.struct_name = None
@@ -294,3 +342,25 @@ class StructModel:
         lines.append("};")
         lines.append(f"// total size: {total_size} bytes")
         return "\n".join(lines)
+
+    def get_struct_ast(self):
+        """回傳符合 V2P API 的 AST dict 結構"""
+        # 假設 self.ast 為 StructDef/UnionDef 物件
+        if hasattr(self, 'ast') and self.ast:
+            return ast_to_dict(self.ast)
+        # 若無，則可用 parse_struct_definition_ast 重新解析
+        if hasattr(self, 'struct_content'):
+            from src.model.struct_parser import parse_struct_definition_ast
+            self.ast = parse_struct_definition_ast(self.struct_content)
+            return ast_to_dict(self.ast)
+        raise ValueError("No AST available")
+
+    def get_display_nodes(self, mode='tree'):
+        """回傳符合 V2P API 的 treeview node 結構"""
+        ast_dict = self.get_struct_ast()
+        if mode == 'tree':
+            return [ast_dict]
+        elif mode == 'flat':
+            return flatten_ast_nodes(ast_dict)
+        else:
+            raise ValueError(f"Unknown display mode: {mode}")
