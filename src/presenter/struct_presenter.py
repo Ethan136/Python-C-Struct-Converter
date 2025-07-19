@@ -7,6 +7,7 @@ import time
 from collections import OrderedDict
 import os
 import threading
+import traceback
 
 
 class HexProcessingError(Exception):
@@ -37,14 +38,32 @@ class StructPresenter:
         self._auto_cache_clear_enabled = False
         self._auto_cache_clear_interval = None
         self._auto_cache_clear_lock = threading.Lock()
+        self._observers = set()  # 新增: 支援多 observer
         # Observer pattern: 註冊自己為 model observer
         if hasattr(self.model, "add_observer"):
             self.model.add_observer(self)
 
+    def add_observer(self, observer):
+        self._observers.add(observer)
+
+    def remove_observer(self, observer):
+        self._observers.discard(observer)
+
+    def notify_observers(self, event_type, **kwargs):
+        for obs in list(self._observers):
+            if hasattr(obs, "update"):
+                obs.update(event_type, self, **kwargs)
+
     def update(self, event_type, model, **kwargs):
         """Observer callback: 當 model 狀態變更時自動呼叫。"""
+        if event_type == "file_struct_loaded":
+            # 只有 file_struct_loaded 才呼叫 get_display_nodes
+            if self.view and hasattr(self.view, "update_display"):
+                self.view.update_display(self.model.get_display_nodes("tree"), getattr(self, "context", {}))
+        # 其他事件只做 cache 失效與 observer 通知
         if event_type in ("manual_struct_changed", "file_struct_loaded"):
             self.invalidate_cache()
+        self.notify_observers(event_type, **kwargs)
         # 可根據 event_type 擴充自動行為
 
     def invalidate_cache(self):
@@ -179,18 +198,13 @@ class StructPresenter:
         return {"h_content": h_content}
 
     def parse_manual_hex_data(self, hex_parts, struct_def, endian):
-        """解析 MyStruct tab 的 hex 資料，回傳 dict 結果，不操作 view"""
         try:
             unit_size = struct_def.get('unit_size')
             byte_order = 'little' if endian == "Little Endian" else 'big'
-
             hex_data, debug_lines = self._process_hex_parts(hex_parts, byte_order)
-
             self.model.set_manual_struct(struct_def['members'], struct_def['total_size'])
             layout = self.model.calculate_manual_layout(struct_def['members'], struct_def['total_size'])
-
             parsed_values = self.model.parse_hex_data(hex_data, byte_order, layout=layout, total_size=struct_def['total_size'])
-
             return {'type': 'ok', 'debug_lines': debug_lines, 'parsed_values': parsed_values}
         except HexProcessingError as e:
             title_map = {

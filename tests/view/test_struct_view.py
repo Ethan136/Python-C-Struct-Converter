@@ -1868,5 +1868,60 @@ class TestStructView(unittest.TestCase):
                 if isinstance(btn, tk.Button):
                     assert btn.cget('takefocus') == 1
 
+    def test_view_observer_pattern_auto_refresh(self):
+        """TDD: 驗證 View 註冊為 Presenter observer，model 狀態變更時自動 refresh UI。"""
+        from src.model.struct_model import StructModel
+        from src.presenter.struct_presenter import StructPresenter
+        calls = []
+        class TestView:
+            def update_display(self, nodes, context):
+                calls.append((nodes, context))
+            def update(self, event_type, model, **kwargs):
+                # observer callback
+                self.update_display(model.get_display_nodes("tree"), {"event": event_type})
+        model = StructModel()
+        # mock get_display_nodes，避免觸發 AST 錯誤
+        model.get_display_nodes = lambda mode: [{"id": "root", "label": "root", "type": "struct", "children": []}]
+        presenter = StructPresenter(model)
+        view = TestView()
+        # 註冊 view 為 observer
+        presenter.add_observer = lambda obs: model.add_observer(obs)
+        presenter.remove_observer = lambda obs: model.remove_observer(obs)
+        presenter.add_observer(view)
+        # 觸發 model 狀態變更
+        model.set_manual_struct([{"name": "a", "type": "int", "bit_size": 0}], 4)
+        # 應自動呼叫 view.update_display
+        assert calls, "View 應自動 refresh UI"
+        # 移除 observer
+        presenter.remove_observer(view)
+        calls.clear()
+        model.set_manual_struct([{"name": "b", "type": "int", "bit_size": 0}], 4)
+        assert not calls, "移除 observer 後不應再通知 view"
+
+    def test_presenter_multi_observer_notify(self):
+        """TDD: 驗證 Presenter 支援多 observer 註冊/移除/通知流程。"""
+        from src.model.struct_model import StructModel
+        from src.presenter.struct_presenter import StructPresenter
+        model = StructModel()
+        presenter = StructPresenter(model)
+        calls1, calls2 = [], []
+        class Obs1:
+            def update(self, event_type, model, **kwargs):
+                calls1.append(event_type)
+        class Obs2:
+            def update(self, event_type, model, **kwargs):
+                calls2.append(event_type)
+        obs1, obs2 = Obs1(), Obs2()
+        presenter.add_observer = lambda obs: model.add_observer(obs)
+        presenter.remove_observer = lambda obs: model.remove_observer(obs)
+        presenter.add_observer(obs1)
+        presenter.add_observer(obs2)
+        model.set_manual_struct([{"name": "a", "type": "int", "bit_size": 0}], 4)
+        assert calls1 and calls2, "兩個 observer 都應收到通知"
+        presenter.remove_observer(obs1)
+        calls1.clear(); calls2.clear()
+        model.set_manual_struct([{"name": "b", "type": "int", "bit_size": 0}], 4)
+        assert not calls1 and calls2, "移除 obs1 後只剩 obs2 收到通知"
+
 if __name__ == "__main__":
     unittest.main()

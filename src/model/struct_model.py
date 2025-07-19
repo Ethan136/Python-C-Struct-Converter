@@ -7,6 +7,7 @@
 from src.model.input_field_processor import InputFieldProcessor
 from .layout import LayoutCalculator, LayoutItem, TYPE_INFO
 from .struct_parser import parse_struct_definition, parse_member_line
+from dataclasses import asdict
 
 
 
@@ -87,13 +88,10 @@ def ast_to_dict(node, parent_id=None, prefix=""):
         "children": [],
     }
     # DEBUG: print node info
-    print(f"DEBUG ast_to_dict: node={node}, type={node_type}, name={getattr(node, 'name', None)}, class={node.__class__.__name__}")
     # 巢狀 struct/union
     if hasattr(node, "nested") and node.nested:
-        print(f"DEBUG ast_to_dict: node {getattr(node, 'name', None)} has nested: {node.nested}")
         base["children"] = [ast_to_dict(child, node_id, prefix=node_id+".") for child in getattr(node.nested, "members", [])]
     elif hasattr(node, "members"):
-        print(f"DEBUG ast_to_dict: node {getattr(node, 'name', None)} has members: {getattr(node, 'members', None)}")
         base["children"] = [ast_to_dict(child, node_id, prefix=node_id+".") for child in node.members]
     return base
 
@@ -137,7 +135,9 @@ class StructModel:
         # 統一格式：轉換為 C++ 標準型別格式
         self.struct_name = "MyStruct"
         self.members = self._convert_to_cpp_members(members)
-        self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
+        layout, self.total_size, self.struct_align = calculate_layout(self.members)
+        # 將 layout 統一轉為 list of dict
+        self.layout = [asdict(item) if hasattr(item, '__dataclass_fields__') else dict(item) for item in layout]
         self.manual_struct = {"members": self.members, "total_size": total_size}
         self._notify_observers("manual_struct_changed")
 
@@ -154,7 +154,6 @@ class StructModel:
         return self.struct_name, self.layout, self.total_size, self.struct_align
 
     def parse_hex_data(self, hex_data, byte_order, layout=None, total_size=None):
-        # 支援外部傳入 layout/total_size（如手動 struct）
         orig_layout = self.layout
         orig_total_size = self.total_size
         if layout is not None:
@@ -196,6 +195,8 @@ class StructModel:
                     "hex_raw": hex_value
                 })
             return parsed_values
+        except Exception as e:
+            raise
         finally:
             self.layout = orig_layout
             self.total_size = orig_total_size
@@ -317,7 +318,9 @@ class StructModel:
         expanded_members = self._convert_to_cpp_members(members)
         # 呼叫 calculate_layout 產生 C++ 標準 struct align/padding
         layout, total, align = calculate_layout(expanded_members)
-        return layout
+        # 將 layout 統一轉為 list of dict
+        layout_dicts = [asdict(item) if hasattr(item, '__dataclass_fields__') else dict(item) for item in layout]
+        return layout_dicts
 
     def export_manual_struct_to_h(self, struct_name=None):
         """匯出手動 struct 為 C header 檔案（V4 版本）"""
