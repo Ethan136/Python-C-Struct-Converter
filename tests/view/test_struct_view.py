@@ -1507,6 +1507,27 @@ class TestStructView(unittest.TestCase):
         if hasattr(view, "_on_treeview_column_menu_click"):
             view._on_treeview_column_menu_click("offset")
             self.assertIn("offset", presenter.toggle_calls)
+        # 驗證右鍵選單 UI（移到 destroy 前）
+        if hasattr(view, "_show_treeview_column_menu"):
+            class DummyEvent:
+                def __init__(self, x_root, y_root, col):
+                    self.x_root = x_root
+                    self.y_root = y_root
+                    self.widget = view.member_tree
+                    self.col = col
+            event = DummyEvent(100, 100, "label")
+            view._show_treeview_column_menu(event, test_mode=True)
+            self.assertTrue(hasattr(view, "_treeview_column_menu"))
+            menu = view._treeview_column_menu
+            col_names = [c["name"] for c in presenter.context["user_settings"]["treeview_columns"]]
+            for name in col_names:
+                found = False
+                for i in range(menu.index("end")+1):
+                    label = menu.entrycget(i, "label")
+                    if label == name:
+                        found = True
+                        break
+                self.assertTrue(found, f"Menu 應包含欄位 {name}")
         view.destroy()
 
 if __name__ == "__main__":

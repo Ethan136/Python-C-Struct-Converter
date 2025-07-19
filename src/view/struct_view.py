@@ -930,6 +930,37 @@ class StructView(tk.Tk):
         self.member_tree.bind('<<TreeviewOpen>>', self._on_member_tree_open)
         self.member_tree.bind('<<TreeviewClose>>', self._on_member_tree_close)
         self.member_tree.bind('<<TreeviewSelect>>', self._on_member_tree_select)
+        # 綁定 header 右鍵事件
+        def bind_header_right_click():
+            for col in self.member_tree["columns"]:
+                self.member_tree.heading(col, command=lambda c=col: None)  # 解除預設排序
+                self.member_tree.heading(col, anchor="w")
+                self.member_tree.heading(col, text=col)
+                self.member_tree.heading(col, command=lambda c=col: None)
+                self.member_tree.heading(col, anchor="w")
+                # 綁定右鍵
+                self.member_tree.heading(col, command=lambda c=col: None)
+            self.member_tree.bind("<Button-3>", self._show_treeview_column_menu)
+        bind_header_right_click()
+
+    def _show_treeview_column_menu(self, event, test_mode=False):
+        # 動態產生欄位選單
+        tree = self.member_tree
+        context = self.presenter.context if self.presenter and hasattr(self.presenter, "context") else {}
+        col_settings = context.get("user_settings", {}).get("treeview_columns", [])
+        menu = tk.Menu(tree, tearoff=0)
+        for c in col_settings:
+            name = c["name"]
+            visible = c.get("visible", True)
+            menu.add_checkbutton(label=name, onvalue=True, offvalue=False, variable=tk.BooleanVar(value=visible),
+                                 command=lambda n=name: self._on_treeview_column_menu_click(n))
+        self._treeview_column_menu = menu
+        if not test_mode:
+            menu.tk_popup(event.x_root, event.y_root)
+
+    def _on_treeview_column_menu_click(self, col_name):
+        if self.presenter and hasattr(self.presenter, "on_toggle_column"):
+            self.presenter.on_toggle_column(col_name)
 
     def _on_member_tree_open(self, event):
         item_id = event.widget.focus()
