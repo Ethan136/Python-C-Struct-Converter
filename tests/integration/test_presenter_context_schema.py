@@ -102,5 +102,84 @@ class TestPresenterContextSchemaContract(unittest.TestCase):
         except Exception as e:
             self.fail(f"Empty list field should not raise: {e}")
 
+    def test_required_field_none(self):
+        ctx = self.presenter.get_default_context()
+        for field in ["display_mode", "expanded_nodes", "version", "extra", "loading", "history", "user_settings", "last_update_time", "readonly", "debug_info"]:
+            ctx2 = dict(ctx)
+            ctx2[field] = None
+            # selected_node, error 可為 None，其他 required 欄位不可
+            if field in ("selected_node", "error"):
+                try:
+                    validate_presenter_context(ctx2)
+                except Exception as e:
+                    self.fail(f"{field} set to None should not raise: {e}")
+            else:
+                with self.assertRaises(jsonschema.ValidationError, msg=f"{field} set to None should raise"):
+                    validate_presenter_context(ctx2)
+
+    def test_required_field_type_error(self):
+        ctx = self.presenter.get_default_context()
+        # 錯誤型別
+        cases = [
+            ("display_mode", 123),
+            ("expanded_nodes", "notalist"),
+            ("version", 1.0),
+            ("extra", []),
+            ("loading", "yes"),
+            ("history", {}),
+            ("user_settings", []),
+            ("last_update_time", "now"),
+            ("readonly", "false"),
+            ("debug_info", [])
+        ]
+        for field, badval in cases:
+            ctx2 = dict(ctx)
+            ctx2[field] = badval
+            with self.assertRaises(jsonschema.ValidationError, msg=f"{field} type error should raise"):
+                validate_presenter_context(ctx2)
+
+    def test_last_update_time_extreme(self):
+        ctx = self.presenter.get_default_context()
+        for val in [-1e100, 1e100, 0, 1.2345]:
+            ctx2 = dict(ctx)
+            ctx2["last_update_time"] = val
+            try:
+                validate_presenter_context(ctx2)
+            except Exception as e:
+                self.fail(f"last_update_time extreme value {val} should not raise: {e}")
+
+    def test_debug_info_missing_or_wrong_type(self):
+        ctx = self.presenter.get_default_context()
+        # 缺漏 debug_info
+        ctx2 = dict(ctx)
+        del ctx2["debug_info"]
+        with self.assertRaises(jsonschema.ValidationError):
+            validate_presenter_context(ctx2)
+        # debug_info 為 list
+        ctx3 = dict(ctx)
+        ctx3["debug_info"] = []
+        with self.assertRaises(jsonschema.ValidationError):
+            validate_presenter_context(ctx3)
+        # debug_info 為 None
+        ctx4 = dict(ctx)
+        ctx4["debug_info"] = None
+        with self.assertRaises(jsonschema.ValidationError):
+            validate_presenter_context(ctx4)
+
+    def test_history_wrong_type(self):
+        ctx = self.presenter.get_default_context()
+        ctx2 = dict(ctx)
+        ctx2["history"] = "notalist"
+        with self.assertRaises(jsonschema.ValidationError):
+            validate_presenter_context(ctx2)
+
+    def test_additional_property_nested(self):
+        ctx = self.presenter.get_default_context()
+        ctx["custom_nested"] = {"foo": [1,2,3], "bar": {"baz": True}}
+        try:
+            validate_presenter_context(ctx)
+        except Exception as e:
+            self.fail(f"Nested additional property should not raise: {e}")
+
 if __name__ == "__main__":
     unittest.main() 
