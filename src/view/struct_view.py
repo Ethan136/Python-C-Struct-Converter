@@ -1055,6 +1055,7 @@ class StructView(tk.Tk):
             self.presenter.on_node_select(list(selected))
 
     def show_treeview_nodes(self, nodes, context, icon_map=None):
+        print(f"[DEBUG] show_treeview_nodes: nodes={[(n.get('id'), n.get('name')) for n in nodes]}, user_settings={context.get('user_settings')} ")
         # 依據 user_settings 設定 displaycolumns
         all_columns = tuple(c["name"] for c in MEMBER_TREEVIEW_COLUMNS)
         columns = all_columns
@@ -1126,6 +1127,8 @@ class StructView(tk.Tk):
                             try: tree.delete(c["id"])
                             except: pass
                 def patch_children(parent_id):
+                    if not tree.exists(parent_id):
+                        return
                     old_ids = [c["id"] for c in old_map[parent_id]["children"]] if parent_id in old_map else []
                     new_ids = [c["id"] for c in new_map[parent_id]["children"]] if parent_id in new_map else []
                     print(f"[patch_children] parent_id={parent_id} old_ids={old_ids} new_ids={new_ids}")
@@ -1140,6 +1143,7 @@ class StructView(tk.Tk):
                     # 若 parent_id 不在 new_map，無需 patch 新增/順序/內容
                     if parent_id not in new_map:
                         return
+                    parent_children = set(tree.get_children(parent_id))
                     for idx, nid in enumerate(new_ids):
                         n = new_map[nid]
                         node_type = n.get("type", "")
@@ -1157,30 +1161,31 @@ class StructView(tk.Tk):
                             tags.append("array")
                         if n["id"] in set(context.get("highlighted_nodes", [])):
                             tags.append("highlighted")
-                        if nid not in old_ids:
+                        if nid not in parent_children:
                             print(f"[diff/patch] insert {nid} to parent {parent_id} at {idx}")
                             values = tuple(n.get(col, "") for col in columns)
                             if tree.exists(nid):
+                                print(f"[diff/patch] pre-delete {nid} before insert")
                                 tree.delete(nid)
                             tree.insert(parent_id, idx, iid=nid, text=label, values=values, tags=tuple(tags))
                         else:
                             # 若順序不同則 move
-                            old_idx = old_ids.index(nid)
+                            old_idx = old_ids.index(nid) if nid in old_ids else idx
                             if old_idx != idx:
                                 print(f"[diff/patch] move {nid} in parent {parent_id} from {old_idx} to {idx}")
                                 tree.move(nid, parent_id, idx)
                             # 若 name/type 變動則 update
-                            o = old_map[nid]
+                            o = old_map[nid] if nid in old_map else n
                             if n.get("name") != o.get("name") or n.get("type") != o.get("type"):
                                 print(f"[diff/patch] update item {nid} in parent {parent_id}")
                                 values = tuple(n.get(col, "") for col in columns)
                                 tree.item(nid, values=values)
                             # 無論如何都要設置 tag，確保高亮/型別樣式正確
                             tree.item(nid, tags=tuple(tags))
-                        # 遞迴 patch 子節點
-                        for nid in new_ids:
-                            if nid in new_map and "children" in new_map[nid]:
-                                patch_children(nid)
+                    # 遞迴 patch 子節點
+                    for nid in new_ids:
+                        if nid in new_map and "children" in new_map[nid]:
+                            patch_children(nid)
                 root_ids = [n["id"] for n in nodes]
                 for rid in root_ids:
                     patch_children(rid)
@@ -1189,6 +1194,7 @@ class StructView(tk.Tk):
             for item in tree.get_children(""):
                 tree.delete(item)
             def insert_with_highlight(tree, parent_id, node):
+                print(f"[fallback insert] parent_id={parent_id} id={node.get('id')} name={node.get('name')}")
                 if parent_id in (None, "", 0):
                     parent_id = ""
                 node_type = node.get("type", "")
@@ -1232,6 +1238,33 @@ class StructView(tk.Tk):
                 tree.selection_remove(tree.selection())
 
     def update_display(self, nodes, context, icon_map=None):
+        print(f"[DEBUG] update_display: context.version={context.get('version')}, keys={list(context.keys())}")
+        # context version/結構自動升級/降級與警告
+        required_fields = {"highlighted_nodes": []}
+        version = context.get("version")
+        warning_msg = None
+        if version == "2.0":
+            for k, v in required_fields.items():
+                if k not in context:
+                    print(f"[DEBUG] auto add field {k} for v2.0")
+                    context[k] = v
+        elif version == "1.0":
+            for k, v in required_fields.items():
+                if k not in context:
+                    print(f"[DEBUG] auto add field {k} for v1.0")
+                    context[k] = v
+            warning_msg = "context 結構過舊，已自動升級"
+        else:
+            warning_msg = "context version 不明，請檢查"
+        if warning_msg:
+            print(f"[DEBUG] warning: {warning_msg}")
+            try:
+                from tkinter import messagebox
+                messagebox.showwarning("Context Warning", warning_msg)
+            except Exception:
+                pass
+            context.setdefault("debug_info", {})["context_warning"] = warning_msg
+        # 原本 update_display 流程
         self.show_treeview_nodes(nodes, context, icon_map)
         # 顯示錯誤訊息
         if context.get("error"):

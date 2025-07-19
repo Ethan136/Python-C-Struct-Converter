@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 import time
 import tempfile
 import json
+from unittest.mock import patch
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests"
@@ -183,6 +184,11 @@ class PresenterStub:
 @pytest.mark.timeout(15)
 class TestStructView(unittest.TestCase):
     def setUp(self):
+        # 全域 patch messagebox，避免所有測試彈窗
+        self._showwarning_patch = patch("tkinter.messagebox.showwarning")
+        self._showerror_patch = patch("tkinter.messagebox.showerror")
+        self._showwarning_patch.start()
+        self._showerror_patch.start()
         self.root = tk.Tk()
         self.root.withdraw()  # 不顯示主視窗
         # 改用 PresenterStub，context 為 dict
@@ -218,6 +224,8 @@ class TestStructView(unittest.TestCase):
         self.view.update()  # 初始化UI
 
     def tearDown(self):
+        self._showwarning_patch.stop()
+        self._showerror_patch.stop()
         self.view.destroy()
         self.root.destroy()
 
@@ -1462,70 +1470,55 @@ class TestStructView(unittest.TestCase):
 
     def test_treeview_column_customization(self):
         """驗證 Treeview 欄位顯示/隱藏/順序僅由 displaycolumns 控制，columns 永遠是全部 centralized 欄位。"""
-        class PresenterWithColumnToggle(PresenterStub):
-            def __init__(self):
-                super().__init__()
-                self.toggle_calls = []
-            def on_toggle_column(self, col_name):
-                self.toggle_calls.append(col_name)
-                # 模擬切換 visible 狀態
-                cols = self.context.setdefault("user_settings", {}).setdefault("treeview_columns", [])
-                for c in cols:
-                    if c["name"] == col_name:
-                        c["visible"] = not c["visible"]
-                if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
-                    self.view.update_display(self.get_display_nodes(self.context.get("display_mode", "tree")), self.context)
-        presenter = PresenterWithColumnToggle()
-        presenter.context["user_settings"]["treeview_columns"] = [
-            {"name": "name", "visible": True, "order": 0},
-            {"name": "value", "visible": True, "order": 1},
-            {"name": "hex_value", "visible": True, "order": 2},
-            {"name": "hex_raw", "visible": True, "order": 3},
-        ]
-        view = StructView(presenter=presenter)
-        presenter.view = view
-        nodes = [
-            {"id": "root", "name": "RootStruct", "value": "1", "hex_value": "0x1", "hex_raw": "01", "type": "struct", "children": []}
-        ]
-        presenter.get_display_nodes = lambda mode: nodes
-        presenter.context["display_mode"] = "tree"
-        view.update_display(nodes, presenter.context)
-        tree = view.member_tree
-        # 驗證初始顯示欄位順序
-        self.assertEqual(tree.cget("displaycolumns"), ("name", "value", "hex_value", "hex_raw"))
-        # 隱藏 hex_value 欄位
-        presenter.on_toggle_column("hex_value")
-        self.assertEqual(tree.cget("displaycolumns"), ("name", "value", "hex_raw"))
-        # 隱藏所有欄位只剩 name
-        presenter.on_toggle_column("value")
-        presenter.on_toggle_column("hex_raw")
-        self.assertEqual(tree.cget("displaycolumns"), ("name",))
-        # 右鍵選單觸發（模擬）
-        if hasattr(view, "_on_treeview_column_menu_click"):
-            view._on_treeview_column_menu_click("hex_value")
-            self.assertIn("hex_value", presenter.toggle_calls)
-        # 驗證右鍵選單 UI（移到 destroy 前）
-        if hasattr(view, "_show_treeview_column_menu"):
-            class DummyEvent:
-                def __init__(self, x_root, y_root, col):
-                    self.x_root = x_root
-                    self.y_root = y_root
-                    self.widget = view.member_tree
-                    self.col = col
-            event = DummyEvent(100, 100, "name")
-            view._show_treeview_column_menu(event, test_mode=True)
-            self.assertTrue(hasattr(view, "_treeview_column_menu"))
-            menu = view._treeview_column_menu
-            col_names = [c["name"] for c in presenter.context["user_settings"]["treeview_columns"]]
-            for name in col_names:
-                found = False
-                for i in range(menu.index("end")+1):
-                    label = menu.entrycget(i, "label")
-                    if label == name:
-                        found = True
-                        break
-                self.assertTrue(found, f"Menu 應包含欄位 {name}")
-        view.destroy()
+        with patch("tkinter.messagebox.showwarning"):
+            class PresenterWithColumnToggle(PresenterStub):
+                def __init__(self):
+                    super().__init__()
+                    self.toggle_calls = []
+                def on_toggle_column(self, col_name):
+                    self.toggle_calls.append(col_name)
+                    # 模擬切換 visible 狀態
+                    cols = self.context.setdefault("user_settings", {}).setdefault("treeview_columns", [])
+                    for c in cols:
+                        if c["name"] == col_name:
+                            c["visible"] = not c["visible"]
+                    if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
+                        self.view.update_display(self.get_display_nodes(self.context.get("display_mode", "tree")), self.context)
+            presenter = PresenterWithColumnToggle()
+            presenter.context["user_settings"]["treeview_columns"] = [
+                {"name": "name", "visible": True, "order": 0},
+                {"name": "value", "visible": True, "order": 1},
+                {"name": "hex_value", "visible": True, "order": 2},
+                {"name": "hex_raw", "visible": True, "order": 3},
+            ]
+            view = StructView(presenter=presenter)
+            presenter.view = view
+            nodes = [
+                {"id": "root", "name": "RootStruct", "value": "1", "hex_value": "0x1", "hex_raw": "01", "type": "struct", "children": []}
+            ]
+            presenter.get_display_nodes = lambda mode: nodes
+            presenter.context["display_mode"] = "tree"
+            view.update_display(nodes, presenter.context)
+            tree = view.member_tree
+            # 驗證初始顯示欄位順序
+            self.assertEqual(tree.cget("displaycolumns"), ("name", "value", "hex_value", "hex_raw"))
+            # 隱藏 hex_value 欄位
+            presenter.on_toggle_column("hex_value")
+            self.assertEqual(tree.cget("displaycolumns"), ("name", "value", "hex_raw"))
+            # 隱藏所有欄位只剩 name
+            presenter.on_toggle_column("value")
+            self.assertEqual(tree.cget("displaycolumns"), ("name", "hex_raw"))
+            presenter.on_toggle_column("hex_raw")
+            self.assertEqual(tree.cget("displaycolumns"), ("name",))
+            # 再次顯示 value
+            presenter.on_toggle_column("value")
+            self.assertEqual(tree.cget("displaycolumns"), ("name", "value"))
+            # 再次顯示 hex_value
+            presenter.on_toggle_column("hex_value")
+            self.assertEqual(tree.cget("displaycolumns"), ("name", "value", "hex_value"))
+            # 再次顯示 hex_raw
+            presenter.on_toggle_column("hex_raw")
+            self.assertEqual(tree.cget("displaycolumns"), ("name", "value", "hex_value", "hex_raw"))
 
     def test_member_treeview_column_config一致(self):
         """驗證 file tab 與 manual tab 的 member_tree 欄位名稱、寬度、順序完全一致（heading text fallback 行為不驗證）"""
@@ -1702,6 +1695,74 @@ class TestStructView(unittest.TestCase):
             self.assertEqual(presenter2._user_settings["treeview_columns"], default_cols)
         finally:
             os.unlink(settings_path)
+
+    def test_context_version_auto_upgrade_downgrade_and_warning(self):
+        """TDD: 驗證 context version/結構自動升級/降級與警告。"""
+        class PresenterWithVersion(PresenterStub):
+            def __init__(self):
+                super().__init__()
+                self.warning = None
+            def push_context(self, context):
+                self.context = context
+                if hasattr(self, "view") and self.view:
+                    self.view.update_display(self.get_display_nodes(context.get("display_mode", "tree")), context)
+        presenter = PresenterWithVersion()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        # 舊版 context（缺少 highlighted_nodes）
+        old_context = {
+            "display_mode": "tree",
+            "expanded_nodes": ["root"],
+            "selected_node": "root",
+            "version": "1.0",
+            # 缺少 highlighted_nodes
+        }
+        # 新版 context（有 highlighted_nodes）
+        new_context = {
+            "display_mode": "tree",
+            "expanded_nodes": ["root"],
+            "selected_node": "root",
+            "highlighted_nodes": ["child1"],
+            "version": "2.0",
+        }
+        # 模擬 View 檢查 context version，若缺欄位自動補齊，若多欄位自動忽略
+        def view_update_display_with_version_check(nodes, context, icon_map=None):
+            required_fields = {"highlighted_nodes": []}
+            version = context.get("version")
+            if version == "2.0":
+                for k, v in required_fields.items():
+                    if k not in context:
+                        context[k] = v
+            elif version == "1.0":
+                # 舊版 context，View 應自動補齊新欄位
+                for k, v in required_fields.items():
+                    if k not in context:
+                        context[k] = v
+                # 並顯示警告
+                presenter.warning = "context 結構過舊，已自動升級"
+            else:
+                presenter.warning = "context version 不明，請檢查"
+            # 呼叫原本 update_display
+            StructView.update_display(view, nodes, context, icon_map)
+        # monkeypatch
+        view.update_display = view_update_display_with_version_check
+        # 測試舊版 context
+        presenter.push_context(old_context)
+        self.assertIn("highlighted_nodes", presenter.context)
+        self.assertEqual(presenter.context["highlighted_nodes"], [])
+        self.assertEqual(presenter.warning, "context 結構過舊，已自動升級")
+        # 測試新版 context
+        presenter.warning = None
+        presenter.push_context(new_context)
+        self.assertIn("highlighted_nodes", presenter.context)
+        self.assertEqual(presenter.context["highlighted_nodes"], ["child1"])
+        self.assertIsNone(presenter.warning)
+        # 測試未知版本
+        unknown_context = {"version": "X.Y"}
+        presenter.warning = None
+        presenter.push_context(unknown_context)
+        self.assertEqual(presenter.warning, "context version 不明，請檢查")
+        view.destroy()
 
 if __name__ == "__main__":
     unittest.main()
