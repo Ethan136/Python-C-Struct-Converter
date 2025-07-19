@@ -23,6 +23,7 @@ from src.model.struct_model import (
 from tests.data_driven.xml_struct_model_loader import load_struct_model_tests
 from tests.data_driven.xml_struct_parse_definition_loader import load_struct_parse_definition_tests
 from tests.data_driven.xml_struct_model_manual_loader import load_struct_model_manual_tests
+from tests.data_driven.xml_struct_model_export_h_loader import load_struct_model_export_h_tests
 
 
 class TestParseStructDefinition(unittest.TestCase):
@@ -593,6 +594,28 @@ class TestStructModelNDArray(unittest.TestCase):
         self.assertEqual(len(actual), 4, "巢狀 struct 多維陣列應展開為 4 個元素 (2x2)")
         for idx, exp in enumerate(expected):
             self.assertEqual(actual[idx]["name"], exp["name"], f"第 {idx} 個元素名稱錯誤")
+
+
+class TestStructModelExportHXMLDriven(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_struct_model_export_h_config.xml')
+        cls.cases = load_struct_model_export_h_tests(config_path)
+
+    def test_export_h_cases(self):
+        model = StructModel()
+        for case in self.cases:
+            with self.subTest(name=case['name']):
+                members = case['members']
+                total_size = case['total_size']
+                struct_name = case.get('struct_name')
+                model.set_manual_struct(members, total_size)
+                if struct_name:
+                    h_content = model.export_manual_struct_to_h(struct_name=struct_name)
+                else:
+                    h_content = model.export_manual_struct_to_h()
+                for line in case['expected_h_contains']:
+                    self.assertIn(line, h_content)
 
 
 if __name__ == "__main__":

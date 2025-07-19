@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<export_h_tests>
+    <test_case name="bitfield_export">
+        <members>
+            <member name="a" type="unsigned int" bit_size="3"/>
+            <member name="b" type="unsigned int" bit_size="5"/>
+            <member name="c" type="unsigned int" bit_size="8"/>
+        </members>
+        <total_size>2</total_size>
+        <expected_h_contains>
+            <line>struct MyStruct</line>
+            <line>unsigned int a : 3;</line>
+            <line>unsigned int b : 5;</line>
+            <line>unsigned int c : 8;</line>
+            <line>// total size: 2 bytes</line>
+        </expected_h_contains>
+    </test_case>
+    <test_case name="custom_struct_name">
+        <members>
+            <member name="a" type="unsigned int" bit_size="3"/>
+            <member name="b" type="unsigned int" bit_size="5"/>
+        </members>
+        <total_size>1</total_size>
+        <struct_name>CustomStruct</struct_name>
+        <expected_h_contains>
+            <line>struct CustomStruct</line>
+            <line>unsigned int a : 3;</line>
+            <line>unsigned int b : 5;</line>
+            <line>// total size: 1 bytes</line>
+        </expected_h_contains>
+    </test_case>
+    <test_case name="anonymous_bitfield_export">
+        <members>
+            <member name="a" type="int" bit_size="3"/>
+            <member name="" type="int" bit_size="2"/>
+            <member name="b" type="int" bit_size="5"/>
+        </members>
+        <total_size>4</total_size>
+        <expected_h_contains>
+            <line>int a : 3;</line>
+            <line>int : 2;</line>
+            <line>int b : 5;</line>
+        </expected_h_contains>
+    </test_case>
+</export_h_tests> 
