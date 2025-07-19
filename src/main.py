@@ -1,5 +1,6 @@
 import os
 import sys
+import jsonschema  # for PyInstaller bundle
 if getattr(sys, 'frozen', False):
     # 加入 src 目錄和 exe 目錄
     sys.path.append(os.path.join(os.path.dirname(sys.executable), 'src'))
