@@ -23,9 +23,6 @@
 | V2P API 文件/contract 最終 review | 文件與 codebase 一致 | contract test + code review | [  ] |
 |  | 欄位/事件/權限/版本/錯誤/測試皆覆蓋 | contract test | [  ] |
 |  | API 版本號明確 | 文件檢查 | [  ] |
-| 多語系/本地化/a11y 基礎設計（如有） | context/事件流預留 locale/a11y 欄位 | code review | [  ] |
-|  | UI 支援多語系切換 | UI 測試 | [  ] |
-|  | a11y 基本測試通過 | a11y 測試 | [  ] |
 
 ---
 
@@ -74,9 +71,6 @@ cache_state_coverage: true
 api_doc_review: true
 api_fields_events: true
 api_version: true
-i18n_locale: false
-i18n_ui: false
-a11y_test: false
 ```
 
 ### CI 驗證腳本（pseudo code）
