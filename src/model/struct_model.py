@@ -356,11 +356,26 @@ class StructModel:
         raise ValueError("No AST available")
 
     def get_display_nodes(self, mode='tree'):
-        """回傳符合 V2P API 的 treeview node 結構"""
+        """回傳符合 V2P API 文件的 Treeview node 結構。"""
         ast_dict = self.get_struct_ast()
-        if mode == 'tree':
-            return [ast_dict]
-        elif mode == 'flat':
-            return flatten_ast_nodes(ast_dict)
+        def to_treeview_node(node):
+            label = node["name"]
+            if node.get("is_struct"):
+                label = f"{label} [struct]"
+            elif node.get("is_union"):
+                label = f"{label} [union]"
+            return {
+                "id": node["id"],
+                "label": label,
+                "type": node["type"],
+                "children": [to_treeview_node(child) for child in node.get("children", [])],
+                "icon": node.get("type"),
+                "extra": {},
+            }
+        if mode == "tree":
+            return [to_treeview_node(ast_dict)]
+        elif mode == "flat":
+            flat_nodes = flatten_ast_nodes(ast_dict)
+            return [to_treeview_node(n) for n in flat_nodes]
         else:
             raise ValueError(f"Unknown display mode: {mode}")

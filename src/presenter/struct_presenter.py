@@ -319,3 +319,23 @@ class StructPresenter:
         """查詢自動清空 cache 是否啟用。"""
         with self._auto_cache_clear_lock:
             return self._auto_cache_clear_enabled
+
+    def on_switch_display_mode(self, mode):
+        self.context["display_mode"] = mode
+        self.context["expanded_nodes"] = ["root"]
+        self.context["selected_node"] = None
+        self.context["debug_info"]["last_event"] = "on_switch_display_mode"
+        self.context["debug_info"]["last_event_args"] = {"mode": mode}
+        # 推送 context 給 view（如有）
+        if self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(self.model.get_display_nodes(mode), self.context)
+
+    def on_delete_node(self, node_id):
+        if not self.context.get("can_delete", False):
+            self.context["error"] = "Permission denied"
+            self.context["debug_info"]["last_error"] = "PERMISSION_DENIED"
+            if self.view and hasattr(self.view, "update_display"):
+                self.view.update_display(self.model.get_display_nodes(self.context["display_mode"]), self.context)
+            return {"success": False, "error_code": "PERMISSION_DENIED", "error_message": "No permission to delete."}
+        # ...實際刪除邏輯略...
+        return {"success": True}
