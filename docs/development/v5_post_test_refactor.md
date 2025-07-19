@@ -382,3 +382,44 @@ pytest --maxfail=10 --cov=src tests/
 - 擴充方式：
   - 依 7.6.1 條列 edge case，持續新增 XML 測試資料即可。
   - 每次擴充後執行 pytest，確保驗證邏輯與資料一致。 
+
+### 7.11 錯誤情境 XML 驗證規劃
+- 可驗證錯誤情境：
+  - 欄位名稱重複
+  - bit_size 非法（負數、超過型別上限）
+  - total_size 非法（負數、過小）
+  - hex 長度不足/過長
+  - 不支援型別
+- XML schema 範例：
+```xml
+<manual_struct_error_tests>
+    <test_case name="duplicate_member_name">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+            <member name="a" type="char" bit_size="0"/>
+        </members>
+        <total_size>8</total_size>
+        <expect_error>成員名稱 'a' 重複</expect_error>
+    </test_case>
+    <test_case name="invalid_bit_size">
+        <members>
+            <member name="a" type="int" bit_size="-1"/>
+        </members>
+        <total_size>4</total_size>
+        <expect_error>bit_size 需為 0 或正整數</expect_error>
+    </test_case>
+    <test_case name="invalid_total_size">
+        <members>
+            <member name="a" type="int" bit_size="0"/>
+        </members>
+        <total_size>-1</total_size>
+        <expect_error>結構體大小需為正整數</expect_error>
+    </test_case>
+</manual_struct_error_tests>
+```
+- 驗證重點：
+  - 正確捕捉並比對例外訊息
+  - 支援多種錯誤情境
+- 擴充方式：
+  - 依 7.6.1 條列錯誤情境，持續新增 XML 測試資料即可。
+  - 每次擴充後執行 pytest，確保驗證邏輯與資料一致。 
