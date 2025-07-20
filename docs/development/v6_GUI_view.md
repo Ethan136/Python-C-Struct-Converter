@@ -128,3 +128,178 @@
 ### 4. 文件同步與 CI
 - 文件需同步規範 stub/mock、context schema、UI 測試設計原則。
 - 建議 CI 加入型別檢查、lint、pytest-cov 等，確保 stub/mock/型別一致性。 
+
+---
+
+## [2024-12-19] 新舊 GUI 切換選單設計規劃
+
+### 1. 設計目標
+- **新舊 GUI 並存**：提供用戶在「舊版平面顯示」與「新版樹狀顯示」之間切換的能力
+- **資料同步**：切換時確保 struct 資料、解析結果、context 狀態完全同步
+- **漸進式升級**：用戶可隨時回退到舊版，確保功能不中斷
+- **基本樹狀顯示**：支援巢狀 struct/union 的基本樹狀顯示功能
+
+### 2. UI 元件設計
+
+#### 2.1 切換選單位置與樣式
+```python
+# 在主視窗頂部新增切換選單
+GUI_VERSION_OPTIONS = [
+    {"value": "legacy", "label": "舊版 GUI (平面顯示)", "description": "傳統平面表格顯示"},
+    {"value": "modern", "label": "新版 GUI (樹狀顯示)", "description": "樹狀巢狀結構顯示"}
+]
+
+# 切換選單元件
+self.gui_version_var = tk.StringVar(value="legacy")
+self.gui_version_menu = ttk.OptionMenu(
+    self, 
+    self.gui_version_var, 
+    "legacy", 
+    *[opt["value"] for opt in GUI_VERSION_OPTIONS],
+    command=self._on_gui_version_change
+)
+```
+
+#### 2.2 簡化的顯示切換機制
+```python
+def _on_gui_version_change(self, version):
+    """處理 GUI 版本切換"""
+    if self.presenter and hasattr(self.presenter, "on_switch_gui_version"):
+        # 通知 presenter 切換 GUI 版本
+        self.presenter.on_switch_gui_version(version)
+    
+    # 更新 context
+    self.context["gui_version"] = version
+    
+    # 切換顯示模式
+    if version == "modern":
+        self._switch_to_modern_gui()
+    else:  # legacy
+        self._switch_to_legacy_gui()
+
+def _switch_to_legacy_gui(self):
+    """切換到舊版平面顯示"""
+    # 隱藏新版元件，顯示舊版元件
+    if hasattr(self, "modern_frame"):
+        self.modern_frame.pack_forget()
+    if hasattr(self, "member_tree"):
+        self.member_tree.pack(fill="x")
+
+def _switch_to_modern_gui(self):
+    """切換到新版樹狀顯示"""
+    # 隱藏舊版元件，顯示新版元件
+    if hasattr(self, "member_tree"):
+        self.member_tree.pack_forget()
+    if hasattr(self, "modern_frame"):
+        self.modern_frame.pack(fill="both", expand=True)
+    else:
+        self._create_modern_gui()
+
+def _create_modern_gui(self):
+    """建立新版樹狀顯示 GUI"""
+    self.modern_frame = tk.Frame(self.tab_file)
+    
+    # 建立樹狀 Treeview
+    self.modern_tree = ttk.Treeview(
+        self.modern_frame,
+        columns=("name", "type", "value", "offset", "size"),
+        show="tree headings",
+        height=10
+    )
+    self.modern_tree.heading("name", text="欄位名稱")
+    self.modern_tree.heading("type", text="型別")
+    self.modern_tree.heading("value", text="值")
+    self.modern_tree.heading("offset", text="Offset")
+    self.modern_tree.heading("size", text="Size")
+    self.modern_tree.pack(fill="both", expand=True)
+    
+    # 綁定展開/收合事件
+    self.modern_tree.bind("<<TreeviewOpen>>", self._on_modern_tree_open)
+    self.modern_tree.bind("<<TreeviewClose>>", self._on_modern_tree_close)
+```
+
+### 3. 新版 GUI 基本功能
+
+#### 3.1 樹狀巢狀顯示
+- **巢狀 struct/union 展開**：支援多層級結構展開
+- **[struct]/[union] 標籤**：清楚標示節點類型
+- **基本 icon**：不同類型節點使用不同 icon
+- **展開/收合**：支援節點展開與收合
+
+#### 3.2 基本搜尋
+- **簡單搜尋**：支援節點名稱搜尋
+- **高亮顯示**：搜尋結果高亮顯示
+
+### 4. Context 擴充
+```python
+# 在 context schema 中新增
+"gui_version": {"type": "string", "enum": ["legacy", "modern"]}
+```
+
+### 5. 實作步驟（按照策略文件）
+
+#### 5.1 AST 結構傳遞
+- 確認 parser/model 能回傳巢狀 AST 結構
+
+#### 5.2 Treeview 遞迴插入
+- 實作遞迴插入函式，將 AST 轉為 Treeview node
+
+#### 5.3 GUI prototype
+- 新增切換選單，支援新舊顯示切換
+
+#### 5.4 優化顯示
+- 加上 icon、顏色、[struct]/[union] 標籤
+
+#### 5.5 保留現有 GUI
+- 提供選單切換新舊頁面
+
+### 6. 基本測試
+
+#### 6.1 切換機制測試
+```python
+def test_gui_version_switch(self):
+    """測試 GUI 版本切換"""
+    # 測試切換選單存在
+    self.assertIsNotNone(self.view.gui_version_var)
+    
+    # 測試切換到新版
+    self.view._on_gui_version_change("modern")
+    self.assertEqual(self.presenter.context["gui_version"], "modern")
+    
+    # 測試切換到舊版
+    self.view._on_gui_version_change("legacy")
+    self.assertEqual(self.presenter.context["gui_version"], "legacy")
+```
+
+#### 6.2 樹狀顯示測試
+```python
+def test_modern_treeview_display(self):
+    """測試新版樹狀顯示"""
+    # 切換到新版
+    self.view._on_gui_version_change("modern")
+    
+    # 驗證樹狀元件存在
+    self.assertIsNotNone(self.view.modern_tree)
+    
+    # 驗證基本功能
+    self.assertTrue(hasattr(self.view, "_on_modern_tree_open"))
+    self.assertTrue(hasattr(self.view, "_on_modern_tree_close"))
+```
+
+### 7. 注意事項
+
+#### 7.1 資料同步
+- **切換時資料同步**：確保切換 GUI 版本時，struct 資料完全同步
+- **context 相容**：確保新舊 GUI 都能正確處理 context 結構
+
+#### 7.2 回退機制
+- **錯誤處理**：切換失敗時提供明確的錯誤訊息
+- **回退機制**：新機制有 bug 可隨時切回舊顯示
+
+### 8. 符合策略文件的範圍
+
+- ✅ **新舊 GUI 並存**：符合「新舊顯示機制並存，切換框架可隨時回退」
+- ✅ **基本樹狀顯示**：符合「支援巢狀 struct/union 樹狀顯示」
+- ✅ **資料同步**：符合「切換新舊顯示時，資料 context 必須同步」
+- ✅ **簡單實作**：符合策略文件的 6 個簡單開發步驟
+- ✅ **worktree 對應**：符合「gui_switch_container：設計切換容器，實作新舊顯示切換」 
