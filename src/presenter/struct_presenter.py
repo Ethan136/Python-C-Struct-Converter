@@ -40,6 +40,7 @@ class StructPresenter:
         self._auto_cache_clear_enabled = False
         self._auto_cache_clear_interval = None
         self._auto_cache_clear_lock = threading.Lock()
+        self._observers = set()  # 新增: 支援多 observer
         # Observer pattern: 註冊自己為 model observer
         if hasattr(self.model, "add_observer"):
             self.model.add_observer(self)
@@ -51,10 +52,27 @@ class StructPresenter:
         self._pending_context = None
         self._history_maxlen = 200
 
+    def add_observer(self, observer):
+        self._observers.add(observer)
+
+    def remove_observer(self, observer):
+        self._observers.discard(observer)
+
+    def notify_observers(self, event_type, **kwargs):
+        for obs in list(self._observers):
+            if hasattr(obs, "update"):
+                obs.update(event_type, self, **kwargs)
+
     def update(self, event_type, model, **kwargs):
         """Observer callback: 當 model 狀態變更時自動呼叫。"""
+        if event_type == "file_struct_loaded":
+            # 只有 file_struct_loaded 才呼叫 get_display_nodes
+            if self.view and hasattr(self.view, "update_display"):
+                self.view.update_display(self.model.get_display_nodes("tree"), getattr(self, "context", {}))
+        # 其他事件只做 cache 失效與 observer 通知
         if event_type in ("manual_struct_changed", "file_struct_loaded"):
             self.invalidate_cache()
+        self.notify_observers(event_type, **kwargs)
         # 可根據 event_type 擴充自動行為
 
     def invalidate_cache(self):
@@ -204,18 +222,13 @@ class StructPresenter:
         return {"h_content": h_content}
 
     def parse_manual_hex_data(self, hex_parts, struct_def, endian):
-        """解析 MyStruct tab 的 hex 資料，回傳 dict 結果，不操作 view"""
         try:
             unit_size = struct_def.get('unit_size')
             byte_order = 'little' if endian == "Little Endian" else 'big'
-
             hex_data, debug_lines = self._process_hex_parts(hex_parts, byte_order)
-
             self.model.set_manual_struct(struct_def['members'], struct_def['total_size'])
             layout = self.model.calculate_manual_layout(struct_def['members'], struct_def['total_size'])
-
             parsed_values = self.model.parse_hex_data(hex_data, byte_order, layout=layout, total_size=struct_def['total_size'])
-
             return {'type': 'ok', 'debug_lines': debug_lines, 'parsed_values': parsed_values}
         except HexProcessingError as e:
             title_map = {
@@ -231,14 +244,11 @@ class StructPresenter:
     def compute_member_layout(self, members, total_size):
         """計算 struct member 的 layout，回傳 layout list，含 LRU cache 機制。"""
         cache_key = self._make_cache_key(members, total_size)
-        print(f"[DEBUG] cache_key: {cache_key}")
-        print(f"[DEBUG] cache keys before: {list(self._layout_cache.keys())}")
         if self._lru_cache_size > 0 and cache_key in self._layout_cache:
             self._cache_hits += 1
             # LRU: move to end
             self._layout_cache.move_to_end(cache_key)
             self._last_hit_key = cache_key  # 新增
-            print(f"[DEBUG] cache hit: {cache_key}")
             return self._layout_cache[cache_key]
         try:
             start = time.perf_counter()
@@ -254,12 +264,10 @@ class StructPresenter:
             while len(self._layout_cache) > self._lru_cache_size:
                 evicted = self._layout_cache.popitem(last=False)
                 self._last_evict_key = evicted[0]  # 新增
-                print(f"[DEBUG] evicted: {evicted[0]}")
         else:
             # cache size 0，不儲存任何項目
             self._layout_cache.clear()
         self._cache_misses += 1
-        print(f"[DEBUG] cache keys after: {list(self._layout_cache.keys())}")
         return layout
 
     def get_last_layout_time(self):
@@ -350,12 +358,13 @@ class StructPresenter:
         import time
         return {
             "display_mode": "tree",
+            "gui_version": "legacy",  # 新增 GUI 版本欄位
             "expanded_nodes": ["root"],
             "selected_node": None,
             "error": None,
             "filter": None,
             "search": None,
-            "version": "1.0",
+            "version": "2.0",  # 修正：升級到 2.0 版本
             "extra": {},
             "loading": False,
             "history": [],
@@ -369,7 +378,7 @@ class StructPresenter:
                 "last_error": None,
                 "context_history": [],
                 "api_trace": [],
-                "version": "1.0",
+                "version": "2.0",  # 修正：同步升級 debug_info 版本
                 "extra": {}
             },
             "can_edit": True,
@@ -470,6 +479,17 @@ class StructPresenter:
         self.context["display_mode"] = mode
         self.context["expanded_nodes"] = ["root"]
         self.context["selected_node"] = None
+
+    @event_handler("on_switch_gui_version")
+    def on_switch_gui_version(self, version):
+        """處理 GUI 版本切換事件"""
+        if version not in ["legacy", "modern"]:
+            raise ValueError(f"Invalid GUI version: {version}")
+        self.context["gui_version"] = version
+        # 切換時重置一些狀態
+        self.context["expanded_nodes"] = ["root"]
+        self.context["selected_node"] = None
+        self.context["selected_nodes"] = []
 
     @event_handler("on_collapse")
     def on_collapse(self, node_id):

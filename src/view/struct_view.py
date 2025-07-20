@@ -3,24 +3,64 @@ from tkinter import ttk
 from tkinter import filedialog, messagebox
 # from src.config import get_string
 from src.model.struct_model import StructModel
+import time
+
+# --- Treeview 巢狀遞迴插入與互動 helper ---
+MEMBER_TREEVIEW_COLUMNS = [
+    {"name": "name", "title": "欄位名稱", "width": 120},
+    {"name": "value", "title": "值", "width": 100},
+    {"name": "hex_value", "title": "Hex Value", "width": 100},
+    {"name": "hex_raw", "title": "Hex Raw", "width": 150},
+]
 
 def create_member_treeview(parent):
+    all_columns = MEMBER_TREEVIEW_COLUMNS
+    col_names = tuple(c["name"] for c in all_columns)
     tree = ttk.Treeview(
         parent,
-        columns=("name", "value", "hex_value", "hex_raw"),
+        columns=col_names,
         show="headings",
-        height=6
+        height=6,
+        selectmode="extended"  # 支援多選
     )
-    tree.heading("name", text="欄位名稱")
-    tree.heading("value", text="值")
-    tree.heading("hex_value", text="Hex Value")
-    tree.heading("hex_raw", text="Hex Raw")
-    tree.column("name", width=120, stretch=False)
-    tree.column("value", width=100, stretch=False)
-    tree.column("hex_value", width=100, stretch=False)
-    tree.column("hex_raw", width=150, stretch=False)
+    for c in all_columns:
+        tree.heading(c["name"], text=c["title"])
+        tree.column(c["name"], width=c["width"], stretch=False)
+    tree["displaycolumns"] = col_names
     tree.pack(fill="x")
     return tree
+
+def update_treeview_by_context(tree, context):
+    # 展開/收合
+    expanded = set(context.get("expanded_nodes", []))
+    for item in tree.get_children(""):
+        _update_treeview_expand_recursive(tree, item, expanded)
+    # 高亮選取
+    selected = context.get("selected_node")
+    selected_nodes = context.get("selected_nodes")
+    # 取得所有現有 id
+    def collect_all_ids(tree, parent=""):
+        ids = list(tree.get_children(parent))
+        for i in list(ids):
+            ids.extend(collect_all_ids(tree, i))
+        return ids
+    all_ids = set(collect_all_ids(tree, ""))
+    # 僅在型別正確時才呼叫 selection_set，且只選取存在的 id
+    if isinstance(selected_nodes, (list, tuple)) and selected_nodes:
+        filtered = [i for i in selected_nodes if i in all_ids]
+        if filtered:
+            tree.selection_set(filtered)
+        else:
+            tree.selection_remove(tree.selection())
+    elif isinstance(selected, str) and selected and selected in all_ids:
+        tree.selection_set(selected)
+    else:
+        tree.selection_remove(tree.selection())
+
+def _update_treeview_expand_recursive(tree, item_id, expanded):
+    tree.item(item_id, open=(item_id in expanded))
+    for child in tree.get_children(item_id):
+        _update_treeview_expand_recursive(tree, child, expanded)
 
 def create_scrollable_tab_frame(parent):
     canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
@@ -42,6 +82,9 @@ def create_scrollable_tab_frame(parent):
 class StructView(tk.Tk):
     def __init__(self, presenter=None):
         super().__init__()
+        self._member_table_refresh_count = 0
+        self._hex_grid_refresh_count = 0
+        self._treeview_refresh_count = 0
         self.presenter = presenter
         self.title("C Struct GUI")
         self.geometry("1200x800")
@@ -49,6 +92,18 @@ class StructView(tk.Tk):
         self._debug_auto_refresh_enabled = None
         self._debug_auto_refresh_interval = None
         self._create_tab_control()
+        # Treeview 事件綁定
+        if hasattr(self, "member_tree"):
+            self._bind_member_tree_events()
+        # 新增 presenter/view 綁定與初始顯示
+        self._init_presenter_view_binding()
+
+    def get_member_table_refresh_count(self):
+        return self._member_table_refresh_count
+    def get_hex_grid_refresh_count(self):
+        return self._hex_grid_refresh_count
+    def get_treeview_refresh_count(self):
+        return self._treeview_refresh_count
 
     def _create_tab_control(self):
         self.tab_control = ttk.Notebook(self)
@@ -70,6 +125,7 @@ class StructView(tk.Tk):
         # 單位選擇與 endianness
         control_frame = tk.Frame(main_frame)
         control_frame.pack(fill="x", pady=(5, 2))
+        self.file_control_frame = control_frame  # 供測試直接存取
         tk.Label(control_frame, text="單位大小：").pack(side=tk.LEFT)
         self.unit_size_var = tk.StringVar(value="1 Byte")
         unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
@@ -80,7 +136,43 @@ class StructView(tk.Tk):
         endian_options = ["Little Endian", "Big Endian"]
         self.endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=lambda _: self._on_endianness_change())
         self.endian_menu.pack(side=tk.LEFT)
-
+        # 顯示模式切換
+        tk.Label(control_frame, text="  顯示模式：").pack(side=tk.LEFT)
+        self.display_mode_var = tk.StringVar(value="tree")
+        display_mode_options = ["tree", "flat"]
+        self.display_mode_menu = tk.OptionMenu(control_frame, self.display_mode_var, *display_mode_options, command=self._on_display_mode_change)
+        self.display_mode_menu.pack(side=tk.LEFT)
+        # GUI 版本切換
+        tk.Label(control_frame, text="  GUI 版本：").pack(side=tk.LEFT)
+        self.gui_version_var = tk.StringVar(value="legacy")
+        gui_version_options = ["legacy", "modern"]
+        self.gui_version_menu = tk.OptionMenu(control_frame, self.gui_version_var, *gui_version_options, command=self._on_gui_version_change)
+        self.gui_version_menu.pack(side=tk.LEFT)
+        # 搜尋輸入框
+        tk.Label(control_frame, text="  搜尋：").pack(side=tk.LEFT)
+        self.search_var = tk.StringVar()
+        self.search_entry = tk.Entry(control_frame, textvariable=self.search_var, width=16)
+        self.search_entry.pack(side=tk.LEFT)
+        self.search_entry.bind('<KeyRelease>', self._on_search_entry_change)
+        # Filter 輸入框
+        tk.Label(control_frame, text="  Filter：").pack(side=tk.LEFT)
+        self.filter_var = tk.StringVar()
+        self.filter_entry = tk.Entry(control_frame, textvariable=self.filter_var, width=16)
+        self.filter_entry.pack(side=tk.LEFT)
+        self.filter_entry.bind('<KeyRelease>', self._on_filter_entry_change)
+        # 展開全部/收合全部按鈕
+        self.expand_all_btn = tk.Button(control_frame, text="展開全部", command=self._on_expand_all)
+        self.expand_all_btn.pack(side=tk.LEFT, padx=2)
+        self.collapse_all_btn = tk.Button(control_frame, text="收合全部", command=self._on_collapse_all)
+        self.collapse_all_btn.pack(side=tk.LEFT, padx=2)
+        # 批次操作按鈕
+        self.batch_expand_btn = tk.Button(control_frame, text="展開選取", command=self._on_batch_expand)
+        self.batch_expand_btn.pack(side=tk.LEFT, padx=2)
+        self.batch_collapse_btn = tk.Button(control_frame, text="收合選取", command=self._on_batch_collapse)
+        self.batch_collapse_btn.pack(side=tk.LEFT, padx=2)
+        # 批次刪除按鈕
+        self.batch_delete_btn = tk.Button(control_frame, text="批次刪除", command=self._on_batch_delete)
+        self.batch_delete_btn.pack(side=tk.LEFT, padx=2)
         # 檔案選擇按鈕
         tk.Button(main_frame, text="選擇 .h 檔", command=self._on_browse_file).pack(anchor="w", pady=2)
         # 檔案路徑顯示
@@ -100,6 +192,7 @@ class StructView(tk.Tk):
         member_frame = tk.LabelFrame(main_frame, text="Struct Member Value")
         member_frame.pack(fill="x", padx=2, pady=2)
         self.member_tree = create_member_treeview(member_frame)
+        self._bind_member_tree_events()
 
         # debug bytes 顯示區
         debug_frame = tk.LabelFrame(main_frame, text="Debug Bytes")
@@ -234,7 +327,6 @@ class StructView(tk.Tk):
     def _compute_member_layout(self, is_v3_format):
         """回傳 {name: size} 對應表供表格使用，改為呼叫 presenter，並過濾 padding。"""
         if not self.presenter:
-            print("[DEBUG] presenter is None")
             return {}
         member_data = [
             {
@@ -244,18 +336,14 @@ class StructView(tk.Tk):
             }
             for m in self.members
         ]
-        print(f"[DEBUG] member_data: {member_data}")
         try:
             layout = self.presenter.compute_member_layout(member_data, self.size_var.get())
         except Exception as e:
-            print(f"[DEBUG] compute_member_layout error: {e}")
             layout = []
-        print(f"[DEBUG] layout: {layout}")
         mapping = {}
         for item in layout:
             if item.get("type") != "padding":
                 mapping[item["name"]] = str(item["size"])
-        print(f"[DEBUG] mapping: {mapping}")
         return mapping
 
     def _build_member_header(self, is_v3_format):
@@ -272,29 +360,19 @@ class StructView(tk.Tk):
 
         name_var = tk.StringVar(value=member.get("name", ""))
         name_entry = tk.Entry(self.member_frame, textvariable=name_var, width=10)
-        name_entry.grid(row=row, column=1, padx=2, pady=1)
-
         type_var = tk.StringVar(value=member.get("type", ""))
         type_options = self._get_type_options(member.get("bit_size", 0) > 0)
         type_menu = tk.OptionMenu(self.member_frame, type_var, *type_options)
-        type_menu.grid(row=row, column=2, padx=2, pady=1)
-
         bit_var = tk.IntVar(value=member.get("bit_size", 0))
         bit_entry = tk.Entry(self.member_frame, textvariable=bit_var, width=6)
-        bit_entry.grid(row=row, column=3, padx=2, pady=1)
-
         size_val = name2size.get(member.get("name", ""), "-")
         size_label = tk.Label(self.member_frame, text=size_val)
-        size_label.grid(row=row, column=4, padx=2, pady=1)
         size_label.is_size_label = True
-
         op_frame = tk.Frame(self.member_frame)
-        op_frame.grid(row=row, column=5, padx=2, pady=1)
         tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i), width=4).pack(side=tk.LEFT, padx=1)
         tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i), width=4).pack(side=tk.LEFT, padx=1)
         tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i), width=4).pack(side=tk.LEFT, padx=1)
         tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4).pack(side=tk.LEFT, padx=1)
-
         name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
         type_var.trace_add("write", lambda *_, i=idx, v=type_var: self._update_member_type(i, v))
         bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
@@ -307,19 +385,112 @@ class StructView(tk.Tk):
         self.member_entries.append((name_entry, type_menu, bit_entry, size_label, op_frame))
 
     def _render_member_table(self):
-        # 清空現有表格
-        for widget in self.member_frame.winfo_children():
-            widget.destroy()
-        self.member_entries = []  # 清空 row widget 記錄
-        # Member 編輯表格
-        if self.members:
-            self._build_member_header(True)
-            name2size = self._compute_member_layout(True)
-            for idx, m in enumerate(self.members):
-                self._render_member_row(idx, m, True, name2size)
-        else:
+        self._member_table_refresh_count += 1
+        members = self.members
+        # 初始化 row widget cache
+        if not hasattr(self, "_member_row_widgets") or self._member_row_widgets is None:
+            self._member_row_widgets = {}
+        row_widgets = self._member_row_widgets
+        # 若 members 為空，清空所有 row widget
+        if not members:
+            for widgets in row_widgets.values():
+                for w in widgets:
+                    w.destroy()
+            row_widgets.clear()
+            for widget in self.member_frame.winfo_children():
+                widget.destroy()
             tk.Label(self.member_frame, text="無成員資料", fg="gray").grid(row=0, column=0, columnspan=6, pady=10)
-        # 更新下方標準 struct layout treeview
+            self.member_entries = []
+            self._update_manual_layout_tree()
+            return
+        # 若 header 不存在或被清空，重建 header
+        if not hasattr(self, "_member_header_widgets") or self._member_header_widgets is None or not self._member_header_widgets:
+            for widget in self.member_frame.winfo_children():
+                widget.destroy()
+            self._member_header_widgets = [
+                tk.Label(self.member_frame, text="#", font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text="成員名稱", font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text="型別", font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text="bit size", font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text="size", font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text="操作", font=("Arial", 9, "bold")),
+            ]
+            for col, w in enumerate(self._member_header_widgets):
+                w.grid(row=0, column=col, padx=2, pady=2)
+        name2size = self._compute_member_layout(True)
+        # 刪除多餘 row widget
+        for idx in list(row_widgets.keys()):
+            if idx >= len(members):
+                for w in row_widgets[idx]:
+                    w.destroy()
+                del row_widgets[idx]
+        # 更新/新增 row widget
+        self.member_entries = []
+        for idx, m in enumerate(members):
+            if idx in row_widgets:
+                widgets = row_widgets[idx]
+                # 更新值
+                widgets[0].config(text=str(idx + 1))  # row number
+                widgets[1].delete(0, "end"); widgets[1].insert(0, m.get("name", ""))
+                widgets[2].setvar(widgets[2].cget("textvariable"), m.get("type", ""))
+                widgets[3].delete(0, "end"); widgets[3].insert(0, m.get("bit_size", 0))
+                widgets[4].config(text=name2size.get(m.get("name", ""), "-"))
+                # 操作按鈕無需更新
+            else:
+                # 新增 row widget
+                name_var = tk.StringVar(value=m.get("name", ""))
+                name_entry = tk.Entry(self.member_frame, textvariable=name_var, width=10, takefocus=1)
+                type_var = tk.StringVar(value=m.get("type", ""))
+                type_options = self._get_type_options(m.get("bit_size", 0) > 0)
+                type_menu = tk.OptionMenu(self.member_frame, type_var, *type_options)
+                type_menu.configure(takefocus=1)
+                # 取得 OptionMenu 內部 Button
+                type_menu_btn = None
+                for child in type_menu.winfo_children():
+                    if isinstance(child, tk.Button):
+                        type_menu_btn = child
+                        break
+                if type_menu_btn:
+                    type_menu_btn.configure(takefocus=1)
+                bit_var = tk.IntVar(value=m.get("bit_size", 0))
+                bit_entry = tk.Entry(self.member_frame, textvariable=bit_var, width=6, takefocus=1)
+                size_val = name2size.get(m.get("name", ""), "-")
+                size_label = tk.Label(self.member_frame, text=size_val)
+                size_label.is_size_label = True
+                op_frame = tk.Frame(self.member_frame)
+                # 操作按鈕 takefocus=1
+                del_btn = tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i), width=4, takefocus=1)
+                up_btn = tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i), width=4, takefocus=1)
+                down_btn = tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i), width=4, takefocus=1)
+                copy_btn = tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4, takefocus=1)
+                del_btn.pack(side=tk.LEFT, padx=1)
+                up_btn.pack(side=tk.LEFT, padx=1)
+                down_btn.pack(side=tk.LEFT, padx=1)
+                copy_btn.pack(side=tk.LEFT, padx=1)
+                name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
+                type_var.trace_add("write", lambda *_, i=idx, v=type_var: self._update_member_type(i, v))
+                bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
+                widgets = [
+                    tk.Label(self.member_frame, text=str(idx + 1)),
+                    name_entry, type_menu, bit_entry, size_label, op_frame
+                ]
+                for col, w in enumerate(widgets):
+                    w.grid(row=idx + 1, column=col, padx=2, pady=1)
+                # 組合 tab order: Entry → OptionMenu.Button → bit_entry → del_btn → up_btn → down_btn → copy_btn
+                focus_widgets = [name_entry]
+                if type_menu_btn:
+                    focus_widgets.append(type_menu_btn)
+                focus_widgets.append(bit_entry)
+                focus_widgets.extend([del_btn, up_btn, down_btn, copy_btn])
+                for i, fw in enumerate(focus_widgets):
+                    fw.configure(takefocus=1)
+                    def on_tab(event, idx=i):
+                        if idx + 1 < len(focus_widgets):
+                            focus_widgets[idx + 1].focus_set()
+                            return "break"
+                    fw.bind("<Tab>", on_tab)
+                row_widgets[idx] = widgets
+            self.member_entries.append(tuple(row_widgets[idx][1:6]))
         self._update_manual_layout_tree()
 
     def _update_manual_layout_tree(self):
@@ -454,8 +625,34 @@ class StructView(tk.Tk):
         }
 
     def show_manual_struct_validation(self, errors):
+        # 先全部恢復預設顏色並移除 tooltip
+        if hasattr(self, "member_entries"):
+            for entry_tuple in self.member_entries:
+                entry = entry_tuple[0]  # name_entry
+                try:
+                    entry.config(highlightbackground="systemWindowBackgroundColor", highlightcolor="systemWindowBackgroundColor")
+                except Exception:
+                    entry.config(highlightbackground="white", highlightcolor="white")
+                # 移除舊 tooltip
+                if hasattr(entry, '_tooltip'):
+                    entry.unbind('<Enter>')
+                    entry.unbind('<Leave>')
+                    entry._tooltip.hide()
+                    del entry._tooltip
         if errors:
             self.validation_label.config(text="; ".join(errors), fg="red")
+            # 若有名稱相關錯誤，將對應 Entry 設紅框並掛載 tooltip
+            if hasattr(self, "member_entries"):
+                for idx, entry_tuple in enumerate(self.member_entries):
+                    entry = entry_tuple[0]
+                    name = self.members[idx].get("name", "")
+                    for err in errors:
+                        if name and name in err:
+                            entry.config(highlightbackground="red", highlightcolor="red")
+                            EntryTooltip(entry, err)
+                        elif "名稱不可為空" in err and not name:
+                            entry.config(highlightbackground="red", highlightcolor="red")
+                            EntryTooltip(entry, err)
         else:
             # 改為呼叫 presenter 計算剩餘空間
             struct_data = self.get_manual_struct_definition()
@@ -626,29 +823,47 @@ class StructView(tk.Tk):
         return int(self.manual_unit_size_var.get().split()[0])
 
     def _build_hex_grid(self, frame, entry_list, total_size, unit_size):
-        """建立十六進位輸入格的共用函式"""
-        for widget in frame.winfo_children():
-            widget.destroy()
-        entry_list.clear()
+        self._hex_grid_refresh_count += 1
+        # 增量更新 Entry widget
+        if not hasattr(frame, "_hex_entry_widgets") or frame._hex_entry_widgets is None:
+            frame._hex_entry_widgets = []
+        widgets = frame._hex_entry_widgets
+        # 計算應有的 box 數
         if total_size == 0:
+            for w, _ in widgets:
+                w.destroy()
+            widgets.clear()
+            entry_list.clear()
             return
-
         chars_per_box = unit_size * 2
         num_boxes = (total_size + unit_size - 1) // unit_size
         cols = max(1, 16 // unit_size)
-
+        # 刪除多餘 Entry
+        while len(widgets) > num_boxes:
+            w, _ = widgets.pop()
+            w.destroy()
+        # 新增缺少的 Entry
+        while len(widgets) < num_boxes:
+            entry = tk.Entry(frame, font=("Courier", 10))
+            widgets.append((entry, chars_per_box))
+        # 更新/配置 Entry
         for i in range(num_boxes):
             if i == num_boxes - 1:
                 remain_bytes = total_size - (unit_size * (num_boxes - 1))
                 box_chars = remain_bytes * 2 if remain_bytes > 0 else chars_per_box
             else:
                 box_chars = chars_per_box
-
-            entry = tk.Entry(frame, width=box_chars + 2, font=("Courier", 10))
+            entry, _ = widgets[i]
+            entry.config(width=box_chars + 2)
             entry.grid(row=i // cols, column=i % cols, padx=2, pady=2)
-            entry_list.append((entry, box_chars))
+            # 綁定事件
             entry.bind("<KeyPress>", lambda e, length=box_chars: self._validate_input(e, length))
             entry.bind("<Key>", lambda e, length=box_chars: self._limit_input_length(e, length))
+            widgets[i] = (entry, box_chars)
+        # 更新 entry_list
+        entry_list.clear()
+        entry_list.extend(widgets[:num_boxes])
+        frame._hex_entry_widgets = widgets[:num_boxes]
 
     def rebuild_hex_grid(self, total_size, unit_size):
         self._build_hex_grid(self.hex_grid_frame, self.hex_entries, total_size, unit_size)
@@ -723,42 +938,48 @@ class StructView(tk.Tk):
         control_frame = tk.Frame(self.debug_tab)
         control_frame.pack(fill="x", padx=10, pady=5)
 
+        # Undo/Redo 按鈕
+        self.undo_btn = tk.Button(control_frame, text="Undo", command=self._on_undo)
+        self.undo_btn.grid(row=0, column=0, padx=5)
+        self.redo_btn = tk.Button(control_frame, text="Redo", command=self._on_redo)
+        self.redo_btn.grid(row=0, column=1, padx=5)
+
         # 手動清空 cache 按鈕
         clear_btn = tk.Button(control_frame, text="手動清空 Cache", command=self._on_invalidate_cache)
-        clear_btn.grid(row=0, column=0, padx=5)
+        clear_btn.grid(row=0, column=2, padx=5)
 
         # LRU cache 容量 Spinbox
-        tk.Label(control_frame, text="LRU 容量:").grid(row=0, column=1, padx=2)
+        tk.Label(control_frame, text="LRU 容量:").grid(row=0, column=3, padx=2)
         self.lru_size_var = tk.IntVar(value=self.presenter.get_lru_cache_size() if self.presenter else 32)
         lru_spin = tk.Spinbox(control_frame, from_=0, to=128, width=5, textvariable=self.lru_size_var, command=self._on_set_lru_size)
-        lru_spin.grid(row=0, column=2, padx=2)
+        lru_spin.grid(row=0, column=4, padx=2)
 
         # 自動清空 Checkbox
         val = self.presenter.is_auto_cache_clear_enabled() if self.presenter else False
         self.auto_clear_var = tk.BooleanVar(value=bool(val))
         auto_clear_cb = tk.Checkbutton(control_frame, text="啟用自動清空", variable=self.auto_clear_var, command=self._on_toggle_auto_clear)
-        auto_clear_cb.grid(row=0, column=3, padx=5)
+        auto_clear_cb.grid(row=0, column=5, padx=5)
 
         # 自動清空 interval Entry
-        tk.Label(control_frame, text="Interval (秒):").grid(row=0, column=4, padx=2)
+        tk.Label(control_frame, text="Interval (秒):").grid(row=0, column=6, padx=2)
         self.auto_clear_interval_var = tk.DoubleVar(value=1.0)
         interval_entry = tk.Entry(control_frame, width=6, textvariable=self.auto_clear_interval_var)
-        interval_entry.grid(row=0, column=5, padx=2)
+        interval_entry.grid(row=0, column=7, padx=2)
 
         # --- 新增自動 refresh ---
         self._debug_auto_refresh_enabled = tk.BooleanVar(value=True)
         self._debug_auto_refresh_id = None
         self._debug_auto_refresh_interval = tk.DoubleVar(value=1.0)
         auto_refresh_cb = tk.Checkbutton(control_frame, text="自動 Refresh", variable=self._debug_auto_refresh_enabled, command=self._on_toggle_debug_auto_refresh)
-        auto_refresh_cb.grid(row=0, column=7, padx=5)
-        tk.Label(control_frame, text="Refresh Interval (秒):").grid(row=0, column=8, padx=2)
+        auto_refresh_cb.grid(row=0, column=9, padx=5)
+        tk.Label(control_frame, text="Refresh Interval (秒):").grid(row=0, column=10, padx=2)
         auto_refresh_interval_entry = tk.Entry(control_frame, width=6, textvariable=self._debug_auto_refresh_interval)
-        auto_refresh_interval_entry.grid(row=0, column=9, padx=2)
+        auto_refresh_interval_entry.grid(row=0, column=11, padx=2)
         self._debug_auto_refresh_interval.trace_add("write", lambda *_: self._on_debug_auto_refresh_interval_change())
 
         # 手動 refresh 按鈕
         refresh_btn = tk.Button(control_frame, text="Refresh", command=self.refresh_debug_info)
-        refresh_btn.grid(row=0, column=6, padx=5)
+        refresh_btn.grid(row=0, column=8, padx=5)
 
         self.refresh_debug_info()
         self._start_debug_auto_refresh()
@@ -818,24 +1039,580 @@ class StructView(tk.Tk):
         self.refresh_debug_info()
 
     def refresh_debug_info(self):
+        lines = []
+        # 顯示 presenter cache stats
         if self.presenter and hasattr(self.presenter, "get_cache_stats") and hasattr(self.presenter, "get_last_layout_time"):
             hit, miss = self.presenter.get_cache_stats()
             last_time = self.presenter.get_last_layout_time()
-            text = f"Cache Hit: {hit}\nCache Miss: {miss}\nLast Layout Time: {last_time}"
+            lines.append(f"Cache Hit: {hit}")
+            lines.append(f"Cache Miss: {miss}")
+            lines.append(f"Last Layout Time: {last_time}")
             # 額外顯示 LRU cache 狀態
             if hasattr(self.presenter, "get_cache_keys") and hasattr(self.presenter, "get_lru_state"):
                 keys = self.presenter.get_cache_keys()
                 lru = self.presenter.get_lru_state()
-                text += f"\nCache Keys: {keys}"
-                text += f"\nLRU Capacity: {lru.get('capacity')}"
-                text += f"\nCurrent Size: {lru.get('current_size')}"
-                text += f"\nLast Hit: {lru.get('last_hit')}"
-                text += f"\nLast Evict: {lru.get('last_evict')}"
+                lines.append(f"Cache Keys: {keys}")
+                lines.append(f"LRU Capacity: {lru.get('capacity')}")
+                lines.append(f"Current Size: {lru.get('current_size')}")
+                lines.append(f"Last Hit: {lru.get('last_hit')}")
+                lines.append(f"Last Evict: {lru.get('last_evict')}")
             # 顯示自動清空狀態
             if hasattr(self.presenter, "is_auto_cache_clear_enabled"):
                 enabled = self.presenter.is_auto_cache_clear_enabled()
-                text += f"\nAuto Cache Clear: {'啟用' if enabled else '停用'}"
-                text += f"\nInterval: {self.auto_clear_interval_var.get()} 秒"
+                lines.append(f"Auto Cache Clear: {'啟用' if enabled else '停用'}")
+                lines.append(f"Interval: {self.auto_clear_interval_var.get()} 秒")
         else:
-            text = "No presenter stats available."
-        self.debug_info_label.config(text=text)
+            lines.append("No presenter stats available.")
+        # 額外顯示 context["debug_info"]
+        debug_info = None
+        if self.presenter and hasattr(self.presenter, "context"):
+            debug_info = self.presenter.context.get("debug_info", {})
+        if debug_info:
+            for k, v in debug_info.items():
+                if isinstance(v, dict) or isinstance(v, list):
+                    lines.append(f"{k}: {repr(v)}")
+                else:
+                    lines.append(f"{k}: {v}")
+        self.debug_info_label.config(text="\n".join(lines))
+
+        # Undo/Redo 按鈕狀態
+        context = self.presenter.context if self.presenter and hasattr(self.presenter, "context") else {}
+        if hasattr(self, "undo_btn"):
+            can_undo = bool(context.get("history"))
+            self.undo_btn.config(state="normal" if can_undo else "disabled")
+        if hasattr(self, "redo_btn"):
+            can_redo = bool(context.get("redo_history", []))
+            self.redo_btn.config(state="normal" if can_redo else "disabled")
+
+    def _bind_member_tree_events(self):
+        if not hasattr(self, "member_tree") or not self.member_tree:
+            return
+        self.member_tree.bind('<<TreeviewOpen>>', self._on_member_tree_open)
+        self.member_tree.bind('<<TreeviewClose>>', self._on_member_tree_close)
+        self.member_tree.bind('<<TreeviewSelect>>', self._on_member_tree_select)
+        # 綁定 header 右鍵事件
+        def bind_header_right_click():
+            for col in self.member_tree["columns"]:
+                self.member_tree.heading(col, command=lambda c=col: None)  # 解除預設排序
+                self.member_tree.heading(col, anchor="w")
+                self.member_tree.heading(col, text=col)
+                self.member_tree.heading(col, command=lambda c=col: None)
+                self.member_tree.heading(col, anchor="w")
+                # 綁定右鍵
+                self.member_tree.heading(col, command=lambda c=col: None)
+            self.member_tree.bind("<Button-3>", self._show_treeview_column_menu)
+        bind_header_right_click()
+        # 拖曳排序事件
+        self._dragging_item = None
+        self._dragging_parent = None
+        self._dragging_index = None
+        self._dragging_highlight = None
+        tree = self.member_tree
+        tree.bind("<ButtonPress-1>", self._on_treeview_drag_start)
+        tree.bind("<B1-Motion>", self._on_treeview_drag_motion)
+        tree.bind("<ButtonRelease-1>", self._on_treeview_drag_release)
+
+    def _on_treeview_drag_start(self, event):
+        tree = self.member_tree
+        region = tree.identify("region", event.x, event.y)
+        if region != "cell":
+            self._dragging_item = None
+            return
+        item = tree.identify_row(event.y)
+        if not item:
+            self._dragging_item = None
+            return
+        self._dragging_item = item
+        self._dragging_parent = tree.parent(item)
+        self._dragging_index = tree.index(item)
+        # highlight 起始 row
+        tree.selection_set(item)
+
+    def _on_treeview_drag_motion(self, event):
+        tree = self.member_tree
+        if not self._dragging_item:
+            return
+        target_item = tree.identify_row(event.y)
+        if not target_item or target_item == self._dragging_item:
+            return
+        # 僅允許同層級
+        if tree.parent(target_item) != self._dragging_parent:
+            return
+        # highlight 目標 row
+        if self._dragging_highlight:
+            tree.item(self._dragging_highlight, tags=())
+        self._dragging_highlight = target_item
+        tree.item(target_item, tags=("highlighted",))
+
+    def _on_treeview_drag_release(self, event):
+        tree = self.member_tree
+        if not self._dragging_item:
+            return
+        target_item = tree.identify_row(event.y)
+        if not target_item or target_item == self._dragging_item:
+            self._clear_drag_highlight()
+            self._dragging_item = None
+            return
+        # 僅允許同層級
+        if tree.parent(target_item) != self._dragging_parent:
+            self._clear_drag_highlight()
+            self._dragging_item = None
+            return
+        # 計算新順序
+        siblings = list(tree.get_children(self._dragging_parent))
+        from_idx = siblings.index(self._dragging_item)
+        to_idx = siblings.index(target_item)
+        new_order = siblings[:]
+        item = new_order.pop(from_idx)
+        new_order.insert(to_idx, item)
+        # 呼叫 reorder callback
+        if hasattr(self, "_on_treeview_reorder"):
+            self._on_treeview_reorder(self._dragging_parent or "", new_order)
+        elif self.presenter and hasattr(self.presenter, "on_reorder_nodes"):
+            self.presenter.on_reorder_nodes(self._dragging_parent or "", new_order)
+        self._clear_drag_highlight()
+        self._dragging_item = None
+
+    def _clear_drag_highlight(self):
+        tree = self.member_tree
+        if self._dragging_highlight:
+            tree.item(self._dragging_highlight, tags=())
+        self._dragging_highlight = None
+
+    def _on_treeview_reorder(self, parent_id, new_order):
+        if self.presenter and hasattr(self.presenter, "on_reorder_nodes"):
+            self.presenter.on_reorder_nodes(parent_id, list(new_order))
+
+    def _show_treeview_column_menu(self, event, test_mode=False):
+        # 動態產生欄位選單
+        tree = self.member_tree
+        context = self.presenter.context if self.presenter and hasattr(self.presenter, "context") else {}
+        col_settings = context.get("user_settings", {}).get("treeview_columns", [])
+        menu = tk.Menu(tree, tearoff=0)
+        for c in col_settings:
+            name = c["name"]
+            visible = c.get("visible", True)
+            menu.add_checkbutton(label=name, onvalue=True, offvalue=False, variable=tk.BooleanVar(value=visible),
+                                 command=lambda n=name: self._on_treeview_column_menu_click(n))
+        self._treeview_column_menu = menu
+        if not test_mode:
+            menu.tk_popup(event.x_root, event.y_root)
+
+    def _on_treeview_column_menu_click(self, col_name):
+        if self.presenter and hasattr(self.presenter, "on_toggle_column"):
+            self.presenter.on_toggle_column(col_name)
+
+    def _on_member_tree_open(self, event):
+        item_id = event.widget.focus()
+        if self.presenter and hasattr(self.presenter, "on_expand"):
+            self.presenter.on_expand(item_id)
+
+    def _on_member_tree_close(self, event):
+        item_id = event.widget.focus()
+        if self.presenter and hasattr(self.presenter, "on_collapse"):
+            self.presenter.on_collapse(item_id)
+
+    def _on_member_tree_select(self, event):
+        selected = event.widget.selection()
+        if not selected or not self.presenter:
+            return
+        if len(selected) == 1 and hasattr(self.presenter, "on_node_click"):
+            self.presenter.on_node_click(selected[0])
+        elif len(selected) > 1 and hasattr(self.presenter, "on_node_select"):
+            self.presenter.on_node_select(list(selected))
+
+    def show_treeview_nodes(self, nodes, context, icon_map=None):
+        self._treeview_refresh_count += 1
+        # 依據 user_settings 設定 displaycolumns
+        all_columns = tuple(c["name"] for c in MEMBER_TREEVIEW_COLUMNS)
+        columns = all_columns
+        col_settings = context.get("user_settings", {}).get("treeview_columns")
+        if col_settings:
+            visible_cols = [c for c in sorted(col_settings, key=lambda x: x.get("order", 0)) if c.get("visible", True)]
+            columns = tuple(c["name"] for c in visible_cols)
+        tree = self.member_tree
+        tree["displaycolumns"] = columns
+        # 先清空所有節點，避免 id 重複
+        for item in tree.get_children(""):
+            tree.delete(item)
+        # 每次都設置 tag_configure
+        tree.tag_configure("highlighted", background="yellow")
+        tree.tag_configure("struct", foreground="blue", font="Arial 10 bold")
+        tree.tag_configure("union", foreground="purple", font="Arial 10 bold")
+        tree.tag_configure("bitfield", foreground="#008000")
+        tree.tag_configure("array", foreground="#B8860B")
+        # --- diff/patch 機制 ---
+        if not hasattr(self, "_last_tree_nodes"):
+            self._last_tree_nodes = None
+        def node_dict_by_id(nodes):
+            d = {}
+            def rec(nlist):
+                for n in nlist:
+                    d[n["id"]] = n
+                    rec(n.get("children", []))
+            rec(nodes)
+            return d
+        # fallback: 全量重繪
+        def insert_with_highlight(tree, parent_id, node):
+            if parent_id in (None, "", 0):
+                parent_id = ""
+            node_type = node.get("type", "")
+            label = node.get("label", node.get("name", ""))
+            tags = []
+            if node_type == "struct":
+                label = f"{label} [struct]"
+                tags.append("struct")
+            elif node_type == "union":
+                label = f"{label} [union]"
+                tags.append("union")
+            elif node_type == "bitfield":
+                tags.append("bitfield")
+            elif node_type == "array":
+                tags.append("array")
+            if node["id"] in set(context.get("highlighted_nodes", [])):
+                tags.append("highlighted")
+            values = tuple(label if col == "label" else node.get(col, "") for col in columns)
+            icon = icon_map.get(node["icon"]) if icon_map and node.get("icon") else ""
+            item_id = tree.insert(parent_id, 'end', iid=node['id'], text=label, values=values, image=icon, tags=tuple(tags))
+            for child in node.get('children', []):
+                insert_with_highlight(tree, item_id, child)
+            return item_id
+        for node in nodes:
+            insert_with_highlight(tree, None, node)
+        self._last_tree_nodes = [n.copy() for n in nodes]  # 淺複製即可
+        update_treeview_by_context(tree, context)
+        # 多選高亮
+        selected_nodes = context.get("selected_nodes")
+        if selected_nodes:
+            def collect_all_ids(tree, parent=""):
+                ids = list(tree.get_children(parent))
+                for i in list(ids):
+                    ids.extend(collect_all_ids(tree, i))
+                return ids
+            all_ids = set(collect_all_ids(tree, ""))
+            filtered = [i for i in selected_nodes if i in all_ids]
+            if filtered:
+                tree.selection_set(filtered)
+            else:
+                tree.selection_remove(tree.selection())
+
+    def update_display(self, nodes, context, icon_map=None):
+        # context version/結構自動升級/降級與警告
+        required_fields = {"highlighted_nodes": []}
+        version = context.get("version")
+        warning_msg = None
+        if version == "2.0":
+            for k, v in required_fields.items():
+                if k not in context:
+                    context[k] = v
+        elif version == "1.0":
+            for k, v in required_fields.items():
+                if k not in context:
+                    context[k] = v
+            warning_msg = "context 結構過舊，已自動升級"
+        else:
+            warning_msg = "context version 不明，請檢查"
+        if warning_msg:
+            try:
+                from tkinter import messagebox
+                messagebox.showwarning("Context Warning", warning_msg)
+            except Exception:
+                pass
+            context.setdefault("debug_info", {})["context_warning"] = warning_msg
+        # 原本 update_display 流程
+        self.show_treeview_nodes(nodes, context, icon_map)
+        # 顯示錯誤訊息
+        if context.get("error"):
+            from tkinter import messagebox
+            messagebox.showerror("錯誤", str(context["error"]))
+        # pending_action 狀態顯示進度與禁用互動
+        pending = context.get("pending_action")
+        if pending:
+            # 顯示進度提示
+            if not hasattr(self, "pending_label"):
+                self.pending_label = tk.Label(self, text="", fg="blue", font=("Arial", 14, "bold"))
+                self.pending_label.pack(side="top", fill="x", pady=4)
+            self.pending_label.config(text=f"進行中：{pending}... 請稍候")
+            # 禁用主要互動元件
+            if hasattr(self, "parse_button"): self.parse_button.config(state="disabled")
+            if hasattr(self, "expand_all_btn"): self.expand_all_btn.config(state="disabled")
+            if hasattr(self, "collapse_all_btn"): self.collapse_all_btn.config(state="disabled")
+            if hasattr(self, "member_tree"): self.member_tree.unbind('<<TreeviewOpen>>'); self.member_tree.unbind('<<TreeviewClose>>'); self.member_tree.unbind('<<TreeviewSelect>>')
+        else:
+            # 移除進度提示
+            if hasattr(self, "pending_label") and self.pending_label.winfo_exists():
+                self.pending_label.config(text="")
+            # 恢復互動
+            if hasattr(self, "parse_button"): self.parse_button.config(state="normal")
+            if hasattr(self, "expand_all_btn"): self.expand_all_btn.config(state="normal")
+            if hasattr(self, "collapse_all_btn"): self.collapse_all_btn.config(state="normal")
+            if hasattr(self, "member_tree"): self._bind_member_tree_events()
+        # 顯示 debug_info
+        debug_info = context.get("debug_info", {})
+        debug_lines = []
+        if debug_info:
+            if "last_event" in debug_info:
+                debug_lines.append(f"last_event: {debug_info['last_event']}")
+            if "last_event_args" in debug_info:
+                debug_lines.append(f"last_event_args: {debug_info['last_event_args']}")
+            if "last_error" in debug_info:
+                debug_lines.append(f"last_error: {debug_info['last_error']}")
+            if "api_trace" in debug_info:
+                debug_lines.append(f"api_trace: {debug_info['api_trace']}")
+        self.debug_info_label.config(text="\n".join(debug_lines))
+
+        # Undo/Redo 按鈕狀態
+        context = self.presenter.context if self.presenter and hasattr(self.presenter, "context") else {}
+        if hasattr(self, "undo_btn"):
+            can_undo = bool(context.get("history"))
+            self.undo_btn.config(state="normal" if can_undo else "disabled")
+        if hasattr(self, "redo_btn"):
+            can_redo = bool(context.get("redo_history", []))
+            self.redo_btn.config(state="normal" if can_redo else "disabled")
+
+    def _init_presenter_view_binding(self):
+        if self.presenter:
+            self.presenter.view = self
+            # 若 presenter 有 context 與 get_display_nodes，載入初始資料
+            if hasattr(self.presenter, "context") and hasattr(self.presenter, "get_display_nodes"):
+                context = self.presenter.context
+                mode = context.get("display_mode", "tree")
+                try:
+                    nodes = self.presenter.get_display_nodes(mode)
+                except Exception:
+                    nodes = []
+                self.update_display(nodes, context)
+            # 若 context 尚未初始化，mock 一份 context 以便 UI 測試
+            elif hasattr(self.presenter, "get_display_nodes"):
+                context = {
+                    "display_mode": "tree",
+                    "expanded_nodes": ["root"],
+                    "selected_node": None,
+                    "error": None,
+                    "version": "1.0",
+                    "extra": {},
+                    "loading": False,
+                    "history": [],
+                    "user_settings": {},
+                    "last_update_time": time.time(),
+                    "readonly": False,
+                    "debug_info": {"last_event": None}
+                }
+                nodes = self.presenter.get_display_nodes("tree")
+                self.update_display(nodes, context)
+
+    def _on_expand_all(self):
+        if self.presenter and hasattr(self.presenter, "on_expand_all"):
+            self.presenter.on_expand_all()
+
+    def _on_collapse_all(self):
+        if self.presenter and hasattr(self.presenter, "on_collapse_all"):
+            self.presenter.on_collapse_all()
+
+    def _on_display_mode_change(self, mode):
+        if self.presenter and hasattr(self.presenter, "on_switch_display_mode"):
+            self.presenter.on_switch_display_mode(mode)
+
+    def _on_search_entry_change(self, event):
+        search_str = self.search_var.get()
+        if self.presenter and hasattr(self.presenter, "on_search"):
+            self.presenter.on_search(search_str)
+
+    def _on_filter_entry_change(self, event):
+        filter_str = self.filter_var.get()
+        if self.presenter and hasattr(self.presenter, "on_filter"):
+            self.presenter.on_filter(filter_str)
+
+    def _on_undo(self):
+        if self.presenter and hasattr(self.presenter, "on_undo"):
+            self.presenter.on_undo()
+    def _on_redo(self):
+        if self.presenter and hasattr(self.presenter, "on_redo"):
+            self.presenter.on_redo()
+
+    def _on_batch_delete(self):
+        if self.presenter and hasattr(self.presenter, "on_batch_delete"):
+            selected = self.member_tree.selection()
+            self.presenter.on_batch_delete(list(selected))
+
+    def _on_gui_version_change(self, version):
+        """處理 GUI 版本切換"""
+        if self.presenter and hasattr(self.presenter, "on_switch_gui_version"):
+            self.presenter.on_switch_gui_version(version)
+        
+        # 切換顯示模式
+        if version == "modern":
+            self._switch_to_modern_gui()
+        else:  # legacy
+            self._switch_to_legacy_gui()
+
+    def _switch_to_legacy_gui(self):
+        """切換到舊版平面顯示"""
+        # 隱藏新版元件，顯示舊版元件
+        if hasattr(self, "modern_frame"):
+            self.modern_frame.pack_forget()
+        if hasattr(self, "member_tree"):
+            self.member_tree.pack(fill="x")
+
+    def _switch_to_modern_gui(self):
+        """切換到新版樹狀顯示"""
+        # 隱藏舊版元件，顯示新版元件
+        if hasattr(self, "member_tree"):
+            self.member_tree.pack_forget()
+        if hasattr(self, "modern_frame"):
+            self.modern_frame.pack(fill="both", expand=True)
+        else:
+            self._create_modern_gui()
+
+    def _create_modern_gui(self):
+        """建立新版樹狀顯示 GUI"""
+        # 找到 member_frame 的父容器
+        member_frame = self.member_tree.master
+        parent_frame = member_frame.master
+        
+        # 建立新版框架
+        self.modern_frame = tk.Frame(parent_frame)
+        
+        # 統一引用 MEMBER_TREEVIEW_COLUMNS
+        all_columns = MEMBER_TREEVIEW_COLUMNS
+        col_names = tuple(c["name"] for c in all_columns)
+        self.modern_tree = ttk.Treeview(
+            self.modern_frame,
+            columns=col_names,
+            show="headings",
+            height=10
+        )
+        for c in all_columns:
+            self.modern_tree.heading(c["name"], text=c["title"])
+            self.modern_tree.column(c["name"], width=c["width"], stretch=False)
+        self.modern_tree["displaycolumns"] = col_names
+        self.modern_tree.pack(fill="both", expand=True)
+        
+        # 綁定展開/收合事件
+        self.modern_tree.bind("<<TreeviewOpen>>", self._on_modern_tree_open)
+        self.modern_tree.bind("<<TreeviewClose>>", self._on_modern_tree_close)
+        
+        # 將 modern_frame 加入到父容器中
+        self.modern_frame.pack(fill="both", expand=True)
+        
+        # 如果有現有資料，顯示在新版 GUI 中
+        if self.presenter and hasattr(self.presenter, "get_display_nodes"):
+            nodes = self.presenter.get_display_nodes("tree")
+            if nodes:
+                self._populate_modern_tree(nodes)
+
+    def _populate_modern_tree(self, nodes):
+        """將節點資料填入新版樹狀顯示"""
+        # 清空現有資料
+        for item in self.modern_tree.get_children():
+            self.modern_tree.delete(item)
+        # 設置 tag_configure（每次都設置，確保樣式）
+        self.modern_tree.tag_configure("highlighted", background="yellow")
+        self.modern_tree.tag_configure("struct", foreground="blue", font="Arial 10 bold")
+        self.modern_tree.tag_configure("union", foreground="purple", font="Arial 10 bold")
+        self.modern_tree.tag_configure("bitfield", foreground="#008000")
+        self.modern_tree.tag_configure("array", foreground="#B8860B")
+        # 遞迴插入節點
+        def insert_node(parent, node):
+            node_type = node.get("type", "")
+            label = node.get("label", node.get("name", ""))
+            tags = []
+            if node_type == "struct":
+                label = f"{label} [struct]"
+                tags.append("struct")
+            elif node_type == "union":
+                label = f"{label} [union]"
+                tags.append("union")
+            elif node_type == "bitfield":
+                tags.append("bitfield")
+            elif node_type == "array":
+                tags.append("array")
+            node_id = self.modern_tree.insert(
+                parent, 
+                "end", 
+                iid=node.get("id", None),
+                text=label,
+                values=(
+                    node.get("name", ""),
+                    node.get("value", ""),
+                    node.get("hex_value", ""),
+                    node.get("hex_raw", "")
+                ),
+                tags=tuple(tags)
+            )
+            # 遞迴插入子節點
+            for child in node.get("children", []):
+                insert_node(node_id, child)
+        # 插入所有根節點
+        for node in nodes:
+            insert_node("", node)
+        # 插入完畢後根據 context 展開節點（先展開 parent 再展開 child）
+        if self.presenter and hasattr(self.presenter, "context"):
+            expanded = set(self.presenter.context.get("expanded_nodes", []))
+            def expand_recursive(tree, item_id):
+                if item_id in expanded:
+                    tree.item(item_id, open=True)
+                    tree.update_idletasks()
+                for child in tree.get_children(item_id):
+                    expand_recursive(tree, child)
+            for item in self.modern_tree.get_children(""):
+                expand_recursive(self.modern_tree, item)
+        self.modern_tree.update_idletasks()
+
+    def _on_modern_tree_open(self, event):
+        """新版樹狀顯示展開事件"""
+        pass  # 暫時留空，未來可擴充
+
+    def _on_modern_tree_close(self, event):
+        """新版樹狀顯示收合事件"""
+        pass  # 暫時留空，未來可擴充
+
+    def _on_batch_expand(self):
+        if not self.presenter or not hasattr(self.presenter, "on_expand_nodes"):
+            return
+        selected = self.member_tree.selection()
+        if selected:
+            self.presenter.on_expand_nodes(list(selected))
+            # 重新取得 nodes/context 並刷新顯示
+            if hasattr(self.presenter, "get_display_nodes") and hasattr(self.presenter, "context"):
+                nodes = self.presenter.get_display_nodes(self.presenter.context.get("display_mode", "tree"))
+                self.update_display(nodes, self.presenter.context)
+
+    def _on_batch_collapse(self):
+        if not self.presenter or not hasattr(self.presenter, "on_collapse_nodes"):
+            return
+        selected = self.member_tree.selection()
+        if selected:
+            self.presenter.on_collapse_nodes(list(selected))
+            # 重新取得 nodes/context 並刷新顯示
+            if hasattr(self.presenter, "get_display_nodes") and hasattr(self.presenter, "context"):
+                nodes = self.presenter.get_display_nodes(self.presenter.context.get("display_mode", "tree"))
+                self.update_display(nodes, self.presenter.context)
+
+class EntryTooltip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tipwindow = None
+        self.visible = False
+        widget._tooltip = self
+        widget.bind('<Enter>', self.show)
+        widget.bind('<Leave>', self.hide)
+    def show(self, event=None):
+        if self.tipwindow or not self.text:
+            return
+        x, y, cx, cy = self.widget.bbox("insert") if hasattr(self.widget, 'bbox') else (0, 0, 0, 0)
+        x = x + self.widget.winfo_rootx() + 25
+        y = y + self.widget.winfo_rooty() + 20
+        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(1)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(tw, text=self.text, background="#ffffe0", relief="solid", borderwidth=1, font=("tahoma", "8", "normal"))
+        label.pack(ipadx=1)
+        self.visible = True
+    def hide(self, event=None):
+        tw = self.tipwindow
+        self.tipwindow = None
+        if tw:
+            tw.destroy()
+        self.visible = False

@@ -209,7 +209,6 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         self.bitfield_bit_offset += mbit_size
 
     def _process_regular_member(self, member: Union[Tuple[str, str], dict]):
-        print("DEBUG _process_regular_member:", member)
         self.bitfield_unit_type = None
         self.bitfield_bit_offset = 0
 
