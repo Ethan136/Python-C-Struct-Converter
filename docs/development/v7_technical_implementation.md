@@ -489,6 +489,118 @@ class V7StructParser:
         return lines
 ```
 
+## AST Parser 切分成員的語意判斷設計（v7 新增）
+
+### 設計原則
+- 在解析 C struct/union 成員時，**切分階段就要語意判斷是否為匿名 bitfield**，而不是單純以分號 `;` 為界。
+- 這樣能確保每一個成員（無論有名、匿名、bitfield、陣列）都能被 parser 邏輯正確地還原為語意單位。
+
+### 實作策略
+- 採用「語意切分」：
+    - 掃描 struct body，每遇到分號 `;`，就判斷這一段是否為：
+        - 一般成員（如 `int x;`）
+        - 有名 bitfield（如 `unsigned int flags : 3;`）
+        - 匿名 bitfield（如 `unsigned int : 2;`）
+        - 陣列成員（如 `char str[10];`）
+    - 若為匿名 bitfield，**必須保證型別與 bit 數在同一行**，不可被拆開。
+- 可用正則或狀態機判斷每一段內容。
+
+### 範例
+```c
+struct BitfieldTest {
+    unsigned int flags : 3;
+    unsigned int : 2;
+    unsigned int value : 5;
+};
+```
+- 切分後應得到：
+    - `unsigned int flags : 3;`
+    - `unsigned int : 2;`（匿名 bitfield）
+    - `unsigned int value : 5;`
+
+### Python 實作片段
+```python
+def split_members_semantic(body: str) -> List[str]:
+    import re
+    members = []
+    buf = ''
+    brace_count = 0
+    for c in body:
+        buf += c
+        if c == '{':
+            brace_count += 1
+        elif c == '}':
+            brace_count -= 1
+        elif c == ';' and brace_count == 0:
+            # 語意判斷：bitfield/一般成員/陣列
+            if re.match(r'^\s*(?:\w+\s+)*\w+(\s+[a-zA-Z_]\w*)?\s*(:\s*\d+)?\s*;\s*$', buf.strip()):
+                members.append(buf.strip())
+            else:
+                members.append(buf.strip())
+            buf = ''
+    if buf.strip():
+        members.append(buf.strip())
+    return members
+```
+
+### 效益
+- **正確還原 C 語法語意**，避免匿名 bitfield 被拆開，提升 AST 準確度。
+- **後續 AST 處理、展平、GUI 呈現都更簡單**。
+- **TDD 測試更容易通過**，減少 parser bug。
+
+### v7 相關模組需配合
+- `parser.py`：必須採用語意切分，並在單元測試中驗證匿名 bitfield、陣列、巢狀結構等情境。
+- `test_parser.py`：需有匿名 bitfield、複雜巢狀 struct 測試案例。
+
+## AST Parser Bitfield 語意切分與解析的最穩健 TDD 重構方案（v7 建議）
+
+### 設計原則
+- **切分階段**（_split_member_lines）：
+    - 只負責將每個 struct/union 成員語意完整地切成一行，不做語法判斷。
+    - 例如：`unsigned int : 2;`、`unsigned int flags : 3;`、`int x;` 都是獨立一行。
+- **解析階段**（_parse_member_line / _parse_bitfield_member）：
+    - 先判斷有名 bitfield（有變數名稱），再判斷匿名 bitfield（無變數名稱）。
+    - 型別用非貪婪 `(.+?)`，名稱用合法識別字 `[a-zA-Z_]\w*`。
+    - 這樣能正確支援多單字型別、bitfield padding、C 語法 edge case。
+
+### Python 實作範例
+```python
+def _parse_bitfield_member(self, line: str) -> Optional[ASTNode]:
+    # 有名 bitfield
+    named_pattern = r'^(.+?)\s+([a-zA-Z_]\w*)\s*:\s*(\d+)\s*;$'
+    match = re.match(named_pattern, line.strip())
+    if match:
+        type_name = match.group(1).strip()
+        var_name = match.group(2).strip()
+        bit_size = int(match.group(3))
+        return self.node_factory.create_bitfield_node(var_name, type_name, bit_size)
+    # 匿名 bitfield
+    anonymous_pattern = r'^(.+?)\s*:\s*(\d+)\s*;$'
+    match = re.match(anonymous_pattern, line.strip())
+    if match:
+        type_name = match.group(1).strip()
+        bit_size = int(match.group(2))
+        node = self.node_factory.create_bitfield_node("", type_name, bit_size)
+        node.is_anonymous = True
+        return node
+    return None
+```
+
+### 測試建議（TDD）
+- 測試 `_split_member_lines` 能將 struct/union 內容正確切分為一行一語意。
+- 測試 `_parse_bitfield_member` 能正確解析：
+    - 有名 bitfield：`unsigned int flags : 3;` → type=`unsigned int`，name=`flags`，bit_size=3
+    - 匿名 bitfield：`unsigned int : 2;` → type=`unsigned int`，name=`""`，bit_size=2
+    - 多單字型別、padding、巢狀 struct/union 等 edge case。
+- 測試複雜 struct/union，確保所有成員都能正確還原。
+
+### 長期效益
+- **可維護性高**：未來 C 語法 edge case 只需擴充解析階段，不會讓切分邏輯變複雜。
+- **可擴充性強**：支援 typedef、macro、巢狀 struct/union、bitfield padding 等都容易。
+- **TDD 友善**：每個階段職責單一，測試覆蓋容易，debug 容易。
+
+---
+
 ## 4. GUI 整合實作
 
 ### 4.1 V7 Presenter
