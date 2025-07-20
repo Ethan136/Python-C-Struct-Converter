@@ -333,3 +333,33 @@ def test_modern_treeview_display(self):
 ### 參考
 - [Tkinter Treeview 官方文件](https://docs.python.org/3/library/tkinter.ttk.html#treeview)
 - [Python uuid 官方文件](https://docs.python.org/3/library/uuid.html) 
+
+## [2024-07-09] 新版 GUI struct member value 顯示為空的排查規劃
+
+### 問題描述
+- 新版 GUI（modern Treeview）struct member value 欄位顯示都是空的。
+
+### 排查思路
+1. **確認 parse_hex_data 是否有正確寫入 self.member_values**
+    - 目前 parse_hex_data 會將 {name: value} 寫入 self.member_values。
+    - 需確認所有 struct member（包含巢狀）都正確寫入。
+2. **確認 get_display_nodes 是否正確帶出 value**
+    - to_treeview_node 用 value_map.get(node["name"], "") 取值。
+    - 若 AST 巢狀結構有同名成員，或 id/name 不一致，會導致 value 對不到。
+3. **確認新版 GUI Treeview 是否有正確顯示 value 欄位**
+    - Treeview columns 有 value 欄位，這部分沒問題。
+4. **確認 value 的 key 是否與 AST node 的 name 對應**
+    - 若 value_map 的 key 只是 name，巢狀結構時會對不到正確的 value。
+
+### 主要懷疑
+- AST node 的 name 可能不是唯一，巢狀結構時 value_map.get(node["name"]) 會對不到正確的 value。
+- 解析出來的 value 只對應到最外層 struct，巢狀 struct/union 的 value 沒有被正確寫入。
+
+### 下一步建議
+1. **確認 parse_hex_data 產生的 member_values key/value 是否正確，並與 AST node name 對應。**
+2. **如有巢狀 struct，需考慮用完整路徑（如 parent.name.child）作為 key。**
+3. **可在 get_display_nodes/to_treeview_node 加 debug print，檢查 value_map 和 node["name"] 的對應關係。**
+
+### 備註
+- 若 struct 為巢狀結構，建議 value_map 的 key 應改為完整路徑或 AST id，避免同名成員覆蓋。
+- 若只有平面 struct 也出現 value 空白，需檢查解析流程與 UI 顯示流程。 
