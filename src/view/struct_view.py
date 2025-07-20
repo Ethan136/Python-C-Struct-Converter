@@ -141,6 +141,12 @@ class StructView(tk.Tk):
         display_mode_options = ["tree", "flat"]
         self.display_mode_menu = tk.OptionMenu(control_frame, self.display_mode_var, *display_mode_options, command=self._on_display_mode_change)
         self.display_mode_menu.pack(side=tk.LEFT)
+        # GUI 版本切換
+        tk.Label(control_frame, text="  GUI 版本：").pack(side=tk.LEFT)
+        self.gui_version_var = tk.StringVar(value="legacy")
+        gui_version_options = ["legacy", "modern"]
+        self.gui_version_menu = tk.OptionMenu(control_frame, self.gui_version_var, *gui_version_options, command=self._on_gui_version_change)
+        self.gui_version_menu.pack(side=tk.LEFT)
         # 搜尋輸入框
         tk.Label(control_frame, text="  搜尋：").pack(side=tk.LEFT)
         self.search_var = tk.StringVar()
@@ -1197,6 +1203,9 @@ class StructView(tk.Tk):
             columns = tuple(c["name"] for c in visible_cols)
         tree = self.member_tree
         tree["displaycolumns"] = columns
+        # 先清空所有節點，避免 id 重複
+        for item in tree.get_children(""):
+            tree.delete(item)
         # 每次都設置 tag_configure
         tree.tag_configure("highlighted", background="yellow")
         tree.tag_configure("struct", foreground="blue", font="Arial 10 bold")
@@ -1214,137 +1223,33 @@ class StructView(tk.Tk):
                     rec(n.get("children", []))
             rec(nodes)
             return d
-        # 若有快取，做 diff/patch
-        if self._last_tree_nodes is not None:
-            old_nodes = self._last_tree_nodes
-            old_map = node_dict_by_id(old_nodes)
-            new_map = node_dict_by_id(nodes)
-            # 若 root id 結構不同，直接 fallback 全量重繪
-            old_root_ids = [n["id"] for n in old_nodes]
-            new_root_ids = [n["id"] for n in nodes]
-            if old_root_ids != new_root_ids:
-                for item in tree.get_children(""):
-                    tree.delete(item)
-                def insert_with_highlight(tree, parent_id, node):
-                    if parent_id in (None, "", 0):
-                        parent_id = ""
-                    node_type = node.get("type", "")
-                    label = node.get("label", node.get("name", ""))
-                    tags = []
-                    if node_type == "struct":
-                        label = f"{label} [struct]"
-                        tags.append("struct")
-                    elif node_type == "union":
-                        label = f"{label} [union]"
-                        tags.append("union")
-                    elif node_type == "bitfield":
-                        tags.append("bitfield")
-                    elif node_type == "array":
-                        tags.append("array")
-                    if node["id"] in set(context.get("highlighted_nodes", [])):
-                        tags.append("highlighted")
-                    values = tuple(label if col == "label" else node.get(col, "") for col in columns)
-                    icon = icon_map.get(node["icon"]) if icon_map and node.get("icon") else ""
-                    item_id = tree.insert(parent_id, 'end', iid=node['id'], text=label, values=values, image=icon, tags=tuple(tags))
-                    for child in node.get('children', []):
-                        insert_with_highlight(tree, item_id, child)
-                    return item_id
-                for node in nodes:
-                    insert_with_highlight(tree, None, node)
-            else:
-                # 先刪除所有 old_map 中 parent_id 存在但 new_map 沒有的 children
-                for parent_id in old_map:
-                    if parent_id not in new_map and "children" in old_map[parent_id]:
-                        for c in old_map[parent_id]["children"]:
-                            try: tree.delete(c["id"])
-                            except: pass
-                def patch_children(parent_id):
-                    if not tree.exists(parent_id):
-                        return
-                    old_ids = [c["id"] for c in old_map[parent_id]["children"]] if parent_id in old_map else []
-                    new_ids = [c["id"] for c in new_map[parent_id]["children"]] if parent_id in new_map else []
-                    # 刪除不存在的（即使 parent_id 不在 new_map 也要刪）
-                    for oid in old_ids:
-                        if oid not in new_ids:
-                            try:
-                                tree.delete(oid)
-                            except Exception as e:
-                                pass
-                    # 若 parent_id 不在 new_map，無需 patch 新增/順序/內容
-                    if parent_id not in new_map:
-                        return
-                    parent_children = set(tree.get_children(parent_id))
-                    for idx, nid in enumerate(new_ids):
-                        n = new_map[nid]
-                        node_type = n.get("type", "")
-                        label = n.get("label", n.get("name", ""))
-                        tags = []
-                        if node_type == "struct":
-                            label = f"{label} [struct]"
-                            tags.append("struct")
-                        elif node_type == "union":
-                            label = f"{label} [union]"
-                            tags.append("union")
-                        elif node_type == "bitfield":
-                            tags.append("bitfield")
-                        elif node_type == "array":
-                            tags.append("array")
-                        if n["id"] in set(context.get("highlighted_nodes", [])):
-                            tags.append("highlighted")
-                        if nid not in parent_children:
-                            values = tuple(n.get(col, "") for col in columns)
-                            if tree.exists(nid):
-                                tree.delete(nid)
-                            tree.insert(parent_id, idx, iid=nid, text=label, values=values, tags=tuple(tags))
-                        else:
-                            # 若順序不同則 move
-                            old_idx = old_ids.index(nid) if nid in old_ids else idx
-                            if old_idx != idx:
-                                tree.move(nid, parent_id, idx)
-                            # 若 name/type 變動則 update
-                            o = old_map[nid] if nid in old_map else n
-                            if n.get("name") != o.get("name") or n.get("type") != o.get("type"):
-                                values = tuple(n.get(col, "") for col in columns)
-                                tree.item(nid, values=values)
-                            # 無論如何都要設置 tag，確保高亮/型別樣式正確
-                            tree.item(nid, tags=tuple(tags))
-                    # 遞迴 patch 子節點
-                    for nid in new_ids:
-                        if nid in new_map and "children" in new_map[nid]:
-                            patch_children(nid)
-                root_ids = [n["id"] for n in nodes]
-                for rid in root_ids:
-                    patch_children(rid)
-        else:
-            # fallback: 全量重繪
-            for item in tree.get_children(""):
-                tree.delete(item)
-            def insert_with_highlight(tree, parent_id, node):
-                if parent_id in (None, "", 0):
-                    parent_id = ""
-                node_type = node.get("type", "")
-                label = node.get("label", node.get("name", ""))
-                tags = []
-                if node_type == "struct":
-                    label = f"{label} [struct]"
-                    tags.append("struct")
-                elif node_type == "union":
-                    label = f"{label} [union]"
-                    tags.append("union")
-                elif node_type == "bitfield":
-                    tags.append("bitfield")
-                elif node_type == "array":
-                    tags.append("array")
-                if node["id"] in set(context.get("highlighted_nodes", [])):
-                    tags.append("highlighted")
-                values = tuple(label if col == "label" else node.get(col, "") for col in columns)
-                icon = icon_map.get(node["icon"]) if icon_map and node.get("icon") else ""
-                item_id = tree.insert(parent_id, 'end', iid=node['id'], text=label, values=values, image=icon, tags=tuple(tags))
-                for child in node.get('children', []):
-                    insert_with_highlight(tree, item_id, child)
-                return item_id
-            for node in nodes:
-                insert_with_highlight(tree, None, node)
+        # fallback: 全量重繪
+        def insert_with_highlight(tree, parent_id, node):
+            if parent_id in (None, "", 0):
+                parent_id = ""
+            node_type = node.get("type", "")
+            label = node.get("label", node.get("name", ""))
+            tags = []
+            if node_type == "struct":
+                label = f"{label} [struct]"
+                tags.append("struct")
+            elif node_type == "union":
+                label = f"{label} [union]"
+                tags.append("union")
+            elif node_type == "bitfield":
+                tags.append("bitfield")
+            elif node_type == "array":
+                tags.append("array")
+            if node["id"] in set(context.get("highlighted_nodes", [])):
+                tags.append("highlighted")
+            values = tuple(label if col == "label" else node.get(col, "") for col in columns)
+            icon = icon_map.get(node["icon"]) if icon_map and node.get("icon") else ""
+            item_id = tree.insert(parent_id, 'end', iid=node['id'], text=label, values=values, image=icon, tags=tuple(tags))
+            for child in node.get('children', []):
+                insert_with_highlight(tree, item_id, child)
+            return item_id
+        for node in nodes:
+            insert_with_highlight(tree, None, node)
         self._last_tree_nodes = [n.copy() for n in nodes]  # 淺複製即可
         update_treeview_by_context(tree, context)
         # 多選高亮
@@ -1500,6 +1405,108 @@ class StructView(tk.Tk):
         if self.presenter and hasattr(self.presenter, "on_batch_delete"):
             selected = self.member_tree.selection()
             self.presenter.on_batch_delete(list(selected))
+
+    def _on_gui_version_change(self, version):
+        """處理 GUI 版本切換"""
+        if self.presenter and hasattr(self.presenter, "on_switch_gui_version"):
+            self.presenter.on_switch_gui_version(version)
+        
+        # 切換顯示模式
+        if version == "modern":
+            self._switch_to_modern_gui()
+        else:  # legacy
+            self._switch_to_legacy_gui()
+
+    def _switch_to_legacy_gui(self):
+        """切換到舊版平面顯示"""
+        # 隱藏新版元件，顯示舊版元件
+        if hasattr(self, "modern_frame"):
+            self.modern_frame.pack_forget()
+        if hasattr(self, "member_tree"):
+            self.member_tree.pack(fill="x")
+
+    def _switch_to_modern_gui(self):
+        """切換到新版樹狀顯示"""
+        # 隱藏舊版元件，顯示新版元件
+        if hasattr(self, "member_tree"):
+            self.member_tree.pack_forget()
+        if hasattr(self, "modern_frame"):
+            self.modern_frame.pack(fill="both", expand=True)
+        else:
+            self._create_modern_gui()
+
+    def _create_modern_gui(self):
+        """建立新版樹狀顯示 GUI"""
+        # 找到 member_frame 的父容器
+        member_frame = self.member_tree.master
+        parent_frame = member_frame.master
+        
+        # 建立新版框架
+        self.modern_frame = tk.Frame(parent_frame)
+        
+        # 建立樹狀 Treeview
+        self.modern_tree = ttk.Treeview(
+            self.modern_frame,
+            columns=("name", "type", "value", "offset", "size"),
+            show="tree headings",
+            height=10
+        )
+        self.modern_tree.heading("name", text="欄位名稱")
+        self.modern_tree.heading("type", text="型別")
+        self.modern_tree.heading("value", text="值")
+        self.modern_tree.heading("offset", text="Offset")
+        self.modern_tree.heading("size", text="Size")
+        self.modern_tree.pack(fill="both", expand=True)
+        
+        # 綁定展開/收合事件
+        self.modern_tree.bind("<<TreeviewOpen>>", self._on_modern_tree_open)
+        self.modern_tree.bind("<<TreeviewClose>>", self._on_modern_tree_close)
+        
+        # 將 modern_frame 加入到父容器中
+        self.modern_frame.pack(fill="both", expand=True)
+        
+        # 如果有現有資料，顯示在新版 GUI 中
+        if self.presenter and hasattr(self.presenter, "get_display_nodes"):
+            nodes = self.presenter.get_display_nodes("tree")
+            if nodes:
+                self._populate_modern_tree(nodes)
+
+    def _populate_modern_tree(self, nodes):
+        """將節點資料填入新版樹狀顯示"""
+        # 清空現有資料
+        for item in self.modern_tree.get_children():
+            self.modern_tree.delete(item)
+        
+        # 遞迴插入節點
+        def insert_node(parent, node):
+            node_id = self.modern_tree.insert(
+                parent, 
+                "end", 
+                text=node.get("name", ""),
+                values=(
+                    node.get("name", ""),
+                    node.get("type", ""),
+                    node.get("value", ""),
+                    node.get("offset", ""),
+                    node.get("size", "")
+                )
+            )
+            
+            # 遞迴插入子節點
+            for child in node.get("children", []):
+                insert_node(node_id, child)
+        
+        # 插入所有根節點
+        for node in nodes:
+            insert_node("", node)
+
+    def _on_modern_tree_open(self, event):
+        """新版樹狀顯示展開事件"""
+        pass  # 暫時留空，未來可擴充
+
+    def _on_modern_tree_close(self, event):
+        """新版樹狀顯示收合事件"""
+        pass  # 暫時留空，未來可擴充
 
 class EntryTooltip:
     def __init__(self, widget, text):

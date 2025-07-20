@@ -363,6 +363,7 @@ class StructPresenter:
         import time
         return {
             "display_mode": "tree",
+            "gui_version": "legacy",  # 新增 GUI 版本欄位
             "expanded_nodes": ["root"],
             "selected_node": None,
             "error": None,
@@ -483,6 +484,17 @@ class StructPresenter:
         self.context["display_mode"] = mode
         self.context["expanded_nodes"] = ["root"]
         self.context["selected_node"] = None
+
+    @event_handler("on_switch_gui_version")
+    def on_switch_gui_version(self, version):
+        """處理 GUI 版本切換事件"""
+        if version not in ["legacy", "modern"]:
+            raise ValueError(f"Invalid GUI version: {version}")
+        self.context["gui_version"] = version
+        # 切換時重置一些狀態
+        self.context["expanded_nodes"] = ["root"]
+        self.context["selected_node"] = None
+        self.context["selected_nodes"] = []
 
     @event_handler("on_collapse")
     def on_collapse(self, node_id):

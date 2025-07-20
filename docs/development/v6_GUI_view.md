@@ -303,3 +303,33 @@ def test_modern_treeview_display(self):
 - ✅ **資料同步**：符合「切換新舊顯示時，資料 context 必須同步」
 - ✅ **簡單實作**：符合策略文件的 6 個簡單開發步驟
 - ✅ **worktree 對應**：符合「gui_switch_container：設計切換容器，實作新舊顯示切換」 
+
+## [2024-07-09] AST/Treeview 節點唯一性修正規劃
+
+### 問題描述
+- 切換新版 GUI 或多次載入 struct/解析資料時，Treeview 會出現 `_tkinter.TclError: Item ... already exists` 錯誤。
+- 這是因為 Treeview 的 `iid`（節點 id）重複插入，通常是 AST 結構產生的 id 沒有全域唯一，或 UI 重建時未正確清空舊節點。
+
+### 主要原因
+- AST 產生時，巢狀 struct/union/member 的 id 只用 name 或 parent.name 拼接，若多次載入或有同名巢狀結構，id 會重複。
+- Treeview 在 update_display/show_treeview_nodes 時，若未先清空所有節點，重複插入同 id 會報錯。
+
+### 修正方案
+1. **AST 產生時保證 id 全域唯一**
+    - id 可用 parent id + name 或加上 uuid，確保每個節點唯一。
+    - ast_to_dict 遞迴時，prefix 應包含完整路徑或隨機 uuid。
+2. **Treeview 重建前先清空所有節點**
+    - 在 show_treeview_nodes 或 insert_with_highlight 前，呼叫 tree.delete(*tree.get_children())。
+    - 確保每次重建不會殘留舊節點。
+3. **（可選）Treeview 支援同名節點時自動加序號/uuid**
+    - 若同一層有多個同名節點，id 可加序號或 uuid。
+
+### 修正步驟
+- [ ] 1. 修改 ast_to_dict，id 產生方式改為 parent_id + name 或加 uuid，保證唯一。
+- [ ] 2. 修改 show_treeview_nodes，重建前先清空所有節點。
+- [ ] 3. 測試多次載入/切換/解析 struct，Treeview 不再出現 id 重複錯誤。
+- [ ] 4. 文件同步修正規範與測試建議。
+
+### 參考
+- [Tkinter Treeview 官方文件](https://docs.python.org/3/library/tkinter.ttk.html#treeview)
+- [Python uuid 官方文件](https://docs.python.org/3/library/uuid.html) 

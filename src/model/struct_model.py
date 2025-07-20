@@ -63,8 +63,7 @@ def calculate_layout(members, calculator_cls=None, pack_alignment=None):
 import uuid
 
 def ast_to_dict(node, parent_id=None, prefix=""):
-    """遞迴將 AST 物件轉為 V2P API 規範的 dict 結構"""
-    # 修正：根據 class 型別補上 type 欄位
+    """遞迴將 AST 物件轉為 V2P API 規範的 dict 結構，id 保證全域唯一"""
     node_type = getattr(node, "type", None)
     if node_type is None:
         cls_name = node.__class__.__name__
@@ -72,10 +71,13 @@ def ast_to_dict(node, parent_id=None, prefix=""):
             node_type = "struct"
         elif cls_name == "UnionDef":
             node_type = "union"
-    node_id = f"{prefix}{getattr(node, 'name', None) or str(uuid.uuid4())}"
+    name = getattr(node, "name", None)
+    # id: parent_id.name.uuid4（保證唯一）
+    base_id = f"{parent_id}.{name}" if parent_id and name else (name or str(uuid.uuid4()))
+    unique_id = f"{base_id}.{uuid.uuid4().hex[:8]}"
     base = {
-        "id": node_id,
-        "name": getattr(node, "name", None),
+        "id": unique_id,
+        "name": name,
         "type": node_type,
         "is_struct": node_type == "struct",
         "is_union": node_type == "union",
@@ -87,12 +89,11 @@ def ast_to_dict(node, parent_id=None, prefix=""):
         "size": getattr(node, "size", None),
         "children": [],
     }
-    # DEBUG: print node info
     # 巢狀 struct/union
     if hasattr(node, "nested") and node.nested:
-        base["children"] = [ast_to_dict(child, node_id, prefix=node_id+".") for child in getattr(node.nested, "members", [])]
+        base["children"] = [ast_to_dict(child, unique_id, prefix=unique_id+".") for child in getattr(node.nested, "members", [])]
     elif hasattr(node, "members"):
-        base["children"] = [ast_to_dict(child, node_id, prefix=node_id+".") for child in node.members]
+        base["children"] = [ast_to_dict(child, unique_id, prefix=unique_id+".") for child in node.members]
     return base
 
 # 展平 AST node 為 flat list（for flat mode）
@@ -116,6 +117,7 @@ class StructModel:
         self.input_processor = InputFieldProcessor()
         self.manual_struct = None  # 新增屬性
         self._observers = set()
+        self.member_values = {}  # 新增：存放解析後的 value
 
     # 移除 _merge_byte_and_bit_size
     # 完全移除 _convert_legacy_member 及舊格式相容邏輯
@@ -167,6 +169,7 @@ class StructModel:
             padded_hex = hex_data.zfill(self.total_size * 2)
             data_bytes = bytes.fromhex(padded_hex)
             parsed_values = []
+            member_value_map = {}  # 新增
             for item in self.layout:
                 if item['type'] == "padding":
                     padding_bytes = data_bytes[item['offset'] : item['offset'] + item['size']]
@@ -195,6 +198,8 @@ class StructModel:
                     "value": display_value,
                     "hex_raw": hex_value
                 })
+                member_value_map[name] = display_value  # 新增：存到 model
+            self.member_values = member_value_map  # 新增：存到 model
             return parsed_values
         except Exception as e:
             raise
@@ -353,25 +358,32 @@ class StructModel:
         if hasattr(self, 'ast') and self.ast:
             return ast_to_dict(self.ast)
         # 若無，則可用 parse_struct_definition_ast 重新解析
-        if hasattr(self, 'struct_content'):
+        if hasattr(self, 'struct_content') and self.struct_content:
             from src.model.struct_parser import parse_struct_definition_ast
             self.ast = parse_struct_definition_ast(self.struct_content)
             return ast_to_dict(self.ast)
-        raise ValueError("No AST available")
+        return None  # 修正：沒有 AST 時回傳 None
 
     def get_display_nodes(self, mode='tree'):
         """回傳符合 V2P API 文件的 Treeview node 結構。"""
         ast_dict = self.get_struct_ast()
+        if not ast_dict:
+            return []  # 修正：沒有 AST 時回傳空 list
+        value_map = getattr(self, "member_values", {})  # 新增
         def to_treeview_node(node):
             label = node["name"]
             if node.get("is_struct"):
                 label = f"{label} [struct]"
             elif node.get("is_union"):
                 label = f"{label} [union]"
+            value = value_map.get(node["name"], "")  # 新增
             return {
                 "id": node["id"],
                 "label": label,
                 "type": node["type"],
+                "value": value,  # 新增
+                "offset": node.get("offset", ""),
+                "size": node.get("size", ""),
                 "children": [to_treeview_node(child) for child in node.get("children", [])],
                 "icon": node.get("type"),
                 "extra": {},

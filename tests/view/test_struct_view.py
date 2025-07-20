@@ -23,6 +23,7 @@ class PresenterStub:
         self.calls = []
         self.context = context or {
             "display_mode": "tree",
+            "gui_version": "legacy",
             "expanded_nodes": ["root"],
             "selected_node": "root",
             "selected_nodes": ["root"],
@@ -176,6 +177,15 @@ class PresenterStub:
         self.get_display_nodes = lambda mode: self._nodes
         if hasattr(self, "view") and self.view and hasattr(self.view, "update_display"):
             self.view.update_display(self._nodes, self.context)
+    def on_switch_gui_version(self, version):
+        """處理 GUI 版本切換事件"""
+        if version not in ["legacy", "modern"]:
+            raise ValueError(f"Invalid GUI version: {version}")
+        self.context["gui_version"] = version
+        # 切換時重置一些狀態
+        self.context["expanded_nodes"] = ["root"]
+        self.context["selected_node"] = None
+        self.context["selected_nodes"] = []
 
 @pytest.mark.timeout(15)
 class TestStructView(unittest.TestCase):
@@ -1095,8 +1105,11 @@ class TestStructView(unittest.TestCase):
                 self.calls = []
                 self.context = {
                     "display_mode": "tree",
+                    "gui_version": "legacy",
                     "expanded_nodes": ["root"],
                     "selected_node": "root",
+                    "selected_nodes": ["root"],
+                    "highlighted_nodes": [],
                     "error": None,
                     "version": "1.0",
                     "extra": {},
@@ -1105,7 +1118,8 @@ class TestStructView(unittest.TestCase):
                     "user_settings": {},
                     "last_update_time": 0,
                     "readonly": False,
-                    "debug_info": {"last_event": None}
+                    "debug_info": {"last_event": None},
+                    "redo_history": []
                 }
             def get_display_nodes(self, mode):
                 if mode == "tree":
@@ -1186,8 +1200,11 @@ class TestStructView(unittest.TestCase):
                 self.calls = []
                 self.context = {
                     "display_mode": "tree",
+                    "gui_version": "legacy",
                     "expanded_nodes": ["root"],
                     "selected_node": "root",
+                    "selected_nodes": ["root"],
+                    "highlighted_nodes": [],
                     "error": None,
                     "version": "1.0",
                     "extra": {},
@@ -1197,8 +1214,7 @@ class TestStructView(unittest.TestCase):
                     "last_update_time": 0,
                     "readonly": False,
                     "debug_info": {"last_event": None},
-                    "search": "",
-                    "highlighted_nodes": []
+                    "redo_history": []
                 }
             def get_display_nodes(self, mode):
                 return [{"id": "root", "label": "root", "type": "struct", "children": [], "icon": "struct", "extra": {}}]
@@ -1704,6 +1720,7 @@ class TestStructView(unittest.TestCase):
         # 舊版 context（缺少 highlighted_nodes）
         old_context = {
             "display_mode": "tree",
+            "gui_version": "legacy",
             "expanded_nodes": ["root"],
             "selected_node": "root",
             "version": "1.0",
@@ -1712,6 +1729,7 @@ class TestStructView(unittest.TestCase):
         # 新版 context（有 highlighted_nodes）
         new_context = {
             "display_mode": "tree",
+            "gui_version": "legacy",
             "expanded_nodes": ["root"],
             "selected_node": "root",
             "highlighted_nodes": ["child1"],
@@ -1922,6 +1940,98 @@ class TestStructView(unittest.TestCase):
         calls1.clear(); calls2.clear()
         model.set_manual_struct([{"name": "b", "type": "int", "bit_size": 0}], 4)
         assert not calls1 and calls2, "移除 obs1 後只剩 obs2 收到通知"
+
+    def test_gui_version_switch_ui_and_presenter_call(self):
+        """測試 GUI 版本切換 UI 和 presenter 呼叫"""
+        # 測試切換選單存在
+        self.assertIsNotNone(self.view.gui_version_var)
+        self.assertEqual(self.view.gui_version_var.get(), "legacy")
+        
+        # 測試切換到新版
+        self.view._on_gui_version_change("modern")
+        self.assertEqual(self.presenter.context["gui_version"], "modern")
+        
+        # 測試切換到舊版
+        self.view._on_gui_version_change("legacy")
+        self.assertEqual(self.presenter.context["gui_version"], "legacy")
+
+    def test_modern_gui_creation(self):
+        """測試新版 GUI 建立"""
+        # 切換到新版
+        self.view._on_gui_version_change("modern")
+        
+        # 驗證新版元件存在
+        self.assertIsNotNone(self.view.modern_frame)
+        self.assertIsNotNone(self.view.modern_tree)
+        
+        # 驗證基本功能
+        self.assertTrue(hasattr(self.view, "_on_modern_tree_open"))
+        self.assertTrue(hasattr(self.view, "_on_modern_tree_close"))
+
+    def test_gui_version_switch_ui_visibility(self):
+        """測試 GUI 版本切換時的 UI 可見性"""
+        # 初始狀態應該是舊版顯示
+        self.assertTrue(hasattr(self.view, "member_tree"))
+        
+        # 切換到新版
+        self.view._on_gui_version_change("modern")
+        # 新版應該存在
+        self.assertTrue(hasattr(self.view, "modern_frame"))
+        self.assertTrue(hasattr(self.view, "modern_tree"))
+        
+        # 切換回舊版
+        self.view._on_gui_version_change("legacy")
+        # 舊版應該存在
+        self.assertTrue(hasattr(self.view, "member_tree"))
+
+    def test_modern_tree_population(self):
+        """測試新版樹狀顯示的資料填入"""
+        # 準備測試資料
+        test_nodes = [
+            {
+                "id": "root",
+                "name": "TestStruct",
+                "type": "struct",
+                "value": "",
+                "offset": 0,
+                "size": 8,
+                "children": [
+                    {
+                        "id": "root.field1",
+                        "name": "field1",
+                        "type": "int",
+                        "value": "123",
+                        "offset": 0,
+                        "size": 4,
+                        "children": []
+                    }
+                ]
+            }
+        ]
+        
+        # 切換到新版
+        self.view._on_gui_version_change("modern")
+        
+        # 填入測試資料
+        self.view._populate_modern_tree(test_nodes)
+        
+        # 驗證資料正確填入
+        children = self.view.modern_tree.get_children()
+        self.assertEqual(len(children), 1)
+        
+        # 驗證根節點
+        root_item = children[0]
+        root_values = self.view.modern_tree.item(root_item, "values")
+        self.assertEqual(root_values[0], "TestStruct")  # name
+        self.assertEqual(root_values[1], "struct")      # type
+        
+        # 驗證子節點
+        child_items = self.view.modern_tree.get_children(root_item)
+        self.assertEqual(len(child_items), 1)
+        child_values = self.view.modern_tree.item(child_items[0], "values")
+        self.assertEqual(child_values[0], "field1")     # name
+        self.assertEqual(child_values[1], "int")        # type
+        self.assertEqual(child_values[2], "123")        # value
 
 if __name__ == "__main__":
     unittest.main()
