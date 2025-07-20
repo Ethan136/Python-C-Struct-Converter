@@ -48,7 +48,6 @@
 - [ ] **debug 面板強化**：顯示 context["debug_info"] 內容、API trace、context 快照，支援自動/手動刷新，補強測試。
 - [ ] **處理中禁用互動設計**：僅針對 context["loading"] 或 context["pending_action"] 為 True 時，禁用所有互動，結束時恢復。
 - [ ] **View/context 解耦與效能**：context diff/patch 機制優化，只重繪有變動的節點，context version 自動升級/降級與警告。
-- [ ] **CI/CD 與型別檢查**：型別檢查、lint、pytest-cov 等自動化流程。
 - [ ] **文件同步**：持續同步 stub/mock、context schema、UI 測試設計原則。
 
 ---
