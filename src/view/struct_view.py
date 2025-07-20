@@ -125,6 +125,7 @@ class StructView(tk.Tk):
         # 單位選擇與 endianness
         control_frame = tk.Frame(main_frame)
         control_frame.pack(fill="x", pady=(5, 2))
+        self.file_control_frame = control_frame  # 供測試直接存取
         tk.Label(control_frame, text="單位大小：").pack(side=tk.LEFT)
         self.unit_size_var = tk.StringVar(value="1 Byte")
         unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
@@ -164,6 +165,11 @@ class StructView(tk.Tk):
         self.expand_all_btn.pack(side=tk.LEFT, padx=2)
         self.collapse_all_btn = tk.Button(control_frame, text="收合全部", command=self._on_collapse_all)
         self.collapse_all_btn.pack(side=tk.LEFT, padx=2)
+        # 批次操作按鈕
+        self.batch_expand_btn = tk.Button(control_frame, text="展開選取", command=self._on_batch_expand)
+        self.batch_expand_btn.pack(side=tk.LEFT, padx=2)
+        self.batch_collapse_btn = tk.Button(control_frame, text="收合選取", command=self._on_batch_collapse)
+        self.batch_collapse_btn.pack(side=tk.LEFT, padx=2)
         # 批次刪除按鈕
         self.batch_delete_btn = tk.Button(control_frame, text="批次刪除", command=self._on_batch_delete)
         self.batch_delete_btn.pack(side=tk.LEFT, padx=2)

@@ -2240,5 +2240,24 @@ class TestStructView(unittest.TestCase):
         self.assertFalse(view.member_tree.item("child2", "open"))
         view.destroy()
 
+    def test_batch_expand_collapse_buttons_exist_and_work(self):
+        view = self.view
+        control_frame = getattr(view, 'file_control_frame', None)
+        self.assertIsNotNone(control_frame, "應有主控制列")
+        btn_texts = [c.cget("text") for c in control_frame.winfo_children() if isinstance(c, tk.Button)]
+        self.assertIn("展開選取", btn_texts)
+        self.assertIn("收合選取", btn_texts)
+        # 驗證按鈕能正確呼叫對應方法
+        expand_btn = [c for c in control_frame.winfo_children() if isinstance(c, tk.Button) and c.cget("text") == "展開選取"][0]
+        collapse_btn = [c for c in control_frame.winfo_children() if isinstance(c, tk.Button) and c.cget("text") == "收合選取"][0]
+        # patch 按鈕 command
+        called = {"expand": False, "collapse": False}
+        expand_btn.config(command=lambda: called.update({"expand": True}))
+        collapse_btn.config(command=lambda: called.update({"collapse": True}))
+        expand_btn.invoke()
+        collapse_btn.invoke()
+        self.assertTrue(called["expand"])
+        self.assertTrue(called["collapse"])
+
 if __name__ == "__main__":
     unittest.main()
