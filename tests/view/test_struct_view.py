@@ -2032,15 +2032,14 @@ class TestStructView(unittest.TestCase):
         root_item = children[0]
         root_values = self.view.modern_tree.item(root_item, "values")
         self.assertEqual(root_values[0], "TestStruct")  # name
-        self.assertEqual(root_values[1], "struct")      # type
-        
+        # self.assertEqual(root_values[1], "struct")      # type (已移除)
         # 驗證子節點
         child_items = self.view.modern_tree.get_children(root_item)
         self.assertEqual(len(child_items), 1)
         child_values = self.view.modern_tree.item(child_items[0], "values")
         self.assertEqual(child_values[0], "field1")     # name
-        self.assertEqual(child_values[1], "int")        # type
-        self.assertEqual(child_values[2], "123")        # value
+        # self.assertEqual(child_values[1], "int")        # type (已移除)
+        self.assertEqual(child_values[1], "123")        # value
 
     def test_modern_treeview_column_config一致(self):
         """驗證 modern_tree（新版 GUI）欄位名稱、順序、寬度與 file/manual tab 完全一致，且都來自 MEMBER_TREEVIEW_COLUMNS。"""

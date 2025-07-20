@@ -1534,10 +1534,9 @@ class StructView(tk.Tk):
                 text=label,
                 values=(
                     node.get("name", ""),
-                    node.get("type", ""),
                     node.get("value", ""),
-                    node.get("offset", ""),
-                    node.get("size", "")
+                    node.get("hex_value", ""),
+                    node.get("hex_raw", "")
                 ),
                 tags=tuple(tags)
             )
