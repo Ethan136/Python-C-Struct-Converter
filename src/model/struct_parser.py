@@ -260,6 +260,9 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
     struct_name, struct_body = _extract_struct_body(file_content, "struct")
     if not struct_name or not struct_body:
         return None
+    import re
+    struct_body = re.sub(r"//.*", "", struct_body)  # 修正：先移除所有 // 註解
+    # print("DEBUG struct_body:", repr(struct_body))
     members = []
     pos = 0
     length = len(struct_body)
@@ -368,7 +371,9 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
         if semi == -1:
             break
         line = struct_body[pos:semi].strip()
+        # print("DEBUG parsing line:", repr(line))
         parsed = parse_member_line_v2(line)
+        # print("DEBUG parsed:", parsed)
         if parsed is not None:
             members.append(parsed)
         pos = semi + 1

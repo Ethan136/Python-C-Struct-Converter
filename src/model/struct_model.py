@@ -144,6 +144,7 @@ class StructModel:
     def load_struct_from_file(self, file_path):
         with open(file_path, 'r') as f:
             content = f.read()
+        self.struct_content = content  # 修正：同步設置 struct_content
         struct_name, members = parse_struct_definition(content)
         if not struct_name or not members:
             raise ValueError("Could not find a valid struct definition in the file.")

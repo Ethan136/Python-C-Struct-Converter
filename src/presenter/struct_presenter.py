@@ -368,7 +368,7 @@ class StructPresenter:
             "error": None,
             "filter": None,
             "search": None,
-            "version": "1.0",
+            "version": "2.0",  # 修正：升級到 2.0 版本
             "extra": {},
             "loading": False,
             "history": [],
@@ -382,7 +382,7 @@ class StructPresenter:
                 "last_error": None,
                 "context_history": [],
                 "api_trace": [],
-                "version": "1.0",
+                "version": "2.0",  # 修正：同步升級 debug_info 版本
                 "extra": {}
             },
             "can_edit": True,
