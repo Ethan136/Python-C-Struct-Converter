@@ -2197,5 +2197,48 @@ class TestStructView(unittest.TestCase):
         self.assertIn("rootA", treeA.get_children(""))
         view.destroy()
 
+    def test_treeview_multiselect_and_batch_expand_collapse(self):
+        class PresenterWithExpandCollapse(PresenterStub):
+            def on_expand_nodes(self, node_ids):
+                # 將所有選取節點加入 expanded_nodes
+                self.context["expanded_nodes"] = list(set(self.context.get("expanded_nodes", [])) | set(node_ids))
+            def on_collapse_nodes(self, node_ids):
+                # 將所有選取節點從 expanded_nodes 移除
+                self.context["expanded_nodes"] = [nid for nid in self.context.get("expanded_nodes", []) if nid not in node_ids]
+        presenter = PresenterWithExpandCollapse()
+        view = StructView(presenter=presenter)
+        presenter.view = view
+        nodes = [
+            {"id": "root", "label": "root struct", "type": "struct", "children": [
+                {"id": "child1", "label": "foo", "type": "int", "children": [
+                    {"id": "grand1", "label": "g1", "type": "char", "children": [], "icon": "char", "extra": {}}
+                ], "icon": "int", "extra": {}},
+                {"id": "child2", "label": "bar", "type": "char", "children": [], "icon": "char", "extra": {}}
+            ], "icon": "struct", "extra": {}}
+        ]
+        presenter._nodes = nodes
+        presenter.get_display_nodes = lambda mode: presenter._nodes
+        presenter.context["display_mode"] = "tree"
+        presenter.context["expanded_nodes"] = ["root"]
+        view.update_display(nodes, presenter.context)
+        # 多選 child1, child2
+        view.member_tree.selection_set(["child1", "child2"])
+        view.member_tree.event_generate('<<TreeviewSelect>>')
+        # 批次展開
+        view._on_batch_expand()
+        # 應展開 child1, child2
+        self.assertIn("child1", presenter.context["expanded_nodes"])
+        self.assertIn("child2", presenter.context["expanded_nodes"])
+        self.assertTrue(view.member_tree.item("child1", "open"))
+        self.assertTrue(view.member_tree.item("child2", "open"))
+        # 批次收合
+        view._on_batch_collapse()
+        # 應收合 child1, child2
+        self.assertNotIn("child1", presenter.context["expanded_nodes"])
+        self.assertNotIn("child2", presenter.context["expanded_nodes"])
+        self.assertFalse(view.member_tree.item("child1", "open"))
+        self.assertFalse(view.member_tree.item("child2", "open"))
+        view.destroy()
+
 if __name__ == "__main__":
     unittest.main()

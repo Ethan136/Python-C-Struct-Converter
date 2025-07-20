@@ -1539,6 +1539,28 @@ class StructView(tk.Tk):
         """新版樹狀顯示收合事件"""
         pass  # 暫時留空，未來可擴充
 
+    def _on_batch_expand(self):
+        if not self.presenter or not hasattr(self.presenter, "on_expand_nodes"):
+            return
+        selected = self.member_tree.selection()
+        if selected:
+            self.presenter.on_expand_nodes(list(selected))
+            # 重新取得 nodes/context 並刷新顯示
+            if hasattr(self.presenter, "get_display_nodes") and hasattr(self.presenter, "context"):
+                nodes = self.presenter.get_display_nodes(self.presenter.context.get("display_mode", "tree"))
+                self.update_display(nodes, self.presenter.context)
+
+    def _on_batch_collapse(self):
+        if not self.presenter or not hasattr(self.presenter, "on_collapse_nodes"):
+            return
+        selected = self.member_tree.selection()
+        if selected:
+            self.presenter.on_collapse_nodes(list(selected))
+            # 重新取得 nodes/context 並刷新顯示
+            if hasattr(self.presenter, "get_display_nodes") and hasattr(self.presenter, "context"):
+                nodes = self.presenter.get_display_nodes(self.presenter.context.get("display_mode", "tree"))
+                self.update_display(nodes, self.presenter.context)
+
 class EntryTooltip:
     def __init__(self, widget, text):
         self.widget = widget
