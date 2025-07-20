@@ -109,42 +109,42 @@ class V7Presenter:
 **目標**：建立優化的 AST 結構和解析器
 
 #### 3.1.1 AST 節點重構
-- [ ] 定義新的 `ASTNode` dataclass
-- [ ] 實作節點 ID 生成策略
-- [ ] 建立節點類型驗證機制
-- [ ] 實作節點序列化/反序列化
+- [x] 定義新的 `ASTNode` dataclass
+- [x] 實作節點 ID 生成策略
+- [x] 建立節點類型驗證機制
+- [x] 實作節點序列化/反序列化
 
 #### 3.1.2 解析器優化
-- [ ] 重構 `parse_struct_definition_ast` 支援新 AST 結構
-- [ ] 優化巢狀結構的遞迴解析
-- [ ] 實作匿名結構的識別和處理
-- [ ] 建立解析錯誤處理機制
+- [x] 重構 `parse_struct_definition_ast` 支援新 AST 結構
+- [x] 優化巢狀結構的遞迴解析
+- [x] 實作匿名結構的識別和處理
+- [x] 建立解析錯誤處理機制
 
 #### 3.1.3 測試建立
-- [ ] 建立 AST 節點單元測試
-- [ ] 建立解析器整合測試
-- [ ] 建立 XML 驅動測試框架
+- [x] 建立 AST 節點單元測試
+- [x] 建立解析器整合測試
+- [x] 建立 XML 驅動測試框架
 
 ### 3.2 第二階段：展平算法實作 (Week 3-4)
 **目標**：實作各種結構的展平策略
 
 #### 3.2.1 展平策略實作
-- [ ] 實作 `StructFlatteningStrategy`
-- [ ] 實作 `UnionFlatteningStrategy`
-- [ ] 實作 `ArrayFlatteningStrategy`
-- [ ] 實作 `BitfieldFlatteningStrategy`
+- [x] 實作 `StructFlatteningStrategy`
+- [x] 實作 `UnionFlatteningStrategy`
+- [x] 實作 `ArrayFlatteningStrategy`
+- [x] 實作 `BitfieldFlatteningStrategy`
 
 #### 3.2.2 命名策略
-- [ ] 實作匿名結構的命名規則
-- [ ] 實作陣列索引的命名策略
-- [ ] 實作位元欄位的命名策略
-- [ ] 建立命名衝突解決機制
+- [x] 實作匿名結構的命名規則
+- [x] 實作陣列索引的命名策略
+- [x] 實作位元欄位的命名策略
+- [x] 建立命名衝突解決機制
 
 #### 3.2.3 佈局計算
-- [ ] 優化記憶體佈局計算
-- [ ] 實作複雜對齊規則
-- [ ] 建立位元欄位的佈局計算
-- [ ] 實作 pragma pack 支援
+- [x] 優化記憶體佈局計算
+- [x] 實作複雜對齊規則
+- [x] 建立位元欄位的佈局計算
+- [x] 實作 pragma pack 支援（預留/部分）
 
 ### 3.3 第三階段：GUI 整合 (Week 5-6)
 **目標**：整合 v6 GUI 架構，優化顯示效能
@@ -171,22 +171,30 @@ class V7Presenter:
 **目標**：建立完整測試覆蓋，優化效能
 
 #### 3.4.1 測試覆蓋
-- [ ] 建立完整的單元測試套件
-- [ ] 建立整合測試
-- [ ] 建立效能測試
-- [ ] 建立壓力測試
+- [x] 建立完整的單元測試套件
+- [x] 建立整合測試
+- [x] 建立效能測試
+- [x] 建立壓力測試
 
 #### 3.4.2 效能優化
-- [ ] 優化 AST 解析效能
-- [ ] 優化展平算法效能
+- [x] 優化 AST 解析效能
+- [x] 優化展平算法效能
 - [ ] 優化 GUI 渲染效能
-- [ ] 建立記憶體使用優化
+- [x] 建立記憶體使用優化
 
 #### 3.4.3 文件與範例
-- [ ] 更新技術文件
-- [ ] 建立使用範例
-- [ ] 建立 API 文件
-- [ ] 建立最佳實踐指南
+- [x] 更新技術文件
+- [x] 建立使用範例
+- [x] 建立 API 文件
+- [x] 建立最佳實踐指南
+
+## 3.5 Debug/Migration 策略（2024/07/09 補充）
+- 採用 stepwise migration，從 minimal layout.py 開始，逐步還原 union/array/bitfield/struct flatten 功能。
+- 每步都以 TDD 驗證所有 flatten/AST/bitfield/array/union 測試。
+- union flatten/array flatten 僅保留最大分支，prefix/offset 嚴格對齊 C/C++。
+- 針對 union/array flatten prefix/offset 問題，建立 minimal 測試案例，debug print 追蹤 prefix 傳遞與 offset 累加。
+- 任何 flatten/命名/offset 修正都需同步更新測試與文件。
+- CI/CD 持續整合，確保每次修正不破壞既有功能。
 
 ## 4. 測試策略
 
