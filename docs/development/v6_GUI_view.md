@@ -2,22 +2,54 @@
 
 ## [優先開發] 只需修改 View 的功能
 
-### 1. Treeview/表格欄位設定一致性與共用化
+### 1. Treeview/表格欄位設定一致性與共用化  ✅已完成
 - 所有 tab（如 file/manual/debug）都統一引用 MEMBER_TREEVIEW_COLUMNS，動態顯示/隱藏欄位時只重建 widget。
-- 只需改 view。
+- 已完成，並有單元測試驗證欄位一致性。
 
-### 2. UI/UX 細節優化
+### 2. UI/UX 細節優化  ✅已完成
 - 展開/收合、icon、顏色、[struct]/[union] 標籤的顯示方式。
 - Treeview 樹狀結構的顯示細節、樣式、icon、顏色等。
-- 只需改 view。
+- 已完成，並有測試覆蓋。
 
-### 3. 頁面可嵌入多組顯示元件（多 Treeview/多視窗）
+### 3. 頁面可嵌入多組顯示元件（多 Treeview/多視窗）  ✅已完成
 - UI 支援多組 Treeview，資料來源可共用 context。
-- 主要改 view，若要多 context 則 presenter 也需支援。
+- 已完成，支援多組 Treeview 實例，context 可共用或獨立，測試已覆蓋。
 
 ### 4. UI callback 綁定、UI 測試查找 widget、禁用/唯讀設計
 - callback 綁定、widget 查找、禁用/唯讀行為等。
-- 只需改 view。
+- callback 綁定、widget 查找已完成，禁用/唯讀設計待補強。
+
+### 5. 多選節點與批次操作  ✅已完成
+- 支援多選節點（selected_nodes），UI/狀態同步。
+- 已完成「批次刪除」、「批次展開」、「批次收合」功能，UI 按鈕已補齊，TDD 覆蓋。
+
+### 6. Treeview 拖曳排序  ✅已完成
+- 支援同層級節點拖曳排序，callback 與 UI/狀態同步，TDD 覆蓋。
+
+### 7. 欄位排序與自訂顯示  ✅已完成
+- 支援用戶自訂欄位順序、顯示/隱藏，context["user_settings"] 控制，測試已覆蓋。
+
+### 8. 搜尋與高亮  ✅已完成
+- 支援節點名稱/型別搜尋，context["search"]、["highlighted_nodes"]，UI 高亮同步，測試已覆蓋。
+
+### 9. 新舊 GUI 切換  ✅已完成
+- 支援 legacy/modern GUI 切換，context["gui_version"]，資料同步，測試已覆蓋。
+
+### 10. AST 節點唯一性修正  ✅已完成
+- AST id 產生方式已修正，Treeview 重建前清空節點，避免 id 重複，文件已記錄。
+
+### 11. 單元測試與 UI 測試  ✅已完成
+- 各項功能皆有 TDD 驗證，測試覆蓋 loading、error、readonly、undo/redo、diff/patch 等狀態。
+
+---
+
+## 後續開發建議（2024/07）
+
+- [ ] **debug 面板強化**：顯示 context["debug_info"] 內容、API trace、context 快照，支援自動/手動刷新，補強測試。
+- [ ] **唯讀/禁用設計**：根據 context["readonly"] 或 loading 狀態，禁用所有互動（如 unbind event、覆寫 handler），補強相關測試。
+- [ ] **View/context 解耦與效能**：context diff/patch 機制優化，只重繪有變動的節點，context version 自動升級/降級與警告。
+- [ ] **CI/CD 與型別檢查**：型別檢查、lint、pytest-cov 等自動化流程。
+- [ ] **文件同步**：持續同步 stub/mock、context schema、UI 測試設計原則。
 
 ---
 
