@@ -15,9 +15,9 @@
 - UI 支援多組 Treeview，資料來源可共用 context。
 - 已完成，支援多組 Treeview 實例，context 可共用或獨立，測試已覆蓋。
 
-### 4. UI callback 綁定、UI 測試查找 widget、禁用/唯讀設計
-- callback 綁定、widget 查找、禁用/唯讀行為等。
-- callback 綁定、widget 查找已完成，禁用/唯讀設計待補強。
+### 4. UI callback 綁定、UI 測試查找 widget、處理中禁用互動設計
+- callback 綁定、widget 查找已完成。
+- 處理中（context["loading"] 或 context["pending_action"]）時，禁用所有互動（如按鈕、Treeview 事件、輸入框等），顯示「處理中...請稍候」提示，結束時恢復。
 
 ### 5. 多選節點與批次操作  ✅已完成
 - 支援多選節點（selected_nodes），UI/狀態同步。
@@ -46,7 +46,7 @@
 ## 後續開發建議（2024/07）
 
 - [ ] **debug 面板強化**：顯示 context["debug_info"] 內容、API trace、context 快照，支援自動/手動刷新，補強測試。
-- [ ] **唯讀/禁用設計**：根據 context["readonly"] 或 loading 狀態，禁用所有互動（如 unbind event、覆寫 handler），補強相關測試。
+- [ ] **處理中禁用互動設計**：僅針對 context["loading"] 或 context["pending_action"] 為 True 時，禁用所有互動，結束時恢復。
 - [ ] **View/context 解耦與效能**：context diff/patch 機制優化，只重繪有變動的節點，context version 自動升級/降級與警告。
 - [ ] **CI/CD 與型別檢查**：型別檢查、lint、pytest-cov 等自動化流程。
 - [ ] **文件同步**：持續同步 stub/mock、context schema、UI 測試設計原則。
