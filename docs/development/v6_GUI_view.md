@@ -1,5 +1,26 @@
 # v6 GUI for Nested Struct and Union — View（UI/顯示層設計）
 
+## [優先開發] 只需修改 View 的功能
+
+### 1. Treeview/表格欄位設定一致性與共用化
+- 所有 tab（如 file/manual/debug）都統一引用 MEMBER_TREEVIEW_COLUMNS，動態顯示/隱藏欄位時只重建 widget。
+- 只需改 view。
+
+### 2. UI/UX 細節優化
+- 展開/收合、icon、顏色、[struct]/[union] 標籤的顯示方式。
+- Treeview 樹狀結構的顯示細節、樣式、icon、顏色等。
+- 只需改 view。
+
+### 3. 頁面可嵌入多組顯示元件（多 Treeview/多視窗）
+- UI 支援多組 Treeview，資料來源可共用 context。
+- 主要改 view，若要多 context 則 presenter 也需支援。
+
+### 4. UI callback 綁定、UI 測試查找 widget、禁用/唯讀設計
+- callback 綁定、widget 查找、禁用/唯讀行為等。
+- 只需改 view。
+
+---
+
 ## 1. UI 元件設計
 - Treeview 樹狀顯示元件，支援 parent-child node 遞迴插入。
 - member value、struct layout、debug input raw data 封裝為獨立元件。
