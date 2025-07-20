@@ -5,8 +5,8 @@ v7 展平策略測試
 """
 
 import pytest
-from src.v7.ast_node import ASTNode, ASTNodeFactory
-from src.v7.flattening_strategy import (
+from src.model.ast_node import ASTNode, ASTNodeFactory
+from src.model.flattening_strategy import (
     FlatteningStrategy, 
     StructFlatteningStrategy, 
     UnionFlatteningStrategy,

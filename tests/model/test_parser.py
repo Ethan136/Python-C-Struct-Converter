@@ -5,8 +5,8 @@ v7 解析器測試
 """
 
 import pytest
-from src.v7.parser import V7StructParser
-from src.v7.ast_node import ASTNode, ASTNodeFactory
+from src.model.parser import V7StructParser
+from src.model.ast_node import ASTNode, ASTNodeFactory
 
 
 class TestV7StructParser:

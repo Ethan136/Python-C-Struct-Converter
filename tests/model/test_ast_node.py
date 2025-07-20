@@ -5,7 +5,7 @@ v7 AST 節點測試
 """
 
 import pytest
-from src.v7.ast_node import ASTNode, ASTNodeFactory
+from src.model.ast_node import ASTNode, ASTNodeFactory
 
 
 class TestASTNode:
