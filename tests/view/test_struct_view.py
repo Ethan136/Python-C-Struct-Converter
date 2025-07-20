@@ -1261,17 +1261,26 @@ class TestStructView(unittest.TestCase):
         self.assertIn("yellow", str(style.get("background", "")))
 
     def test_treeview_multiselect_and_selected_nodes(self):
+        """驗證 Treeview 多選節點功能：context["selected_nodes"] 設定時 Treeview selection 會同步，多選時 context["selected_nodes"] 會正確更新。"""
         # 準備 nodes/context
         nodes = PresenterStub().get_display_nodes("tree")
         context = PresenterStub().context.copy()
         context["expanded_nodes"] = ["root"]
         context["selected_nodes"] = ["child1", "child2"]
-        self.view.update_display(nodes, context)
-        tree = self.view.member_tree
+        view = self.view
+        view.update_display(nodes, context)
+        tree = view.member_tree
+        # 驗證 Treeview selectmode
         self.assertEqual(str(tree.cget("selectmode")), "extended")
+        # 驗證多選 selection
         selected = set(tree.selection())
         self.assertIn("child1", selected)
         self.assertIn("child2", selected)
+        # 模擬使用者多選 child1, child2
+        tree.selection_set(["child1", "child2"])
+        tree.event_generate('<<TreeviewSelect>>')
+        # context 應同步更新
+        self.assertEqual(set(view.presenter.context["selected_nodes"]), {"child1", "child2"})
 
     def test_treeview_search_and_highlight(self):
         """驗證 Treeview 搜尋與高亮功能：輸入搜尋字串後，Treeview 會高亮正確節點，切換搜尋字串時高亮同步更新"""
