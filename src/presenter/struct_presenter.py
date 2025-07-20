@@ -244,14 +244,11 @@ class StructPresenter:
     def compute_member_layout(self, members, total_size):
         """計算 struct member 的 layout，回傳 layout list，含 LRU cache 機制。"""
         cache_key = self._make_cache_key(members, total_size)
-        print(f"[DEBUG] cache_key: {cache_key}")
-        print(f"[DEBUG] cache keys before: {list(self._layout_cache.keys())}")
         if self._lru_cache_size > 0 and cache_key in self._layout_cache:
             self._cache_hits += 1
             # LRU: move to end
             self._layout_cache.move_to_end(cache_key)
             self._last_hit_key = cache_key  # 新增
-            print(f"[DEBUG] cache hit: {cache_key}")
             return self._layout_cache[cache_key]
         try:
             start = time.perf_counter()
@@ -267,12 +264,10 @@ class StructPresenter:
             while len(self._layout_cache) > self._lru_cache_size:
                 evicted = self._layout_cache.popitem(last=False)
                 self._last_evict_key = evicted[0]  # 新增
-                print(f"[DEBUG] evicted: {evicted[0]}")
         else:
             # cache size 0，不儲存任何項目
             self._layout_cache.clear()
         self._cache_misses += 1
-        print(f"[DEBUG] cache keys after: {list(self._layout_cache.keys())}")
         return layout
 
     def get_last_layout_time(self):

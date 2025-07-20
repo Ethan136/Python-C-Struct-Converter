@@ -377,6 +377,7 @@ class StructModel:
             elif node.get("is_union"):
                 label = f"{label} [union]"
             value = value_map.get(node["name"], "")  # 新增
+            # print(f"[DEBUG] to_treeview_node: name={node['name']} id={node['id']} value={value}")  # debug print
             return {
                 "id": node["id"],
                 "label": label,
