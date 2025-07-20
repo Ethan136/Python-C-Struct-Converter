@@ -1274,7 +1274,7 @@ class TestStructView(unittest.TestCase):
         self.assertIn("child2", selected)
 
     def test_treeview_search_and_highlight(self):
-        # 準備 presenter/view
+        """驗證 Treeview 搜尋與高亮功能：輸入搜尋字串後，Treeview 會高亮正確節點，切換搜尋字串時高亮同步更新"""
         presenter = PresenterStub()
         view = StructView(presenter=presenter)
         presenter.view = view
