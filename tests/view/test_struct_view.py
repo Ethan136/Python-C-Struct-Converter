@@ -2281,5 +2281,39 @@ class TestStructView(unittest.TestCase):
         assert "last_error: parse failed" in debug_text
         root.destroy()
 
+    def test_treeview_node_id_uniqueness_on_multiple_loads(self):
+        """TDD: 驗證多次載入/重建 Treeview 時，所有 node id 都唯一且不重複 (真實 Model/AST)。"""
+        from src.model.struct_model import StructModel, ast_to_dict
+        # 定義一個巢狀 struct 測試用
+        struct_code = '''
+        struct Inner {
+            int a;
+            char b;
+        };
+        struct Outer {
+            int x;
+            struct Inner y;
+            char z;
+        };
+        '''
+        model = StructModel()
+        # 兩次載入同一 struct，取得 AST dict
+        from src.model.struct_parser import parse_struct_definition_ast
+        ast1 = parse_struct_definition_ast(struct_code)
+        ast2 = parse_struct_definition_ast(struct_code)
+        dict1 = ast_to_dict(ast1)
+        dict2 = ast_to_dict(ast2)
+        # 遞迴收集所有 id
+        def collect_ids(node):
+            ids = [node["id"]]
+            for child in node.get("children", []):
+                ids.extend(collect_ids(child))
+            return ids
+        ids1 = collect_ids(dict1)
+        ids2 = collect_ids(dict2)
+        # 應該沒有任何 id 重複
+        all_ids = ids1 + ids2
+        self.assertEqual(len(all_ids), len(set(all_ids)), "多次載入/重建時所有 node id 應全域唯一且不重複")
+
 if __name__ == "__main__":
     unittest.main()
