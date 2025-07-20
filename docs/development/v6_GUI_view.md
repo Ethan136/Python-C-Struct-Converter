@@ -79,6 +79,46 @@
 - **批次操作**：如展開/收合全部、拖曳排序，對應事件與 context 欄位。
 - **debug 面板**：根據 context 的 `debug_info` 顯示最近事件、API trace、context 快照等。
 
+### 欄位排序與自訂顯示（細節規劃 2024/07 補充）
+
+#### 1. user_settings["treeview_columns"] schema 範例
+```python
+# 儲存於 context["user_settings"]["treeview_columns"]
+[
+  {"name": "name", "visible": True, "order": 0},
+  {"name": "value", "visible": True, "order": 1},
+  {"name": "hex_value", "visible": False, "order": 2},
+  {"name": "hex_raw", "visible": True, "order": 3}
+]
+```
+- name: 欄位名稱（對應 MEMBER_TREEVIEW_COLUMNS）
+- visible: 是否顯示
+- order: 顯示順序（數字越小越前面）
+
+#### 2. UI 操作流程
+- 右鍵點擊 Treeview 標題列，彈出欄位顯示/隱藏選單（checkbutton 控制 visible）
+- 拖曳欄位標題可調整順序（order）
+- 設定變動時，View 呼叫 presenter.on_update_user_settings(new_settings)
+- 設定會即時套用並儲存於 context["user_settings"]
+
+#### 3. 資料流/事件流
+- View 觸發 on_update_user_settings → Presenter 更新 context["user_settings"] → 推送新 context 給 View → View 依據 user_settings 重建 Treeview
+- Treeview displaycolumns 依 user_settings 排序與 visible 決定
+
+#### 4. 預設值與 fallback
+- 若 user_settings 缺失，使用 MEMBER_TREEVIEW_COLUMNS 預設順序與顯示
+- 欄位設定異常時自動回退預設
+
+#### 5. 測試驗證重點
+- 切換欄位順序、顯示/隱藏時，Treeview displaycolumns 正確
+- user_settings 儲存/還原正確
+- 預設值 fallback 行為正確
+- 欄位設定異常時不會造成 UI crash
+
+#### 6. 其他建議
+- 欄位順序/顯示設定可考慮持久化（如寫入本地設定檔）
+- 欄位寬度、顏色等進階設定可後續擴充
+
 ---
 
 ## 7. View 測試與 mock 建議
