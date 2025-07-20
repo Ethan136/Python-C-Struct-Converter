@@ -1477,29 +1477,59 @@ class StructView(tk.Tk):
         # 清空現有資料
         for item in self.modern_tree.get_children():
             self.modern_tree.delete(item)
-        
+        # 設置 tag_configure（每次都設置，確保樣式）
+        self.modern_tree.tag_configure("highlighted", background="yellow")
+        self.modern_tree.tag_configure("struct", foreground="blue", font="Arial 10 bold")
+        self.modern_tree.tag_configure("union", foreground="purple", font="Arial 10 bold")
+        self.modern_tree.tag_configure("bitfield", foreground="#008000")
+        self.modern_tree.tag_configure("array", foreground="#B8860B")
         # 遞迴插入節點
         def insert_node(parent, node):
+            node_type = node.get("type", "")
+            label = node.get("label", node.get("name", ""))
+            tags = []
+            if node_type == "struct":
+                label = f"{label} [struct]"
+                tags.append("struct")
+            elif node_type == "union":
+                label = f"{label} [union]"
+                tags.append("union")
+            elif node_type == "bitfield":
+                tags.append("bitfield")
+            elif node_type == "array":
+                tags.append("array")
             node_id = self.modern_tree.insert(
                 parent, 
                 "end", 
-                text=node.get("name", ""),
+                iid=node.get("id", None),
+                text=label,
                 values=(
                     node.get("name", ""),
                     node.get("type", ""),
                     node.get("value", ""),
                     node.get("offset", ""),
                     node.get("size", "")
-                )
+                ),
+                tags=tuple(tags)
             )
-            
             # 遞迴插入子節點
             for child in node.get("children", []):
                 insert_node(node_id, child)
-        
         # 插入所有根節點
         for node in nodes:
             insert_node("", node)
+        # 插入完畢後根據 context 展開節點（先展開 parent 再展開 child）
+        if self.presenter and hasattr(self.presenter, "context"):
+            expanded = set(self.presenter.context.get("expanded_nodes", []))
+            def expand_recursive(tree, item_id):
+                if item_id in expanded:
+                    tree.item(item_id, open=True)
+                    tree.update_idletasks()
+                for child in tree.get_children(item_id):
+                    expand_recursive(tree, child)
+            for item in self.modern_tree.get_children(""):
+                expand_recursive(self.modern_tree, item)
+        self.modern_tree.update_idletasks()
 
     def _on_modern_tree_open(self, event):
         """新版樹狀顯示展開事件"""
