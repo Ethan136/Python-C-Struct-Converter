@@ -2113,5 +2113,41 @@ class TestStructView(unittest.TestCase):
         # child 展開狀態在 CI/headless 下不保證，僅手動驗證
         # self.assertTrue(modern_tree.item("u1", "open"))  # 已移除，見上註解
 
+    def test_multi_treeview_instances_independent(self):
+        """驗證 StructView 可同時產生多組 Treeview，且能分別顯示不同 nodes/context，互不干擾"""
+        from src.view.struct_view import StructView
+        from tests.view.test_struct_view import PresenterStub
+        # 準備兩組 presenter/context
+        class PresenterA(PresenterStub):
+            def __init__(self):
+                super().__init__()
+                self.context = {"display_mode": "tree", "expanded_nodes": ["rootA"], "selected_node": "rootA"}
+            def get_display_nodes(self, mode):
+                return [{"id": "rootA", "label": "A", "type": "struct", "children": []}]
+        class PresenterB(PresenterStub):
+            def __init__(self):
+                super().__init__()
+                self.context = {"display_mode": "tree", "expanded_nodes": ["rootB"], "selected_node": "rootB"}
+            def get_display_nodes(self, mode):
+                return [{"id": "rootB", "label": "B", "type": "struct", "children": []}]
+        presenterA = PresenterA()
+        presenterB = PresenterB()
+        viewA = StructView(presenter=presenterA)
+        viewB = StructView(presenter=presenterB)
+        # 驗證兩組 Treeview 內容互不干擾
+        treeA = viewA.member_tree
+        treeB = viewB.member_tree
+        self.assertIn("rootA", treeA.get_children(""))
+        self.assertIn("rootB", treeB.get_children(""))
+        self.assertNotIn("rootB", treeA.get_children(""))
+        self.assertNotIn("rootA", treeB.get_children(""))
+        # 驗證 selection 互不影響
+        treeA.selection_set("rootA")
+        treeB.selection_set("rootB")
+        self.assertEqual(treeA.selection(), ("rootA",))
+        self.assertEqual(treeB.selection(), ("rootB",))
+        viewA.destroy()
+        viewB.destroy()
+
 if __name__ == "__main__":
     unittest.main()
