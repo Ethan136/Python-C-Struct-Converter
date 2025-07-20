@@ -2259,5 +2259,27 @@ class TestStructView(unittest.TestCase):
         self.assertTrue(called["expand"])
         self.assertTrue(called["collapse"])
 
+    def test_debug_tab_shows_debug_info_fields(self):
+        import tkinter as tk
+        from src.view.struct_view import StructView
+        root = tk.Tk()
+        presenter = PresenterStub()
+        view = StructView(presenter=presenter)
+        view._create_debug_tab()
+        # 模擬 context["debug_info"]
+        presenter.context["debug_info"] = {
+            "last_event": "on_parse",
+            "api_trace": ["on_parse", "on_update", "on_export"],
+            "context_snapshot": {"selected_node": "child1", "expanded_nodes": ["root", "child1"]},
+            "last_error": "parse failed"
+        }
+        view.refresh_debug_info()
+        debug_text = view.debug_info_label.cget("text")
+        assert "last_event: on_parse" in debug_text
+        assert "api_trace: ['on_parse', 'on_update', 'on_export']" in debug_text
+        assert "context_snapshot" in debug_text
+        assert "last_error: parse failed" in debug_text
+        root.destroy()
+
 if __name__ == "__main__":
     unittest.main()

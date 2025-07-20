@@ -1039,27 +1039,50 @@ class StructView(tk.Tk):
         self.refresh_debug_info()
 
     def refresh_debug_info(self):
+        lines = []
+        # 顯示 presenter cache stats
         if self.presenter and hasattr(self.presenter, "get_cache_stats") and hasattr(self.presenter, "get_last_layout_time"):
             hit, miss = self.presenter.get_cache_stats()
             last_time = self.presenter.get_last_layout_time()
-            text = f"Cache Hit: {hit}\nCache Miss: {miss}\nLast Layout Time: {last_time}"
+            lines.append(f"Cache Hit: {hit}")
+            lines.append(f"Cache Miss: {miss}")
+            lines.append(f"Last Layout Time: {last_time}")
             # 額外顯示 LRU cache 狀態
             if hasattr(self.presenter, "get_cache_keys") and hasattr(self.presenter, "get_lru_state"):
                 keys = self.presenter.get_cache_keys()
                 lru = self.presenter.get_lru_state()
-                text += f"\nCache Keys: {keys}"
-                text += f"\nLRU Capacity: {lru.get('capacity')}"
-                text += f"\nCurrent Size: {lru.get('current_size')}"
-                text += f"\nLast Hit: {lru.get('last_hit')}"
-                text += f"\nLast Evict: {lru.get('last_evict')}"
+                lines.append(f"Cache Keys: {keys}")
+                lines.append(f"LRU Capacity: {lru.get('capacity')}")
+                lines.append(f"Current Size: {lru.get('current_size')}")
+                lines.append(f"Last Hit: {lru.get('last_hit')}")
+                lines.append(f"Last Evict: {lru.get('last_evict')}")
             # 顯示自動清空狀態
             if hasattr(self.presenter, "is_auto_cache_clear_enabled"):
                 enabled = self.presenter.is_auto_cache_clear_enabled()
-                text += f"\nAuto Cache Clear: {'啟用' if enabled else '停用'}"
-                text += f"\nInterval: {self.auto_clear_interval_var.get()} 秒"
+                lines.append(f"Auto Cache Clear: {'啟用' if enabled else '停用'}")
+                lines.append(f"Interval: {self.auto_clear_interval_var.get()} 秒")
         else:
-            text = "No presenter stats available."
-        self.debug_info_label.config(text=text)
+            lines.append("No presenter stats available.")
+        # 額外顯示 context["debug_info"]
+        debug_info = None
+        if self.presenter and hasattr(self.presenter, "context"):
+            debug_info = self.presenter.context.get("debug_info", {})
+        if debug_info:
+            for k, v in debug_info.items():
+                if isinstance(v, dict) or isinstance(v, list):
+                    lines.append(f"{k}: {repr(v)}")
+                else:
+                    lines.append(f"{k}: {v}")
+        self.debug_info_label.config(text="\n".join(lines))
+
+        # Undo/Redo 按鈕狀態
+        context = self.presenter.context if self.presenter and hasattr(self.presenter, "context") else {}
+        if hasattr(self, "undo_btn"):
+            can_undo = bool(context.get("history"))
+            self.undo_btn.config(state="normal" if can_undo else "disabled")
+        if hasattr(self, "redo_btn"):
+            can_redo = bool(context.get("redo_history", []))
+            self.redo_btn.config(state="normal" if can_redo else "disabled")
 
     def _bind_member_tree_events(self):
         if not hasattr(self, "member_tree") or not self.member_tree:
@@ -1339,11 +1362,11 @@ class StructView(tk.Tk):
         self.debug_info_label.config(text="\n".join(debug_lines))
 
         # Undo/Redo 按鈕狀態
+        context = self.presenter.context if self.presenter and hasattr(self.presenter, "context") else {}
         if hasattr(self, "undo_btn"):
             can_undo = bool(context.get("history"))
             self.undo_btn.config(state="normal" if can_undo else "disabled")
         if hasattr(self, "redo_btn"):
-            # 這裡假設 context['redo_history']，如有可啟用 redo
             can_redo = bool(context.get("redo_history", []))
             self.redo_btn.config(state="normal" if can_redo else "disabled")
 
