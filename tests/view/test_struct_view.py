@@ -2315,5 +2315,64 @@ class TestStructView(unittest.TestCase):
         all_ids = ids1 + ids2
         self.assertEqual(len(all_ids), len(set(all_ids)), "多次載入/重建時所有 node id 應全域唯一且不重複")
 
+    def test_modern_treeview_shows_value_and_hex_columns(self):
+        """驗證新版 GUI (modern_tree) Treeview 能正確顯示 value、hex_value、hex_raw 欄位內容"""
+        from src.view.struct_view import MEMBER_TREEVIEW_COLUMNS
+        # 準備一組帶 value/hex_value/hex_raw 的節點
+        nodes = [
+            {
+                "id": "root",
+                "name": "TestStruct",
+                "value": "",
+                "hex_value": "",
+                "hex_raw": "",
+                "type": "struct",
+                "children": [
+                    {
+                        "id": "root.field1",
+                        "name": "field1",
+                        "value": "123",
+                        "hex_value": "0x7b",
+                        "hex_raw": "7b000000",
+                        "type": "int",
+                        "children": []
+                    },
+                    {
+                        "id": "root.field2",
+                        "name": "field2",
+                        "value": "65",
+                        "hex_value": "0x41",
+                        "hex_raw": "41",
+                        "type": "char",
+                        "children": []
+                    }
+                ]
+            }
+        ]
+        # 切換到新版 GUI
+        self.view._on_gui_version_change("modern")
+        self.view._populate_modern_tree(nodes)
+        modern_tree = self.view.modern_tree
+        # 驗證 columns
+        col_names = tuple(c["name"] for c in MEMBER_TREEVIEW_COLUMNS)
+        self.assertEqual(modern_tree.cget("columns"), col_names)
+        # 驗證根節點
+        root_id = modern_tree.get_children("")[0]
+        root_values = modern_tree.item(root_id, "values")
+        self.assertEqual(root_values[0], "TestStruct")
+        # 驗證子節點 value/hex_value/hex_raw
+        child_ids = modern_tree.get_children(root_id)
+        self.assertEqual(len(child_ids), 2)
+        v1 = modern_tree.item(child_ids[0], "values")
+        v2 = modern_tree.item(child_ids[1], "values")
+        self.assertEqual(v1[0], "field1")
+        self.assertEqual(v1[1], "123")
+        self.assertEqual(v1[2], "0x7b")
+        self.assertEqual(v1[3], "7b000000")
+        self.assertEqual(v2[0], "field2")
+        self.assertEqual(v2[1], "65")
+        self.assertEqual(v2[2], "0x41")
+        self.assertEqual(v2[3], "41")
+
 if __name__ == "__main__":
     unittest.main()
