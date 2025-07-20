@@ -1444,18 +1444,19 @@ class StructView(tk.Tk):
         # 建立新版框架
         self.modern_frame = tk.Frame(parent_frame)
         
-        # 建立樹狀 Treeview
+        # 統一引用 MEMBER_TREEVIEW_COLUMNS
+        all_columns = MEMBER_TREEVIEW_COLUMNS
+        col_names = tuple(c["name"] for c in all_columns)
         self.modern_tree = ttk.Treeview(
             self.modern_frame,
-            columns=("name", "type", "value", "offset", "size"),
-            show="tree headings",
+            columns=col_names,
+            show="headings",
             height=10
         )
-        self.modern_tree.heading("name", text="欄位名稱")
-        self.modern_tree.heading("type", text="型別")
-        self.modern_tree.heading("value", text="值")
-        self.modern_tree.heading("offset", text="Offset")
-        self.modern_tree.heading("size", text="Size")
+        for c in all_columns:
+            self.modern_tree.heading(c["name"], text=c["title"])
+            self.modern_tree.column(c["name"], width=c["width"], stretch=False)
+        self.modern_tree["displaycolumns"] = col_names
         self.modern_tree.pack(fill="both", expand=True)
         
         # 綁定展開/收合事件

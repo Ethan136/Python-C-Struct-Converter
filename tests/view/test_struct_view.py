@@ -2033,5 +2033,34 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(child_values[1], "int")        # type
         self.assertEqual(child_values[2], "123")        # value
 
+    def test_modern_treeview_column_config一致(self):
+        """驗證 modern_tree（新版 GUI）欄位名稱、順序、寬度與 file/manual tab 完全一致，且都來自 MEMBER_TREEVIEW_COLUMNS。"""
+        view = self.view
+        presenter = self.presenter
+        # 先切換到 modern GUI
+        if hasattr(view, '_on_gui_version_change'):
+            view._on_gui_version_change('modern')
+        # 觸發一次 update_display，確保 modern_tree 會被正確建立
+        nodes = presenter.get_display_nodes('tree')
+        presenter.context["gui_version"] = "modern"
+        view.update_display(nodes, presenter.context)
+        # modern_tree
+        modern_tree = getattr(view, 'modern_tree', None)
+        self.assertIsNotNone(modern_tree, "modern_tree 應已建立")
+        # file tab
+        file_tree = view.member_tree
+        # manual tab
+        manual_tree = view.manual_member_tree
+        # 欄位名稱
+        self.assertEqual(modern_tree.cget("columns"), file_tree.cget("columns"))
+        self.assertEqual(modern_tree.cget("columns"), manual_tree.cget("columns"))
+        # 欄位順序
+        self.assertEqual(modern_tree.cget("displaycolumns"), file_tree.cget("displaycolumns"))
+        self.assertEqual(modern_tree.cget("displaycolumns"), manual_tree.cget("displaycolumns"))
+        # 欄位寬度
+        for col in modern_tree.cget("columns"):
+            self.assertEqual(modern_tree.column(col)["width"], file_tree.column(col)["width"])
+            self.assertEqual(modern_tree.column(col)["width"], manual_tree.column(col)["width"])
+
 if __name__ == "__main__":
     unittest.main()
