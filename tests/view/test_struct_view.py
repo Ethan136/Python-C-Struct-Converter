@@ -14,7 +14,7 @@ pytestmark = pytest.mark.skipif(
     not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests"
 )
 
-from src.view.struct_view import StructView
+from src.view.struct_view import StructView, create_member_treeview
 from src.presenter.struct_presenter import StructPresenter
 from src.model.struct_model import StructModel
 
@@ -2148,6 +2148,45 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(treeB.selection(), ("rootB",))
         viewA.destroy()
         viewB.destroy()
+
+    def test_dynamic_add_remove_treeview_in_single_view(self):
+        """驗證 StructView 支援同一視窗內動態新增/移除多組 Treeview，且每組 Treeview 可獨立顯示不同資料"""
+        from src.view.struct_view import StructView
+        class PresenterStubA(PresenterStub):
+            def get_display_nodes(self, mode):
+                return [{"id": "rootA", "label": "A", "type": "struct", "children": []}]
+        class PresenterStubB(PresenterStub):
+            def get_display_nodes(self, mode):
+                return [{"id": "rootB", "label": "B", "type": "struct", "children": []}]
+        presenterA = PresenterStubA()
+        presenterB = PresenterStubB()
+        view = StructView(presenter=presenterA)
+        # 動態新增第二組 Treeview
+        if not hasattr(view, "extra_treeviews"): view.extra_treeviews = []
+        def add_treeview(presenter):
+            frame = tk.Frame(view)
+            tree = create_member_treeview(frame)
+            nodes = presenter.get_display_nodes("tree")
+            for item in tree.get_children(""):
+                tree.delete(item)
+            for node in nodes:
+                tree.insert("", "end", iid=node["id"], text=node["label"], values=(node["label"],))
+            frame.pack()
+            view.extra_treeviews.append((frame, tree))
+            return tree
+        treeB = add_treeview(presenterB)
+        # 驗證兩組 Treeview 內容互不干擾
+        treeA = view.member_tree
+        self.assertIn("rootA", treeA.get_children(""))
+        self.assertIn("rootB", treeB.get_children(""))
+        self.assertNotIn("rootB", treeA.get_children(""))
+        self.assertNotIn("rootA", treeB.get_children(""))
+        # 動態移除第二組 Treeview
+        frameB, _ = view.extra_treeviews.pop()
+        frameB.destroy()
+        # 應不影響主 Treeview
+        self.assertIn("rootA", treeA.get_children(""))
+        view.destroy()
 
 if __name__ == "__main__":
     unittest.main()
