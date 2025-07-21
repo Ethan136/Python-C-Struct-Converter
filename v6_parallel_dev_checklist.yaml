@@ -7,7 +7,6 @@ v2p_mock_presenter: true
 v2p_contract_test: true
 v2p_schema_validation: true
 worktree_ready: false
-ci_cd_ready: false
 merge_policy: false
 decouple_no_cross_layer: true
 decouple_observer: true
