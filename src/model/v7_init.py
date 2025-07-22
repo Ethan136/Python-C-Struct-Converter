@@ -8,7 +8,14 @@ __version__ = "7.0.0"
 __author__ = "Python C Struct Converter Team"
 
 from .ast_node import ASTNode, ASTNodeFactory
-from .flattening_strategy import FlatteningStrategy, StructFlatteningStrategy, UnionFlatteningStrategy, FlattenedNode
+from .flattening_strategy import (
+    FlatteningStrategy,
+    StructFlatteningStrategy,
+    UnionFlatteningStrategy,
+    ArrayFlatteningStrategy,
+    BitfieldFlatteningStrategy,
+    FlattenedNode,
+)
 from .parser import V7StructParser
 
 __all__ = [
@@ -17,6 +24,8 @@ __all__ = [
     'FlatteningStrategy',
     'StructFlatteningStrategy',
     'UnionFlatteningStrategy',
+    'ArrayFlatteningStrategy',
+    'BitfieldFlatteningStrategy',
     'FlattenedNode',
     'V7StructParser'
 ] 

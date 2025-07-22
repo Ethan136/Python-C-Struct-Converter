@@ -122,7 +122,7 @@ class StructLayoutCalculator(BaseLayoutCalculator):
             elif isinstance(nested, dict):
                 nested_members = nested.get("members", [])
             if nested_members is not None:
-                _, size, align = StructLayoutCalculator().calculate(nested_members)
+                _, size, align = StructLayoutCalculator(pack_alignment=self.pack_alignment).calculate(nested_members)
                 return size, align
         raise KeyError(f"Unknown type: {mtype}")
 
@@ -146,7 +146,7 @@ class StructLayoutCalculator(BaseLayoutCalculator):
             elif isinstance(nested, dict):
                 nested_members = nested.get("members", [])
         if nested_members is not None:
-            struct_layout, struct_size, struct_align = StructLayoutCalculator().calculate(nested_members)
+            struct_layout, struct_size, struct_align = StructLayoutCalculator(pack_alignment=self.pack_alignment).calculate(nested_members)
             if struct_align > self.max_alignment:
                 self.max_alignment = struct_align
             self._add_padding_if_needed(struct_align)
@@ -229,7 +229,7 @@ class StructLayoutCalculator(BaseLayoutCalculator):
             elif isinstance(nested, dict):
                 nested_members = nested.get("members", [])
         if nested_members is not None:
-            struct_layout, struct_size, struct_align = StructLayoutCalculator().calculate(nested_members)
+            struct_layout, struct_size, struct_align = StructLayoutCalculator(pack_alignment=self.pack_alignment).calculate(nested_members)
             if struct_align > self.max_alignment:
                 self.max_alignment = struct_align
             self._add_padding_if_needed(struct_align)
