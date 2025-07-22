@@ -513,7 +513,6 @@ class ArrayFlatteningStrategy(StructFlatteningStrategy):
             total_elements *= dim
         size = elem_layout['size'] * total_elements
         alignment = self._effective_alignment(elem_layout['alignment'])
-        size = self._align_offset(size, alignment)
         return {
             'size': size,
             'alignment': alignment,

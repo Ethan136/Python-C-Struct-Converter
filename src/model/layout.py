@@ -160,8 +160,9 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         else:
             # 基本型別 array
             size, alignment = self._get_type_size_and_align(mtype, nested)
-            if alignment > self.max_alignment:
-                self.max_alignment = alignment
+            effective_align = self._effective_alignment(alignment)
+            if effective_align > self.max_alignment:
+                self.max_alignment = effective_align
             self._add_padding_if_needed(alignment)
             for idx_tuple in expand_indices(array_dims):
                 idx_str = ''.join(f'[{i}]' for i in idx_tuple)
@@ -192,7 +193,11 @@ class StructLayoutCalculator(BaseLayoutCalculator):
                 self._process_regular_member(member)
 
         self._add_final_padding()
-        return self.layout, self.current_offset, self.max_alignment
+        return (
+            self.layout,
+            self.current_offset,
+            self._effective_alignment(self.max_alignment),
+        )
 
     # Internal helpers -------------------------------------------------
     def _process_bitfield_member(self, member):
@@ -240,8 +245,9 @@ class StructLayoutCalculator(BaseLayoutCalculator):
             return
 
         size, alignment = self._get_type_size_and_align(member_type, nested)
-        if alignment > self.max_alignment:
-            self.max_alignment = alignment
+        effective_align = self._effective_alignment(alignment)
+        if effective_align > self.max_alignment:
+            self.max_alignment = effective_align
         self._add_padding_if_needed(alignment)
         self._add_member_to_layout(member_name, member_type, size)
         self.current_offset += size
@@ -260,8 +266,9 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         self.bitfield_bit_offset = 0
         self.bitfield_unit_offset = self.current_offset
 
-        if alignment > self.max_alignment:
-            self.max_alignment = alignment
+        effective_align = self._effective_alignment(alignment)
+        if effective_align > self.max_alignment:
+            self.max_alignment = effective_align
 
         self.current_offset += size
 
@@ -368,7 +375,11 @@ class UnionLayoutCalculator(BaseLayoutCalculator):
 
         self.current_offset = max_size
         self._add_final_padding()
-        return self.layout, self.current_offset, self.max_alignment
+        return (
+            self.layout,
+            self.current_offset,
+            self._effective_alignment(self.max_alignment),
+        )
 
 
 # Maintain backward compatibility
