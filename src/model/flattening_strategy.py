@@ -102,15 +102,20 @@ class StructFlatteningStrategy(FlatteningStrategy):
             if child.is_bitfield:
                 child_nodes, new_offset = self._flatten_bitfield(child, prefix, current_offset)
             else:
-                # 遞迴展平子節點
+                if self._bitfield_unit_type is not None:
+                    current_offset = self._bitfield_unit_offset + self._bitfield_unit_size
+                    self._reset_bitfield_state()
                 child_nodes = self._flatten_child(child, prefix, current_offset)
                 if child_nodes:
                     new_offset = child_nodes[-1].offset + child_nodes[-1].size
-                    self._reset_bitfield_state()
                 else:
                     new_offset = current_offset
             result.extend(child_nodes)
             current_offset = new_offset
+
+        if self._bitfield_unit_type is not None:
+            current_offset = self._bitfield_unit_offset + self._bitfield_unit_size
+            self._reset_bitfield_state()
 
         return result
     
@@ -231,14 +236,40 @@ class StructFlatteningStrategy(FlatteningStrategy):
         """計算 struct 佈局"""
         total_size = 0
         max_alignment = 1
+        self._reset_bitfield_state()
 
         for child in node.children:
-            child_layout = self._calculate_child_layout(child)
-            total_size = self._align_offset(total_size, child_layout['alignment'])
-            total_size += child_layout['size']
-            max_alignment = max(max_alignment, child_layout['alignment'])
+            if child.is_bitfield:
+                unit = self._get_basic_type_size(child.type)
+                unit_align = self._get_basic_type_alignment(child.type)
+                if (
+                    self._bitfield_unit_type != child.type or
+                    self._bitfield_bit_offset + child.bit_size > unit * 8
+                ):
+                    total_size = self._align_offset(total_size, unit_align)
+                    max_alignment = max(max_alignment, unit_align)
+                    self._bitfield_unit_type = child.type
+                    self._bitfield_unit_size = unit
+                    self._bitfield_unit_align = unit_align
+                    self._bitfield_bit_offset = 0
+                    self._bitfield_unit_offset = total_size
+                self._bitfield_bit_offset += child.bit_size
+                if self._bitfield_bit_offset >= unit * 8:
+                    total_size += unit
+                    self._reset_bitfield_state()
+            else:
+                if self._bitfield_unit_type is not None:
+                    total_size += self._bitfield_unit_size
+                    self._reset_bitfield_state()
+                child_layout = self._calculate_child_layout(child)
+                total_size = self._align_offset(total_size, child_layout['alignment'])
+                total_size += child_layout['size']
+                max_alignment = max(max_alignment, child_layout['alignment'])
 
-        # 最終對齊，pack_alignment 會影響結構對齊
+        if self._bitfield_unit_type is not None:
+            total_size += self._bitfield_unit_size
+            self._reset_bitfield_state()
+
         effective_align = self._effective_alignment(max_alignment)
         total_size = self._align_offset(total_size, effective_align)
 
