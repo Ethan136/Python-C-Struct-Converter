@@ -163,26 +163,25 @@ class StructFlatteningStrategy(FlatteningStrategy):
     
     def _flatten_nested(self, node: ASTNode, prefix: str, base_offset: int) -> List[FlattenedNode]:
         """展平巢狀結構節點"""
-        result = []
-        
-        # 修正：匿名結構不應該在名稱中加入結構名稱
+        # 直接遞迴使用對應策略展平，並加上偏移量
+        if node.is_struct:
+            strategy = StructFlatteningStrategy(self.pack_alignment)
+        else:
+            strategy = UnionFlatteningStrategy(self.pack_alignment)
+
         if node.is_anonymous:
-            # 為匿名結構生成一個臨時名稱
             anonymous_name = f"anonymous_{node.id[:8]}"
             nested_prefix = f"{prefix}{anonymous_name}."
         else:
-            # 檢查是否在陣列上下文中（前綴包含陣列索引）
             if '[' in prefix and ']' in prefix:
-                # 在陣列上下文中，結構應該被視為匿名結構
                 nested_prefix = prefix
             else:
                 nested_prefix = f"{prefix}{node.name}."
-        
-        for child in node.children:
-            child_nodes = self._flatten_child(child, nested_prefix, base_offset)
-            result.extend(child_nodes)
-        
-        return result
+
+        nodes = strategy.flatten_node(node, nested_prefix)
+        for n in nodes:
+            n.offset += base_offset
+        return nodes
     
     def _create_flattened_node(self, node: ASTNode, prefix: str, base_offset: int) -> FlattenedNode:
         """建立展平節點"""
@@ -389,26 +388,25 @@ class UnionFlatteningStrategy(FlatteningStrategy):
     
     def _flatten_nested(self, node: ASTNode, prefix: str, base_offset: int) -> List[FlattenedNode]:
         """展平巢狀結構節點"""
-        result = []
-        
-        # 修正：匿名結構不應該在名稱中加入結構名稱
+        # 直接遞迴使用對應策略展平，並加上偏移量
+        if node.is_struct:
+            strategy = StructFlatteningStrategy(self.pack_alignment)
+        else:
+            strategy = UnionFlatteningStrategy(self.pack_alignment)
+
         if node.is_anonymous:
-            # 為匿名結構生成一個臨時名稱
             anonymous_name = f"anonymous_{node.id[:8]}"
             nested_prefix = f"{prefix}{anonymous_name}."
         else:
-            # 檢查是否在陣列上下文中（前綴包含陣列索引）
             if '[' in prefix and ']' in prefix:
-                # 在陣列上下文中，結構應該被視為匿名結構
                 nested_prefix = prefix
             else:
                 nested_prefix = f"{prefix}{node.name}."
-        
-        for child in node.children:
-            child_nodes = self._flatten_child(child, nested_prefix, base_offset)
-            result.extend(child_nodes)
-        
-        return result
+
+        nodes = strategy.flatten_node(node, nested_prefix)
+        for n in nodes:
+            n.offset += base_offset
+        return nodes
     
     def _create_flattened_node(self, node: ASTNode, prefix: str, base_offset: int) -> FlattenedNode:
         """建立展平節點"""

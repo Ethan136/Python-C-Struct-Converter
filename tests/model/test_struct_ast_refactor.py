@@ -83,6 +83,16 @@ def test_anonymous_struct_union_flatten(src, expect_names):
         int matrix[2][3];
     };
     """, ["matrix[0][0]", "matrix[1][2]"]),
+    ("""
+    struct S {
+        union { int a; char b; } u_arr[2];
+    };
+    """, ["u_arr[0].a", "u_arr[1].b"]),
+    ("""
+    struct S {
+        struct { int x; } nd[2][2];
+    };
+    """, ["nd[0][0].x", "nd[1][1].x"]),
 ])
 def test_struct_union_nd_array_flatten(src, expect):
     sdef = parse_struct_definition_ast(src)
