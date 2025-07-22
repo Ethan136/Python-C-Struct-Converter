@@ -32,11 +32,11 @@
 - 每次 edge case/功能補齊，需同步更新 XML 測資與文件。
 
 ## 六、目前狀態與 TODO
-- [ ] 巢狀 union/struct/array AST/flatten 已完成/待補齊
-- [ ] 匿名 struct/union/bitfield AST/flatten 已完成/待補齊
-- [ ] N-D array 巢狀展平已完成/待補齊
-- [ ] XML 驅動測試已覆蓋/待補齊
-- [ ] 測試 stub/skip 已解除/待補齊
+- [x] 巢狀 union/struct/array AST/flatten 已完成
+- [x] 匿名 struct/union/bitfield AST/flatten 已完成
+- [x] N-D array 巢狀展平已完成
+- [x] XML 驅動測試已覆蓋
+- [x] 測試 stub/skip 已解除
 
 ---
 
