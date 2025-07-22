@@ -18,7 +18,6 @@ from src.model.struct_parser import parse_struct_definition_ast, MemberDef, Stru
         ]),
         ("b", "int")
     ]),
-    # TODO(v5_union): 待 union AST/解析支援後恢復
     pytest.param(
         """
         struct S {
@@ -53,8 +52,6 @@ def test_nested_struct_union_array(src, expect):
             assert m.type == exp[1]
 
 # 2. 匿名 struct/union
-# TODO(v5_anonymous): 待匿名 struct/union AST/展平支援後恢復
-@pytest.mark.skip(reason="anonymous struct/union not supported in MVP")
 @pytest.mark.parametrize("src, expect_names", [
     ("""
     struct S {
@@ -76,8 +73,6 @@ def test_anonymous_struct_union_flatten(src, expect_names):
         assert n in names
 
 # 3. struct/union array, N-D array
-# TODO(v5_nd_array): 待 array/N-D array AST/展平支援後恢復
-@pytest.mark.skip(reason="array/N-D array not supported in MVP")
 @pytest.mark.parametrize("src, expect", [
     ("""
     struct S {
