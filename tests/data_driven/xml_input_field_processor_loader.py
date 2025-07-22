@@ -47,6 +47,12 @@ class InputFieldProcessorXMLTestLoader(BaseXMLTestLoader):
                     'endianness': c.attrib['endianness'],
                     'expected': c.attrib['expected'],
                 })
+        for iss in case.findall('is_supported_field_size'):
+            for c in iss.findall('case'):
+                tests['is_supported_field_size'].append({
+                    'size': int(c.attrib['size']),
+                    'expected': c.attrib['expected'] == 'true',
+                })
         return {'extra_tests': dict(tests)}
 
     def parse_error_cases(self, xml_path):

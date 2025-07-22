@@ -32,16 +32,14 @@ class TestInputFieldProcessor(unittest.TestCase):
                     self.processor.process_input_field(case['input'], case['byte_size'], case['endianness'])
 
     def test_is_supported_field_size(self):
-        """Test the is_supported_field_size method"""
-        # Test supported sizes
-        self.assertTrue(self.processor.is_supported_field_size(1))
-        self.assertTrue(self.processor.is_supported_field_size(4))
-        self.assertTrue(self.processor.is_supported_field_size(8))
-        
-        # Test unsupported sizes
-        self.assertFalse(self.processor.is_supported_field_size(2))
-        self.assertFalse(self.processor.is_supported_field_size(3))
-        self.assertFalse(self.processor.is_supported_field_size(16))
+        for case in load_input_field_processor_tests(
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_input_field_processor_config.xml')
+        ):
+            extra = case.get('extra_tests', {})
+            for sub in extra.get('is_supported_field_size', []):
+                with self.subTest(size=sub['size']):
+                    result = self.processor.is_supported_field_size(sub['size'])
+                    self.assertEqual(result, sub['expected'])
 
 class TestInputFieldProcessorXMLDriven(unittest.TestCase):
     """XML 驅動的 InputFieldProcessor 測試"""

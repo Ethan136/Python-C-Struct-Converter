@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pack_alignment_tests>
+    <test_case name="pack1_no_padding" pack="1">
+        <members>
+            <member type="char" name="a" />
+            <member type="int" name="b" />
+        </members>
+        <expected_offsets>
+            <entry name="a" offset="0" />
+            <entry name="b" offset="1" />
+        </expected_offsets>
+        <expected_total_size>5</expected_total_size>
+    </test_case>
+    <test_case name="pack2" pack="2">
+        <members>
+            <member type="char" name="a" />
+            <member type="int" name="b" />
+            <member type="short" name="c" />
+        </members>
+        <expected_offsets>
+            <entry name="a" offset="0" />
+            <entry name="b" offset="2" />
+            <entry name="c" offset="6" />
+        </expected_offsets>
+        <expected_total_size>8</expected_total_size>
+    </test_case>
+    <test_case name="pack4" pack="4">
+        <members>
+            <member type="char" name="a" />
+            <member type="int" name="b" />
+            <member type="short" name="c" />
+        </members>
+        <expected_offsets>
+            <entry name="a" offset="0" />
+            <entry name="b" offset="4" />
+            <entry name="c" offset="8" />
+        </expected_offsets>
+        <expected_total_size>12</expected_total_size>
+    </test_case>
+    <test_case name="pack8" pack="8">
+        <members>
+            <member type="char" name="a" />
+            <member type="int" name="b" />
+            <member type="short" name="c" />
+        </members>
+        <expected_offsets>
+            <entry name="a" offset="0" />
+            <entry name="b" offset="4" />
+            <entry name="c" offset="8" />
+        </expected_offsets>
+        <expected_total_size>12</expected_total_size>
+    </test_case>
+    <test_case name="bitfield_pack1" pack="1" type="bitfield">
+        <members>
+            <member type="int" name="a" is_bitfield="true" bit_size="3" />
+            <member type="int" name="b" is_bitfield="true" bit_size="5" />
+            <member type="int" name="c" is_bitfield="true" bit_size="8" />
+        </members>
+        <expected_offsets>
+            <entry name="a" offset="0" />
+            <entry name="b" offset="0" />
+            <entry name="c" offset="0" />
+        </expected_offsets>
+        <expected_total_size>4</expected_total_size>
+    </test_case>
+    <test_case name="array_pack1" pack="1" type="array">
+        <members>
+            <member type="char" name="a" />
+            <member type="int" name="arr" array_dims="2" />
+            <member type="short" name="b" />
+        </members>
+        <expected_offsets>
+            <entry name="a" offset="0" />
+            <entry name="arr[0]" offset="1" />
+            <entry name="arr[1]" offset="5" />
+            <entry name="b" offset="9" />
+        </expected_offsets>
+    </test_case>
+    <test_case name="array_pack2" pack="2" type="array">
+        <members>
+            <member type="char" name="a" />
+            <member type="int" name="arr" array_dims="2" />
+            <member type="short" name="b" />
+        </members>
+        <expected_offsets>
+            <entry name="a" offset="0" />
+            <entry name="arr[0]" offset="2" />
+            <entry name="arr[1]" offset="6" />
+            <entry name="b" offset="10" />
+        </expected_offsets>
+    </test_case>
+    <test_case name="array_pack4" pack="4" type="array">
+        <members>
+            <member type="char" name="a" />
+            <member type="int" name="arr" array_dims="2" />
+            <member type="short" name="b" />
+        </members>
+        <expected_offsets>
+            <entry name="a" offset="0" />
+            <entry name="arr[0]" offset="4" />
+            <entry name="arr[1]" offset="8" />
+            <entry name="b" offset="12" />
+        </expected_offsets>
+    </test_case>
+    <test_case name="nested_pack1" pack="1" type="nested">
+        <members>
+            <member type="char" name="a" />
+            <member type="Inner" name="b">
+                <nested_members>
+                    <member type="char" name="x" />
+                    <member type="int" name="y" />
+                </nested_members>
+            </member>
+            <member type="short" name="c" />
+        </members>
+        <expected_offsets>
+            <entry name="a" offset="0" />
+            <entry name="b" offset="1" />
+            <entry name="c" offset="6" />
+        </expected_offsets>
+        <expected_total_size>8</expected_total_size>
+    </test_case>
+    <test_case name="nested_pack2" pack="2" type="nested">
+        <members>
+            <member type="char" name="a" />
+            <member type="Inner" name="b">
+                <nested_members>
+                    <member type="char" name="x" />
+                    <member type="int" name="y" />
+                </nested_members>
+            </member>
+            <member type="short" name="c" />
+        </members>
+        <expected_offsets>
+            <entry name="a" offset="0" />
+            <entry name="b" offset="2" />
+            <entry name="c" offset="8" />
+        </expected_offsets>
+        <expected_total_size>10</expected_total_size>
+    </test_case>
+    <test_case name="nested_pack4" pack="4" type="nested">
+        <members>
+            <member type="char" name="a" />
+            <member type="Inner" name="b">
+                <nested_members>
+                    <member type="char" name="x" />
+                    <member type="int" name="y" />
+                </nested_members>
+            </member>
+            <member type="short" name="c" />
+        </members>
+        <expected_offsets>
+            <entry name="a" offset="0" />
+            <entry name="b" offset="4" />
+            <entry name="c" offset="12" />
+        </expected_offsets>
+        <expected_total_size>16</expected_total_size>
+    </test_case>
+</pack_alignment_tests>

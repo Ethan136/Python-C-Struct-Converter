@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<presenter_refactor_tests>
+    <test_case name="compute_member_layout" type="compute_layout">
+        <members>
+            <member name="a" type="int" bit_size="0" />
+            <member name="b" type="char" bit_size="0" />
+        </members>
+        <expected_layout>
+            <item name="a" type="int" size="4" />
+            <item name="b" type="char" size="1" />
+            <item name="(final padding)" type="padding" />
+        </expected_layout>
+    </test_case>
+    <test_case name="calculate_remaining_space" type="remaining_space">
+        <members>
+            <member name="a" type="int" bit_size="0" />
+            <member name="b" type="char" bit_size="0" />
+        </members>
+        <expected_remaining bits="24" bytes="3" />
+    </test_case>
+</presenter_refactor_tests>

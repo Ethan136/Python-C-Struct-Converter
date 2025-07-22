@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<union_preparation_tests>
+    <test_case name="custom_calculator" type="custom" expected_total="1" expected_align="1" expected_name="dummy" />
+    <test_case name="parse_c_definition" type="parse_definition">
+        <struct_definition><![CDATA[
+        struct A {
+            int x;
+        };
+        ]]></struct_definition>
+    </test_case>
+</union_preparation_tests>

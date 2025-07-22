@@ -1,47 +1,47 @@
-
-import unittest
-from unittest.mock import MagicMock
 import os
 import sys
+import unittest
+from unittest.mock import MagicMock
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+
 from src.presenter.struct_presenter import StructPresenter
 from src.model.struct_model import StructModel
+from tests.data_driven.xml_presenter_refactor_loader import load_presenter_refactor_tests
+
 
 class TestPresenterRefactor(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.model = StructModel()
+        cls.view = MagicMock()
+        cls.presenter = StructPresenter(cls.model, cls.view)
+        xml_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'test_presenter_refactor_config.xml')
+        cls.cases = load_presenter_refactor_tests(xml_path)
 
-    def setUp(self):
-        self.model = StructModel()
-        self.view = MagicMock()
-        self.presenter = StructPresenter(self.model, self.view)
+    def test_presenter_cases(self):
+        for case in self.cases:
+            with self.subTest(name=case['name']):
+                members = case['members']
+                if case['type'] == 'compute_layout':
+                    layout = self.presenter.compute_member_layout(members, 8)
+                    names = [item.get('name', '') for item in layout]
+                    types = [item.get('type', '') for item in layout]
+                    self.assertEqual(len(layout), len(case['expected_layout']))
+                    for exp in case['expected_layout']:
+                        self.assertIn(exp['name'], names)
+                        if 'type' in exp:
+                            idx = names.index(exp['name'])
+                            self.assertEqual(types[idx], exp['type'])
+                        if 'size' in exp:
+                            idx = names.index(exp['name'])
+                            self.assertEqual(layout[idx]['size'], exp['size'])
+                elif case['type'] == 'remaining_space':
+                    bits, bytes_ = self.presenter.calculate_remaining_space(members, 8)
+                    expected = case['expected_remaining']
+                    self.assertEqual(bits, expected[0])
+                    self.assertEqual(bytes_, expected[1])
 
-    def test_compute_member_layout(self):
-        members = [
-            {"name": "a", "type": "int", "bit_size": 0},
-            {"name": "b", "type": "char", "bit_size": 0}
-        ]
-        layout = self.presenter.compute_member_layout(members, 8)
-        # 根據 C/C++ 標準，layout 會有 a, b, padding
-        self.assertEqual(len(layout), 3)
-        names = [item.get("name", "") for item in layout]
-        types = [item.get("type", "") for item in layout]
-        self.assertIn("a", names)
-        self.assertIn("b", names)
-        self.assertIn("padding", types)
-        # 驗證 a, b 的 size
-        for item in layout:
-            if item.get("name") == "a":
-                self.assertEqual(item["size"], 4)
-            if item.get("name") == "b":
-                self.assertEqual(item["size"], 1)
-
-    def test_calculate_remaining_space(self):
-        members = [
-            {"name": "a", "type": "int", "bit_size": 0},
-            {"name": "b", "type": "char", "bit_size": 0}
-        ]
-        remaining_bits, remaining_bytes = self.presenter.calculate_remaining_space(members, 8)
-        self.assertEqual(remaining_bits, 24)
-        self.assertEqual(remaining_bytes, 3)
 
 if __name__ == '__main__':
     unittest.main()
