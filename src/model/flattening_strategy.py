@@ -105,11 +105,13 @@ class StructFlatteningStrategy(FlatteningStrategy):
                 if self._bitfield_unit_type is not None:
                     current_offset = self._bitfield_unit_offset + self._bitfield_unit_size
                     self._reset_bitfield_state()
+                layout = self._calculate_child_layout(child)
+                current_offset = self._align_offset(current_offset, layout['alignment'])
                 child_nodes = self._flatten_child(child, prefix, current_offset)
                 if child_nodes:
                     new_offset = child_nodes[-1].offset + child_nodes[-1].size
                 else:
-                    new_offset = current_offset
+                    new_offset = current_offset + layout['size']
             result.extend(child_nodes)
             current_offset = new_offset
 

@@ -1,6 +1,10 @@
 import pytest
 from src.model.ast_node import ASTNodeFactory
-from src.model.flattening_strategy import ArrayFlatteningStrategy, BitfieldFlatteningStrategy
+from src.model.flattening_strategy import (
+    ArrayFlatteningStrategy,
+    BitfieldFlatteningStrategy,
+    StructFlatteningStrategy,
+)
 
 
 class TestArrayFlatteningStrategy:
@@ -37,4 +41,14 @@ class TestBitfieldFlatteningStrategy:
         layout = strategy.calculate_layout(bf)
         assert layout["size"] == 4
         assert layout["alignment"] == 4
+
+    def test_bitfield_pack_alignment(self):
+        factory = ASTNodeFactory()
+        struct = factory.create_struct_node("Bits")
+        struct.add_child(factory.create_bitfield_node("a", "unsigned int", 3))
+        struct.add_child(factory.create_bitfield_node("b", "unsigned int", 5))
+        strategy = StructFlatteningStrategy(pack_alignment=1)
+        layout = strategy.calculate_layout(struct)
+        assert layout["size"] == 4
+        assert layout["alignment"] == 1
 
