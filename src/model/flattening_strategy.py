@@ -57,6 +57,17 @@ class FlatteningStrategy(ABC):
         }
         return type_sizes.get(type_name, 4)
 
+    def _get_basic_type_alignment(self, type_name: str) -> int:
+        """取得基本型別對齊值"""
+        type_align = {
+            'char': 1, 'unsigned char': 1,
+            'short': 2, 'unsigned short': 2,
+            'int': 4, 'unsigned int': 4,
+            'long': 8, 'unsigned long': 8,
+            'float': 4, 'double': 8
+        }
+        return type_align.get(type_name, 4)
+
 
 class StructFlatteningStrategy(FlatteningStrategy):
     """Struct 展平策略"""
@@ -224,7 +235,8 @@ class StructFlatteningStrategy(FlatteningStrategy):
             return ArrayFlatteningStrategy(self.pack_alignment).calculate_layout(child)
         else:
             size = self._get_basic_type_size(child.type)
-            return {'size': size, 'alignment': size}
+            alignment = self._get_basic_type_alignment(child.type)
+            return {'size': size, 'alignment': alignment}
 
 
 class UnionFlatteningStrategy(FlatteningStrategy):
@@ -370,7 +382,8 @@ class UnionFlatteningStrategy(FlatteningStrategy):
             return ArrayFlatteningStrategy(self.pack_alignment).calculate_layout(child)
         else:
             size = self._get_basic_type_size(child.type)
-            return {'size': size, 'alignment': size}
+            alignment = self._get_basic_type_alignment(child.type)
+            return {'size': size, 'alignment': alignment}
 
 
 class ArrayFlatteningStrategy(StructFlatteningStrategy):
@@ -399,26 +412,35 @@ class ArrayFlatteningStrategy(StructFlatteningStrategy):
         return f"{prefix}{node.name}"
 
     def calculate_layout(self, node: ASTNode) -> Dict[str, Any]:
-        element_size = self._calculate_element_size(node)
+        elem_layout = self._calculate_element_layout(node)
         total_elements = 1
         for dim in node.array_dims:
             total_elements *= dim
         return {
-            'size': element_size * total_elements,
-            'alignment': element_size,
+            'size': elem_layout['size'] * total_elements,
+            'alignment': elem_layout['alignment'],
             'children': []
         }
 
     def _calculate_element_size(self, node: ASTNode) -> int:
+        return self._calculate_element_layout(node)['size']
+
+    def _calculate_element_layout(self, node: ASTNode) -> Dict[str, Any]:
         if node.children:
             child = node.children[0]
             if child.is_struct:
-                return StructFlatteningStrategy(self.pack_alignment).calculate_layout(child)['size']
+                layout = StructFlatteningStrategy(self.pack_alignment).calculate_layout(child)
             elif child.is_union:
-                return UnionFlatteningStrategy(self.pack_alignment).calculate_layout(child)['size']
+                layout = UnionFlatteningStrategy(self.pack_alignment).calculate_layout(child)
             else:
-                return self._get_basic_type_size(child.type)
-        return self._get_basic_type_size(node.type)
+                size = self._get_basic_type_size(child.type)
+                align = self._get_basic_type_alignment(child.type)
+                layout = {'size': size, 'alignment': align}
+        else:
+            size = self._get_basic_type_size(node.type)
+            align = self._get_basic_type_alignment(node.type)
+            layout = {'size': size, 'alignment': align}
+        return layout
 
 
 class BitfieldFlatteningStrategy(FlatteningStrategy):
@@ -440,9 +462,10 @@ class BitfieldFlatteningStrategy(FlatteningStrategy):
 
     def calculate_layout(self, node: ASTNode) -> Dict[str, Any]:
         size = self._get_basic_type_size(node.type)
+        alignment = self._get_basic_type_alignment(node.type)
         return {
             'size': size,
-            'alignment': size,
+            'alignment': alignment,
             'bit_size': node.bit_size,
             'bit_offset': node.bit_offset or 0
         }
