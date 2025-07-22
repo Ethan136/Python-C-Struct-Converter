@@ -382,10 +382,96 @@ def parse_c_definition(file_content: str) -> Tuple[Optional[str], Optional[str],
     return "struct", name, members
 
 
-def parse_c_definition_ast(file_content: str) -> Optional[Union[StructDef, UnionDef]]:
-    """Parse a C struct or union and return a definition object.
+def parse_union_definition_ast(file_content: str) -> Optional[UnionDef]:
+    """Parse a union definition and return a :class:`UnionDef` object."""
+    union_name, union_body = _extract_struct_body(file_content, "union")
+    if not union_name or not union_body:
+        return None
 
-    Union support is not yet implemented and will return ``None`` if a union
-    definition is encountered.
-    """
+    union_body = re.sub(r"//.*", "", union_body)
+    members = []
+    pos = 0
+    length = len(union_body)
+    while pos < length:
+        while pos < length and union_body[pos] in ' \n\t;':
+            pos += 1
+        if pos >= length:
+            break
+
+        if union_body.startswith('union', pos) or union_body.startswith('struct', pos):
+            kind = 'union' if union_body.startswith('union', pos) else 'struct'
+            m = re.match(rf'{kind}\s+(\w+)\s*\{{', union_body[pos:])
+            anon = False
+            nested_name = None
+            if not m:
+                m = re.match(rf'{kind}\s*\{{', union_body[pos:])
+                anon = True
+            if m:
+                nested_name = m.group(1) if len(m.groups()) > 0 else None
+                brace_start = pos + m.end(0) - 1
+                brace_count = 1
+                i = brace_start + 1
+                while i < length and brace_count > 0:
+                    if union_body[i] == '{':
+                        brace_count += 1
+                    elif union_body[i] == '}':
+                        brace_count -= 1
+                    i += 1
+                if brace_count != 0:
+                    break
+                inner_content = union_body[brace_start + 1:i - 1]
+                j = i
+                while j < length and union_body[j] in ' \n\t':
+                    j += 1
+                var_match = re.match(r'(\w+(?:\[\d+\])*)\s*;?', union_body[j:])
+                nested_members = []
+                for line in _split_member_lines(inner_content):
+                    line = line.strip()
+                    if line.startswith('struct') or line.startswith('union'):
+                        temp = parse_struct_definition_ast(f'struct Temp {{ {line}; }};')
+                        if temp and temp.members:
+                            nested_members.append(temp.members[0])
+                    else:
+                        parsed = parse_member_line_v2(line)
+                        if parsed is not None:
+                            nested_members.append(parsed)
+                if var_match:
+                    var_token = var_match.group(1)
+                    var_name, dims = _extract_array_dims(var_token)
+                    nested_def = (StructDef if kind == 'struct' else UnionDef)(
+                        name=nested_name or var_name,
+                        members=nested_members,
+                    )
+                    members.append(
+                        MemberDef(
+                            type=kind,
+                            name=var_name,
+                            array_dims=dims,
+                            nested=nested_def,
+                        )
+                    )
+                    pos = j + var_match.end(0)
+                    continue
+                elif j < length and union_body[j] == ';':
+                    members.extend(nested_members)
+                    pos = j + 1
+                    continue
+
+        semi = union_body.find(';', pos)
+        if semi == -1:
+            break
+        line = union_body[pos:semi].strip()
+        parsed = parse_member_line_v2(line)
+        if parsed is not None:
+            members.append(parsed)
+        pos = semi + 1
+
+    return UnionDef(name=union_name, members=members)
+
+
+def parse_c_definition_ast(file_content: str) -> Optional[Union[StructDef, UnionDef]]:
+    """Parse a C struct or union and return a definition object."""
+    header = file_content.strip().split('{', 1)[0]
+    if header.strip().startswith('union'):
+        return parse_union_definition_ast(file_content)
     return parse_struct_definition_ast(file_content)

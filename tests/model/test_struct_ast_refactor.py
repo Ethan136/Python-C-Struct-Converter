@@ -137,4 +137,19 @@ def _flatten_member_names(sdef):
 def test_anonymous_bitfield(src, expect):
     sdef = parse_struct_definition_ast(src)
     names = [m.name for m in sdef.members]
-    assert names == expect 
+    assert names == expect
+
+
+def test_union_definition_ast():
+    src = """
+    union U {
+        int a;
+        char b;
+    };
+    """
+    from src.model.struct_parser import parse_union_definition_ast
+
+    udef = parse_union_definition_ast(src)
+    assert isinstance(udef, UnionDef)
+    assert udef.name == "U"
+    assert [m.name for m in udef.members] == ["a", "b"]
