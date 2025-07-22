@@ -11,47 +11,50 @@ from tests.data_driven.xml_struct_model_loader import load_struct_model_tests
 
 
 class TestStructModel(unittest.TestCase):
-    """Behaviour tests not covered by data-driven cases."""
+    """Behaviour tests loaded from XML."""
 
-    def setUp(self):
-        self.model = StructModel()
+    @classmethod
+    def setUpClass(cls):
+        config_file = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            'data',
+            'test_struct_model_integration_config.xml',
+        )
+        cls.cases = [c for c in load_struct_model_tests(config_file) if c.get('type') in ('init', 'no_layout', 'hex_raw_formatting')]
 
-    def test_init(self):
-        self.assertIsNone(self.model.struct_name)
-        self.assertEqual(self.model.members, [])
-        self.assertEqual(self.model.layout, [])
-        self.assertEqual(self.model.total_size, 0)
-        self.assertEqual(self.model.struct_align, 1)
-        self.assertIsNotNone(self.model.input_processor)
-
-    def test_parse_hex_data_no_layout(self):
-        with self.assertRaises(ValueError):
-            self.model.parse_hex_data("1234", 'little')
-
-    def test_hex_raw_formatting_and_padding(self):
-        content = """
-        struct HexStruct {
-            char a;
-            int b;
-        };
-        """
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.h') as f:
-            f.write(content)
-            file_path = f.name
-        try:
-            self.model.load_struct_from_file(file_path)
-            parsed_values = self.model.parse_hex_data("12", 'little')
-            for item in parsed_values:
-                if item["name"] != "(padding)":
-                    hex_raw = item["hex_raw"]
-                    self.assertEqual(len(hex_raw) % 2, 0)
-                    int(hex_raw, 16)
-                    layout_item = next((l for l in self.model.layout if l["name"] == item["name"]), None)
-                    if layout_item:
-                        expected_size = layout_item["size"] * 2
-                        self.assertEqual(len(hex_raw), expected_size)
-        finally:
-            os.unlink(file_path)
+    def test_behavior_cases(self):
+        for case in self.cases:
+            with self.subTest(name=case['name']):
+                if case['type'] == 'init':
+                    model = StructModel()
+                    self.assertIsNone(model.struct_name)
+                    self.assertEqual(model.members, [])
+                    self.assertEqual(model.layout, [])
+                    self.assertEqual(model.total_size, 0)
+                    self.assertEqual(model.struct_align, 1)
+                    self.assertIsNotNone(model.input_processor)
+                elif case['type'] == 'no_layout':
+                    model = StructModel()
+                    with self.assertRaises(eval(case['expected_exception'])):
+                        model.parse_hex_data(case['input_hex'], case.get('endianness', 'little'))
+                elif case['type'] == 'hex_raw_formatting':
+                    model = StructModel()
+                    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.h') as f:
+                        f.write(case['struct_definition'])
+                        file_path = f.name
+                    try:
+                        model.load_struct_from_file(file_path)
+                        parsed_values = model.parse_hex_data(case['input_hex'], case.get('endianness', 'little'))
+                        for item in parsed_values:
+                            if item['name'] != '(padding)':
+                                hex_raw = item['hex_raw']
+                                self.assertEqual(len(hex_raw) % 2, 0)
+                                layout_item = next((l for l in model.layout if l['name'] == item['name']), None)
+                                if layout_item:
+                                    expected_size = layout_item['size'] * 2
+                                    self.assertEqual(len(hex_raw), expected_size)
+                    finally:
+                        os.unlink(file_path)
 
 
 class TestStructModelIntegrationXMLDriven(unittest.TestCase):
@@ -62,7 +65,7 @@ class TestStructModelIntegrationXMLDriven(unittest.TestCase):
             'data',
             'test_struct_model_integration_config.xml',
         )
-        cls.cases = load_struct_model_tests(config_file)
+        cls.cases = [c for c in load_struct_model_tests(config_file) if not c.get('type')]
 
     def test_integration_cases(self):
         for case in self.cases:

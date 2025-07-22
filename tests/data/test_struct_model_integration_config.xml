@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <struct_model_integration_tests>
+    <test_case name="init_defaults" type="init"/>
+    <test_case name="parse_hex_no_layout" type="no_layout">
+        <input_data><hex>1234</hex></input_data>
+        <expected_exception>ValueError</expected_exception>
+    </test_case>
+    <test_case name="hex_raw_formatting" type="hex_raw_formatting">
+        <struct_definition><![CDATA[
+            struct HexStruct {
+                char a;
+                int b;
+            };
+        ]]></struct_definition>
+        <input_data><hex>12</hex></input_data>
+    </test_case>
     <test_case name="load_struct_valid" description="Load struct from file">
         <struct_definition><![CDATA[
             struct TestStruct {

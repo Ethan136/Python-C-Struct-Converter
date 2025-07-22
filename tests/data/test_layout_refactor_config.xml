@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<layout_refactor_tests>
+    <test_case name="base_class_abstract" type="abstract" />
+    <test_case name="layout_alias" type="alias" />
+    <test_case name="struct_layout_compare" type="compare">
+        <members>
+            <member type="char" name="a" />
+            <member type="int" name="b" />
+        </members>
+    </test_case>
+</layout_refactor_tests>

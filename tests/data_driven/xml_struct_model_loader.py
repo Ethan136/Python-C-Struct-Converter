@@ -4,6 +4,7 @@ from tests.data_driven.base_xml_test_loader import BaseXMLTestLoader
 class StructModelXMLTestLoader(BaseXMLTestLoader):
     def parse_common_fields(self, case):
         data = super().parse_common_fields(case)
+        data['type'] = case.get('type')
         # 解析 <input_data><hex> 作為 input_hex
         input_data_elem = case.find('input_data')
         input_hex = None

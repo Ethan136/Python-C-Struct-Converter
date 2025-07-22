@@ -102,4 +102,12 @@
         <case input="A" byte_size="4" endianness="big" expected="0000000a"/>
         <case input="B" byte_size="8" endianness="big" expected="000000000000000b"/>
     </process_input_field_edge_cases>
+    <is_supported_field_size>
+        <case size="1" expected="true"/>
+        <case size="4" expected="true"/>
+        <case size="8" expected="true"/>
+        <case size="2" expected="false"/>
+        <case size="3" expected="false"/>
+        <case size="16" expected="false"/>
+    </is_supported_field_size>
 </input_field_processor_tests> 
