@@ -86,6 +86,27 @@ def _parse_bitfield_declaration(line: str):
     return None
 
 
+def _split_member_lines(body: str):
+    """Split struct/union body into member lines respecting nested braces."""
+    lines = []
+    current = ""
+    brace = 0
+    for ch in body:
+        if ch == '{':
+            brace += 1
+        elif ch == '}':
+            brace -= 1
+        if ch == ';' and brace == 0:
+            current += ch
+            lines.append(current.strip().rstrip(';').strip())
+            current = ""
+            continue
+        current += ch
+    if current.strip():
+        lines.append(current.strip())
+    return lines
+
+
 def parse_member_line(line):
     """Parse a single struct member line.
 
@@ -272,10 +293,19 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
             pos += 1
         if pos >= length:
             break
-        # 新增：支援 union { ... } 名稱;
-        if struct_body.startswith('union', pos):
-            m = re.match(r'union\s*\{', struct_body[pos:])
+
+        # 先嘗試解析 union/struct 宣告（含匿名與陣列）
+        if struct_body.startswith('union', pos) or struct_body.startswith('struct', pos):
+            kind = 'union' if struct_body.startswith('union', pos) else 'struct'
+            m = re.match(rf'{kind}\s+(\w+)\s*\{{', struct_body[pos:])
+            anon = False
+            nested_name = None
+            if not m:
+                # 可能是匿名類型，如 union { ... }
+                m = re.match(rf'{kind}\s*\{{', struct_body[pos:])
+                anon = True
             if m:
+                nested_name = m.group(1) if len(m.groups()) > 0 else None
                 brace_start = pos + m.end(0) - 1
                 brace_count = 1
                 i = brace_start + 1
@@ -291,89 +321,49 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
                 j = i
                 while j < length and struct_body[j] in ' \n\t':
                     j += 1
-                var_match = re.match(r'(\w+)\s*;?', struct_body[j:])
-                if var_match:
-                    var_name = var_match.group(1)
-                    # 遞迴解析 union 內容
-                    union_members = []
-                    union_lines = inner_content.split(';')
-                    for line in union_lines:
+                # 取得變數名稱 (含陣列)
+                var_match = re.match(r'(\w+(?:\[\d+\])*)\s*;?', struct_body[j:])
+                # 解析內部成員
+                nested_members = []
+                for line in _split_member_lines(inner_content):
+                    line = line.strip()
+                    if line.startswith('struct') or line.startswith('union'):
+                        temp = parse_struct_definition_ast(f'struct Temp {{ {line}; }};')
+                        if temp and temp.members:
+                            nested_members.append(temp.members[0])
+                    else:
                         parsed = parse_member_line_v2(line)
                         if parsed is not None:
-                            union_members.append(parsed)
-                    nested_union = UnionDef(name=var_name, members=union_members)
-                    members.append(MemberDef(type="union", name=var_name, nested=nested_union))
-                    pos = j + var_match.end(0)
-                    continue
-        # 原有：支援 union 名稱 { ... } 名稱;（如有）
-        if struct_body.startswith('union', pos):
-            m = re.match(r'union\s+(\w+)\s*\{', struct_body[pos:])
-            if m:
-                nested_name = m.group(1)
-                brace_start = pos + m.end(0) - 1
-                brace_count = 1
-                i = brace_start + 1
-                while i < length and brace_count > 0:
-                    if struct_body[i] == '{':
-                        brace_count += 1
-                    elif struct_body[i] == '}':
-                        brace_count -= 1
-                    i += 1
-                if brace_count != 0:
-                    break
-                inner_content = struct_body[brace_start + 1:i - 1]
-                j = i
-                while j < length and struct_body[j] in ' \n\t':
-                    j += 1
-                var_match = re.match(r'(\w+)\s*;?', struct_body[j:])
+                            nested_members.append(parsed)
                 if var_match:
-                    var_name = var_match.group(1)
-                    # 遞迴解析 union 內容
-                    union_members = []
-                    union_lines = inner_content.split(';')
-                    for line in union_lines:
-                        parsed = parse_member_line_v2(line)
-                        if parsed is not None:
-                            union_members.append(parsed)
-                    nested_union = UnionDef(name=nested_name, members=union_members)
-                    members.append(MemberDef(type="union", name=var_name, nested=nested_union))
+                    var_token = var_match.group(1)
+                    var_name, dims = _extract_array_dims(var_token)
+                    nested_def = (StructDef if kind == 'struct' else UnionDef)(
+                        name=nested_name or var_name,
+                        members=nested_members,
+                    )
+                    members.append(
+                        MemberDef(
+                            type=kind,
+                            name=var_name,
+                            array_dims=dims,
+                            nested=nested_def,
+                        )
+                    )
                     pos = j + var_match.end(0)
                     continue
-        # 嘗試解析巢狀 struct
-        if struct_body.startswith('struct', pos):
-            m = re.match(r'struct\s+(\w+)\s*\{', struct_body[pos:])
-            if m:
-                nested_name = m.group(1)
-                brace_start = pos + m.end(0) - 1
-                brace_count = 1
-                i = brace_start + 1
-                while i < length and brace_count > 0:
-                    if struct_body[i] == '{':
-                        brace_count += 1
-                    elif struct_body[i] == '}':
-                        brace_count -= 1
-                    i += 1
-                if brace_count != 0:
-                    break
-                inner_content = struct_body[brace_start + 1:i - 1]
-                j = i
-                while j < length and struct_body[j] in ' \n\t':
-                    j += 1
-                var_match = re.match(r'(\w+)\s*;?', struct_body[j:])
-                if var_match:
-                    var_name = var_match.group(1)
-                    nested_struct = parse_struct_definition_ast(f"struct {nested_name} {{{inner_content}}};")
-                    members.append(MemberDef(type="struct", name=var_name, nested=nested_struct))
-                    pos = j + var_match.end(0)
+                elif j < length and struct_body[j] == ';':
+                    # 匿名且無變數名稱 -> 展平成員
+                    members.extend(nested_members)
+                    pos = j + 1
                     continue
+
         # 處理一般欄位
         semi = struct_body.find(';', pos)
         if semi == -1:
             break
         line = struct_body[pos:semi].strip()
-        # print("DEBUG parsing line:", repr(line))
         parsed = parse_member_line_v2(line)
-        # print("DEBUG parsed:", parsed)
         if parsed is not None:
             members.append(parsed)
         pos = semi + 1
