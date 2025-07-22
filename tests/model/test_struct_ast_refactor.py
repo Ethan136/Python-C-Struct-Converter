@@ -33,7 +33,6 @@ from src.model.struct_parser import parse_struct_definition_ast, MemberDef, Stru
                 ("b", "char")
             ])
         ],
-        # marks=pytest.mark.skip(reason="union not supported in MVP")  # 解除 skip
     ),
 ])
 def test_nested_struct_union_array(src, expect):

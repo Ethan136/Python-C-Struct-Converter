@@ -46,6 +46,15 @@ class V7StructParser:
         except Exception as e:
             print(f"解析錯誤: {e}")
             return None
+
+    def _extract_array_dims(self, token: str):
+        """回傳變數名稱及陣列維度列表"""
+        m = re.match(r"(\w+)((?:\[\d+\])*)", token)
+        if not m:
+            return token, []
+        name = m.group(1)
+        dims = [int(n) for n in re.findall(r"\[(\d+)\]", m.group(2))]
+        return name, dims
     
     def _parse_members(self, body: str, parent_node: ASTNode):
         """解析結構成員"""
@@ -98,11 +107,16 @@ class V7StructParser:
             # 解析成員
             self._parse_members(struct_body, struct_node)
             
-            # 提取變數名稱
-            var_match = re.search(r'\}\s*(\w+)\s*;', line[body_end:])
+            var_match = re.search(r'\}\s*([^;]+)\s*;', line[body_end:])
             if var_match:
-                struct_node.name = var_match.group(1)
-            
+                token = var_match.group(1).strip()
+                name, dims = self._extract_array_dims(token)
+                struct_node.name = name
+                if dims:
+                    array_node = self.node_factory.create_array_node(name, "struct", dims)
+                    array_node.add_child(struct_node)
+                    return array_node
+
             return struct_node
         else:
             # 有名結構
@@ -124,11 +138,16 @@ class V7StructParser:
             # 解析成員
             self._parse_members(struct_body, struct_node)
             
-            # 提取變數名稱
-            var_match = re.search(r'\}\s*(\w+)\s*;', line[body_end:])
+            var_match = re.search(r'\}\s*([^;]+)\s*;', line[body_end:])
             if var_match:
-                struct_node.name = var_match.group(1)
-            
+                token = var_match.group(1).strip()
+                name, dims = self._extract_array_dims(token)
+                struct_node.name = name
+                if dims:
+                    array_node = self.node_factory.create_array_node(name, "struct", dims)
+                    array_node.add_child(struct_node)
+                    return array_node
+
             return struct_node
     
     def _parse_nested_union(self, line: str) -> Optional[ASTNode]:
@@ -150,11 +169,16 @@ class V7StructParser:
             # 解析成員
             self._parse_members(union_body, union_node)
             
-            # 提取變數名稱
-            var_match = re.search(r'\}\s*(\w+)\s*;', line[body_end:])
+            var_match = re.search(r'\}\s*([^;]+)\s*;', line[body_end:])
             if var_match:
-                union_node.name = var_match.group(1)
-            
+                token = var_match.group(1).strip()
+                name, dims = self._extract_array_dims(token)
+                union_node.name = name
+                if dims:
+                    array_node = self.node_factory.create_array_node(name, "union", dims)
+                    array_node.add_child(union_node)
+                    return array_node
+
             return union_node
         else:
             # 有名聯合
@@ -176,11 +200,16 @@ class V7StructParser:
             # 解析成員
             self._parse_members(union_body, union_node)
             
-            # 提取變數名稱
-            var_match = re.search(r'\}\s*(\w+)\s*;', line[body_end:])
+            var_match = re.search(r'\}\s*([^;]+)\s*;', line[body_end:])
             if var_match:
-                union_node.name = var_match.group(1)
-            
+                token = var_match.group(1).strip()
+                name, dims = self._extract_array_dims(token)
+                union_node.name = name
+                if dims:
+                    array_node = self.node_factory.create_array_node(name, "union", dims)
+                    array_node.add_child(union_node)
+                    return array_node
+
             return union_node
     
     def _parse_array_member(self, line: str) -> Optional[ASTNode]:

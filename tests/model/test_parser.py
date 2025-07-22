@@ -334,4 +334,40 @@ class TestV7StructParser:
         assert result.name == "WhitespaceTest"
         assert len(result.children) == 2
         assert result.children[0].name == "x"
-        assert result.children[1].name == "y" 
+        assert result.children[1].name == "y"
+
+    def test_parse_nested_struct_array(self):
+        """巢狀結構陣列解析"""
+        content = """
+        struct SA {
+            struct { int x; } arr[2][2];
+        };
+        """
+
+        result = self.parser.parse_struct_definition(content)
+
+        assert result is not None
+        arr = result.children[0]
+        assert arr.name == "arr"
+        assert arr.is_array is True
+        assert arr.array_dims == [2, 2]
+        assert arr.children[0].is_struct is True
+        assert arr.children[0].children[0].name == "x"
+
+    def test_parse_nested_union_array(self):
+        """巢狀聯合陣列解析"""
+        content = """
+        struct UA {
+            union { int a; char b; } u[3];
+        };
+        """
+
+        result = self.parser.parse_struct_definition(content)
+
+        assert result is not None
+        u = result.children[0]
+        assert u.name == "u"
+        assert u.is_array is True
+        assert u.array_dims == [3]
+        assert u.children[0].is_union is True
+        assert len(u.children[0].children) == 2
