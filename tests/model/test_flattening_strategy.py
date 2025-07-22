@@ -246,7 +246,7 @@ class TestStructFlatteningStrategy:
         layout = packed.calculate_layout(struct_node)
 
         assert layout['size'] == 5
-        assert layout['alignment'] == 4
+        assert layout['alignment'] == 1
 
 
 class TestUnionFlatteningStrategy:

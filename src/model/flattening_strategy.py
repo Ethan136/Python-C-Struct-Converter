@@ -231,19 +231,20 @@ class StructFlatteningStrategy(FlatteningStrategy):
         """計算 struct 佈局"""
         total_size = 0
         max_alignment = 1
-        
+
         for child in node.children:
             child_layout = self._calculate_child_layout(child)
             total_size = self._align_offset(total_size, child_layout['alignment'])
             total_size += child_layout['size']
             max_alignment = max(max_alignment, child_layout['alignment'])
-        
-        # 最終對齊
-        total_size = self._align_offset(total_size, max_alignment)
-        
+
+        # 最終對齊，pack_alignment 會影響結構對齊
+        effective_align = self._effective_alignment(max_alignment)
+        total_size = self._align_offset(total_size, effective_align)
+
         return {
             'size': total_size,
-            'alignment': max_alignment,
+            'alignment': effective_align,
             'children': [self._calculate_child_layout(child) for child in node.children]
         }
     
@@ -399,11 +400,12 @@ class UnionFlatteningStrategy(FlatteningStrategy):
             max_size = max(max_size, child_layout['size'])
             max_alignment = max(max_alignment, child_layout['alignment'])
 
-        union_size = self._align_offset(max_size, max_alignment)
+        effective_align = self._effective_alignment(max_alignment)
+        union_size = self._align_offset(max_size, effective_align)
 
         return {
             'size': union_size,
-            'alignment': max_alignment,
+            'alignment': effective_align,
             'children': [self._calculate_child_layout(child) for child in node.children]
         }
     
