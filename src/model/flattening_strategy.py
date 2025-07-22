@@ -5,7 +5,7 @@ v7 展平策略實作
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from itertools import product
 from .ast_node import ASTNode
 
@@ -74,21 +74,35 @@ class StructFlatteningStrategy(FlatteningStrategy):
 
     def __init__(self, pack_alignment: Optional[int] = None):
         super().__init__(pack_alignment)
-    
+        self._reset_bitfield_state()
+
+    def _reset_bitfield_state(self):
+        self._bitfield_unit_type = None
+        self._bitfield_unit_size = 0
+        self._bitfield_unit_align = 0
+        self._bitfield_bit_offset = 0
+        self._bitfield_unit_offset = 0
+
     def flatten_node(self, node: ASTNode, prefix: str = "") -> List[FlattenedNode]:
         """展平 struct 節點"""
         result = []
+        self._reset_bitfield_state()
         current_offset = 0
-        
+
         for child in node.children:
-            # 遞迴展平子節點
-            child_nodes = self._flatten_child(child, prefix, current_offset)
+            if child.is_bitfield:
+                child_nodes, new_offset = self._flatten_bitfield(child, prefix, current_offset)
+            else:
+                # 遞迴展平子節點
+                child_nodes = self._flatten_child(child, prefix, current_offset)
+                if child_nodes:
+                    new_offset = child_nodes[-1].offset + child_nodes[-1].size
+                    self._reset_bitfield_state()
+                else:
+                    new_offset = current_offset
             result.extend(child_nodes)
-            
-            # 更新偏移量
-            if child_nodes:
-                current_offset = child_nodes[-1].offset + child_nodes[-1].size
-        
+            current_offset = new_offset
+
         return result
     
     def _flatten_child(self, child: ASTNode, prefix: str, base_offset: int) -> List[FlattenedNode]:
@@ -101,9 +115,8 @@ class StructFlatteningStrategy(FlatteningStrategy):
         elif child.is_struct or child.is_union:
             return self._flatten_nested(child, prefix, base_offset)
         elif child.is_bitfield:
-            nodes = BitfieldFlatteningStrategy(self.pack_alignment).flatten_node(child, prefix)
-            for n in nodes:
-                n.offset = base_offset
+            # bitfield 由 struct 策略統一處理以計算 bit_offset
+            nodes, _ = self._flatten_bitfield(child, prefix, base_offset)
             return nodes
         else:
             return [self._create_flattened_node(child, prefix, base_offset)]
@@ -160,6 +173,43 @@ class StructFlatteningStrategy(FlatteningStrategy):
         name = f"{prefix}{node.name}"
         size = self._get_basic_type_size(node.type)
         return FlattenedNode(name, node.type, base_offset, size)
+
+    def _flatten_bitfield(self, node: ASTNode, prefix: str, base_offset: int) -> Tuple[List[FlattenedNode], int]:
+        """展平位元欄位並計算 bit offset 與偏移"""
+        unit_size = self._get_basic_type_size(node.type)
+        unit_align = self._get_basic_type_alignment(node.type)
+
+        if (
+            self._bitfield_unit_type != node.type
+            or self._bitfield_bit_offset + node.bit_size > unit_size * 8
+        ):
+            # 新的 storage unit
+            base_offset = self._align_offset(base_offset, unit_align)
+            self._bitfield_unit_type = node.type
+            self._bitfield_unit_size = unit_size
+            self._bitfield_unit_align = unit_align
+            self._bitfield_bit_offset = 0
+            self._bitfield_unit_offset = base_offset
+
+        bit_offset = self._bitfield_bit_offset
+        self._bitfield_bit_offset += node.bit_size
+        self._bitfield_unit_offset = base_offset
+
+        name = self.generate_name(node, prefix)
+        flt = FlattenedNode(
+            name,
+            node.type,
+            base_offset,
+            unit_size,
+            bit_size=node.bit_size,
+            bit_offset=bit_offset,
+        )
+        next_offset = base_offset
+        if self._bitfield_bit_offset >= unit_size * 8:
+            next_offset += unit_size
+            self._bitfield_unit_type = None
+            self._bitfield_bit_offset = 0
+        return [flt], next_offset
     
     def generate_name(self, node: ASTNode, prefix: str = "") -> str:
         """生成展平後的名稱"""
