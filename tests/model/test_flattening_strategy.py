@@ -170,6 +170,42 @@ class TestStructFlatteningStrategy:
         assert flattened[1].name == "arr[0].y"
         assert flattened[2].name == "arr[1].x"
         assert flattened[3].name == "arr[1].y"
+
+    def test_flatten_union_array(self):
+        """union 陣列展平"""
+        struct_node = self.factory.create_struct_node("UnionArray")
+        union_array = self.factory.create_array_node("u", "union", [2])
+        union = self.factory.create_union_node("InnerU")
+        union.add_child(self.factory.create_basic_node("a", "int"))
+        union.add_child(self.factory.create_basic_node("b", "char"))
+        union_array.add_child(union)
+        struct_node.add_child(union_array)
+
+        flattened = self.strategy.flatten_node(struct_node)
+
+        assert [n.name for n in flattened] == [
+            "u[0].a", "u[0].b", "u[1].a", "u[1].b"
+        ]
+
+    def test_flatten_multi_dim_struct_array(self):
+        """多維結構陣列展平"""
+        struct_node = self.factory.create_struct_node("NDStruct")
+        array_node = self.factory.create_array_node("mat", "struct", [2, 2])
+        inner = self.factory.create_struct_node("S")
+        inner.add_child(self.factory.create_basic_node("x", "int"))
+        inner.add_child(self.factory.create_basic_node("y", "char"))
+        array_node.add_child(inner)
+        struct_node.add_child(array_node)
+
+        flattened = self.strategy.flatten_node(struct_node)
+
+        expected_names = [
+            "mat[0][0].x", "mat[0][0].y",
+            "mat[0][1].x", "mat[0][1].y",
+            "mat[1][0].x", "mat[1][0].y",
+            "mat[1][1].x", "mat[1][1].y",
+        ]
+        assert [n.name for n in flattened] == expected_names
     
     def test_calculate_layout_simple(self):
         """測試簡單佈局計算"""
