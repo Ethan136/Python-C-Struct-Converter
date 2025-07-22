@@ -228,7 +228,6 @@ class TestStructFlatteningStrategy:
         struct_node = self.factory.create_struct_node("Bf")
         bf1 = self.factory.create_bitfield_node("a", "unsigned int", 3)
         bf2 = self.factory.create_bitfield_node("b", "unsigned int", 5)
-        bf2.bit_offset = 3
         struct_node.add_child(bf1)
         struct_node.add_child(bf2)
 
