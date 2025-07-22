@@ -31,6 +31,10 @@ class FlatteningStrategy(ABC):
     def __init__(self, pack_alignment: Optional[int] = None):
         self.pack_alignment = pack_alignment
 
+    def _effective_alignment(self, alignment: int) -> int:
+        """Return alignment adjusted by ``pack_alignment``."""
+        return min(alignment, self.pack_alignment) if self.pack_alignment else alignment
+
     @abstractmethod
     def flatten_node(self, node: ASTNode, prefix: str = "") -> List[FlattenedNode]:
         """展平節點"""
@@ -47,8 +51,8 @@ class FlatteningStrategy(ABC):
         pass
 
     def _align_offset(self, offset: int, alignment: int) -> int:
-        """依據 pack_alignment 對齊位移"""
-        effective = min(alignment, self.pack_alignment) if self.pack_alignment else alignment
+        """Align offset respecting ``pack_alignment``."""
+        effective = self._effective_alignment(alignment)
         return (offset + effective - 1) // effective * effective
 
     def _get_basic_type_size(self, type_name: str) -> int:
@@ -472,9 +476,12 @@ class ArrayFlatteningStrategy(StructFlatteningStrategy):
         total_elements = 1
         for dim in node.array_dims:
             total_elements *= dim
+        size = elem_layout['size'] * total_elements
+        alignment = self._effective_alignment(elem_layout['alignment'])
+        size = self._align_offset(size, alignment)
         return {
-            'size': elem_layout['size'] * total_elements,
-            'alignment': elem_layout['alignment'],
+            'size': size,
+            'alignment': alignment,
             'children': []
         }
 
@@ -518,7 +525,8 @@ class BitfieldFlatteningStrategy(FlatteningStrategy):
 
     def calculate_layout(self, node: ASTNode) -> Dict[str, Any]:
         size = self._get_basic_type_size(node.type)
-        alignment = self._get_basic_type_alignment(node.type)
+        alignment = self._effective_alignment(self._get_basic_type_alignment(node.type))
+        size = self._align_offset(size, alignment)
         return {
             'size': size,
             'alignment': alignment,
