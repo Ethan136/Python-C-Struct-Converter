@@ -19,6 +19,14 @@ from src.model.layout import (
     StructLayoutCalculator,
     UnionLayoutCalculator,
 )
+from src.model.flattening_strategy import (
+    ArrayFlatteningStrategy,
+    BitfieldFlatteningStrategy,
+    StructFlatteningStrategy,
+    UnionFlatteningStrategy,
+    FlatteningStrategy,
+    FlattenedNode,
+)
 
 __all__ = [
     'StructModel',
@@ -28,6 +36,12 @@ __all__ = [
     'BaseLayoutCalculator',
     'StructLayoutCalculator',
     'UnionLayoutCalculator',
+    'ArrayFlatteningStrategy',
+    'BitfieldFlatteningStrategy',
+    'StructFlatteningStrategy',
+    'UnionFlatteningStrategy',
+    'FlatteningStrategy',
+    'FlattenedNode',
     'LayoutItem',
     'MemberDef',
     'StructDef',
@@ -38,3 +52,4 @@ __all__ = [
     'parse_c_definition',
     'parse_c_definition_ast',
 ]
+

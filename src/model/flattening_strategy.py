@@ -66,9 +66,17 @@ class StructFlatteningStrategy(FlatteningStrategy):
     def _flatten_child(self, child: ASTNode, prefix: str, base_offset: int) -> List[FlattenedNode]:
         """展平子節點"""
         if child.is_array:
-            return self._flatten_array(child, prefix, base_offset)
+            nodes = ArrayFlatteningStrategy().flatten_node(child, prefix)
+            for n in nodes:
+                n.offset += base_offset
+            return nodes
         elif child.is_struct or child.is_union:
             return self._flatten_nested(child, prefix, base_offset)
+        elif child.is_bitfield:
+            nodes = BitfieldFlatteningStrategy().flatten_node(child, prefix)
+            for n in nodes:
+                n.offset = base_offset
+            return nodes
         else:
             return [self._create_flattened_node(child, prefix, base_offset)]
     
@@ -194,8 +202,12 @@ class StructFlatteningStrategy(FlatteningStrategy):
     
     def _calculate_child_layout(self, child: ASTNode) -> Dict[str, Any]:
         """計算子節點佈局"""
-        if child.is_struct or child.is_union:
+        if child.is_struct:
             return self.calculate_layout(child)
+        elif child.is_union:
+            return UnionFlatteningStrategy().calculate_layout(child)
+        elif child.is_array:
+            return ArrayFlatteningStrategy().calculate_layout(child)
         else:
             size = self._get_basic_type_size(child.type)
             return {'size': size, 'alignment': size}
@@ -219,9 +231,17 @@ class UnionFlatteningStrategy(FlatteningStrategy):
     def _flatten_child(self, child: ASTNode, prefix: str, base_offset: int) -> List[FlattenedNode]:
         """展平 union 子節點"""
         if child.is_array:
-            return self._flatten_array(child, prefix, base_offset)
+            nodes = ArrayFlatteningStrategy().flatten_node(child, prefix)
+            for n in nodes:
+                n.offset = base_offset
+            return nodes
         elif child.is_struct or child.is_union:
             return self._flatten_nested(child, prefix, base_offset)
+        elif child.is_bitfield:
+            nodes = BitfieldFlatteningStrategy().flatten_node(child, prefix)
+            for n in nodes:
+                n.offset = base_offset
+            return nodes
         else:
             return [self._create_flattened_node(child, prefix, base_offset)]
     
@@ -325,12 +345,82 @@ class UnionFlatteningStrategy(FlatteningStrategy):
     
     def _calculate_child_layout(self, child: ASTNode) -> Dict[str, Any]:
         """計算子節點佈局"""
-        if child.is_struct or child.is_union:
-            if child.is_struct:
-                strategy = StructFlatteningStrategy()
-            else:
-                strategy = UnionFlatteningStrategy()
-            return strategy.calculate_layout(child)
+        if child.is_struct:
+            return StructFlatteningStrategy().calculate_layout(child)
+        elif child.is_union:
+            return UnionFlatteningStrategy().calculate_layout(child)
+        elif child.is_array:
+            return ArrayFlatteningStrategy().calculate_layout(child)
         else:
             size = self._get_basic_type_size(child.type)
-            return {'size': size, 'alignment': size} 
+            return {'size': size, 'alignment': size}
+
+
+class ArrayFlatteningStrategy(StructFlatteningStrategy):
+    """Array 展平策略"""
+
+    def flatten_node(self, node: ASTNode, prefix: str = "") -> List[FlattenedNode]:
+        result = []
+        element_size = self._calculate_element_size(node)
+        indices = self._generate_indices(node.array_dims)
+        for idx in indices:
+            idx_str = ''.join(f'[{i}]' for i in idx)
+            elem_prefix = f"{prefix}{node.name}{idx_str}"
+            offset = self._calculate_array_offset(idx, node.array_dims, element_size)
+            if node.children:
+                for child in node.children:
+                    child_nodes = StructFlatteningStrategy()._flatten_child(child, f"{elem_prefix}.", offset)
+                    result.extend(child_nodes)
+            else:
+                result.append(FlattenedNode(elem_prefix, node.type, offset, element_size))
+        return result
+
+    def generate_name(self, node: ASTNode, prefix: str = "") -> str:
+        return f"{prefix}{node.name}"
+
+    def calculate_layout(self, node: ASTNode) -> Dict[str, Any]:
+        element_size = self._calculate_element_size(node)
+        total_elements = 1
+        for dim in node.array_dims:
+            total_elements *= dim
+        return {
+            'size': element_size * total_elements,
+            'alignment': element_size,
+            'children': []
+        }
+
+    def _calculate_element_size(self, node: ASTNode) -> int:
+        if node.children:
+            child = node.children[0]
+            if child.is_struct:
+                return StructFlatteningStrategy().calculate_layout(child)['size']
+            elif child.is_union:
+                return UnionFlatteningStrategy().calculate_layout(child)['size']
+            else:
+                return self._get_basic_type_size(child.type)
+        return self._get_basic_type_size(node.type)
+
+
+class BitfieldFlatteningStrategy(FlatteningStrategy):
+    """Bitfield 展平策略"""
+
+    def flatten_node(self, node: ASTNode, prefix: str = "") -> List[FlattenedNode]:
+        name = self.generate_name(node, prefix)
+        size = self._get_basic_type_size(node.type)
+        bit_offset = node.bit_offset or 0
+        return [FlattenedNode(name, node.type, 0, size, bit_size=node.bit_size, bit_offset=bit_offset)]
+
+    def generate_name(self, node: ASTNode, prefix: str = "") -> str:
+        if node.is_anonymous or not node.name:
+            return f"{prefix}anonymous_{node.id[:8]}"
+        return f"{prefix}{node.name}"
+
+    def calculate_layout(self, node: ASTNode) -> Dict[str, Any]:
+        size = self._get_basic_type_size(node.type)
+        return {
+            'size': size,
+            'alignment': size,
+            'bit_size': node.bit_size,
+            'bit_offset': node.bit_offset or 0
+        }
+
