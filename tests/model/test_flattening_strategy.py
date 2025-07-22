@@ -134,6 +134,17 @@ class TestStructFlatteningStrategy:
         assert flattened[0].type == "int"
         assert flattened[5].name == "arr[1][2]"
         assert flattened[5].type == "int"
+
+    def test_flatten_array_offsets(self):
+        """多維陣列偏移計算"""
+        struct_node = self.factory.create_struct_node("OffsetArray")
+        array_node = self.factory.create_array_node("matrix", "int", [2, 2])
+        struct_node.add_child(array_node)
+
+        flattened = self.strategy.flatten_node(struct_node)
+
+        offsets = [n.offset for n in flattened]
+        assert offsets == [0, 4, 8, 12]
     
     def test_flatten_nested_array(self):
         """測試巢狀陣列展平"""
@@ -211,6 +222,32 @@ class TestStructFlatteningStrategy:
         # Assert
         assert "anonymous" in name
         assert name.startswith("prefix.")
+
+    def test_flatten_bitfield(self):
+        """位元欄位展平與位元偏移"""
+        struct_node = self.factory.create_struct_node("Bf")
+        bf1 = self.factory.create_bitfield_node("a", "unsigned int", 3)
+        bf2 = self.factory.create_bitfield_node("b", "unsigned int", 5)
+        bf2.bit_offset = 3
+        struct_node.add_child(bf1)
+        struct_node.add_child(bf2)
+
+        flattened = self.strategy.flatten_node(struct_node)
+
+        assert flattened[0].bit_size == 3 and flattened[0].bit_offset == 0
+        assert flattened[1].bit_size == 5 and flattened[1].bit_offset == 3
+
+    def test_layout_with_pack(self):
+        """pragma pack 對齊"""
+        packed = StructFlatteningStrategy(pack_alignment=1)
+        struct_node = self.factory.create_struct_node("Pack")
+        struct_node.add_child(self.factory.create_basic_node("a", "char"))
+        struct_node.add_child(self.factory.create_basic_node("b", "int"))
+
+        layout = packed.calculate_layout(struct_node)
+
+        assert layout['size'] == 5
+        assert layout['alignment'] == 4
 
 
 class TestUnionFlatteningStrategy:
