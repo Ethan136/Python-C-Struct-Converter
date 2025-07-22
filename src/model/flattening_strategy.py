@@ -46,6 +46,11 @@ class FlatteningStrategy(ABC):
         """計算佈局資訊"""
         pass
 
+    def _align_offset(self, offset: int, alignment: int) -> int:
+        """依據 pack_alignment 對齊位移"""
+        effective = min(alignment, self.pack_alignment) if self.pack_alignment else alignment
+        return (offset + effective - 1) // effective * effective
+
     def _get_basic_type_size(self, type_name: str) -> int:
         """取得基本型別大小"""
         type_sizes = {
@@ -270,11 +275,6 @@ class StructFlatteningStrategy(FlatteningStrategy):
         }
         return type_sizes.get(type_name, 4)
     
-    def _align_offset(self, offset: int, alignment: int) -> int:
-        """對齊偏移量"""
-        effective = min(alignment, self.pack_alignment) if self.pack_alignment else alignment
-        return (offset + effective - 1) // effective * effective
-    
     def _calculate_child_layout(self, child: ASTNode) -> Dict[str, Any]:
         """計算子節點佈局"""
         if child.is_struct:
@@ -283,6 +283,8 @@ class StructFlatteningStrategy(FlatteningStrategy):
             return UnionFlatteningStrategy(self.pack_alignment).calculate_layout(child)
         elif child.is_array:
             return ArrayFlatteningStrategy(self.pack_alignment).calculate_layout(child)
+        elif child.is_bitfield:
+            return BitfieldFlatteningStrategy(self.pack_alignment).calculate_layout(child)
         else:
             size = self._get_basic_type_size(child.type)
             alignment = self._get_basic_type_alignment(child.type)
@@ -387,14 +389,16 @@ class UnionFlatteningStrategy(FlatteningStrategy):
         """計算 union 佈局"""
         max_size = 0
         max_alignment = 1
-        
+
         for child in node.children:
             child_layout = self._calculate_child_layout(child)
             max_size = max(max_size, child_layout['size'])
             max_alignment = max(max_alignment, child_layout['alignment'])
-        
+
+        union_size = self._align_offset(max_size, max_alignment)
+
         return {
-            'size': max_size,
+            'size': union_size,
             'alignment': max_alignment,
             'children': [self._calculate_child_layout(child) for child in node.children]
         }
@@ -430,6 +434,8 @@ class UnionFlatteningStrategy(FlatteningStrategy):
             return UnionFlatteningStrategy(self.pack_alignment).calculate_layout(child)
         elif child.is_array:
             return ArrayFlatteningStrategy(self.pack_alignment).calculate_layout(child)
+        elif child.is_bitfield:
+            return BitfieldFlatteningStrategy(self.pack_alignment).calculate_layout(child)
         else:
             size = self._get_basic_type_size(child.type)
             alignment = self._get_basic_type_alignment(child.type)
