@@ -1443,6 +1443,10 @@ class StructView(tk.Tk):
         # 切換顯示模式
         if version == "legacy":
             self._switch_to_legacy_gui()
+        elif version == "modern":
+            self._switch_to_modern_gui()
+        elif version == "v7":
+            self._switch_to_v7_gui()
         else:
             self._switch_to_modern_gui()
 
@@ -1463,6 +1467,10 @@ class StructView(tk.Tk):
             self.modern_frame.pack(fill="both", expand=True)
         else:
             self._create_modern_gui()
+
+    def _switch_to_v7_gui(self):
+        """切換到 v7 版本 GUI。當前實作與新版 GUI 相同。"""
+        self._switch_to_modern_gui()
 
     def _create_modern_gui(self):
         """建立新版樹狀顯示 GUI"""

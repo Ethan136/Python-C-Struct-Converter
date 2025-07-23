@@ -72,6 +72,13 @@ class V7Presenter:
         self.context["selected_node"] = None
         self._update_context()
 
+    def on_switch_gui_version(self, version: str):
+        """Update context when the view switches GUI version."""
+        self.context["gui_version"] = version
+        self.context["expanded_nodes"] = ["root"]
+        self.context["selected_node"] = None
+        self._update_context()
+
     def get_display_nodes(self, mode: Optional[str] = None) -> List[Dict[str, Any]]:
         if mode is None:
             mode = self.context.get("display_mode", "tree")
