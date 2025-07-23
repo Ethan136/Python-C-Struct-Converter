@@ -192,6 +192,7 @@ class StructView(tk.Tk):
         member_frame = tk.LabelFrame(main_frame, text="Struct Member Value")
         member_frame.pack(fill="x", padx=2, pady=2)
         self.member_tree = create_member_treeview(member_frame)
+        self.legacy_tree = self.member_tree  # keep reference to legacy tree
         self._bind_member_tree_events()
 
         # debug bytes 顯示區
@@ -1455,8 +1456,11 @@ class StructView(tk.Tk):
         # 隱藏新版元件，顯示舊版元件
         if hasattr(self, "modern_frame"):
             self.modern_frame.pack_forget()
+        if hasattr(self, "legacy_tree"):
+            self.member_tree = self.legacy_tree
         if hasattr(self, "member_tree"):
             self.member_tree.pack(fill="x")
+            self._bind_member_tree_events()
 
     def _switch_to_modern_gui(self):
         """切換到新版樹狀顯示"""
@@ -1467,6 +1471,9 @@ class StructView(tk.Tk):
             self.modern_frame.pack(fill="both", expand=True)
         else:
             self._create_modern_gui()
+        if hasattr(self, "modern_tree"):
+            self.member_tree = self.modern_tree
+            self._bind_member_tree_events()
 
     def _switch_to_v7_gui(self):
         """切換到 v7 版本 GUI。當前實作與新版 GUI 相同。"""

@@ -17,6 +17,8 @@ class StructViewV7(StructView):
         super()._switch_to_modern_gui()
         if hasattr(self, "modern_tree"):
             self.virtual = VirtualTreeview(self.modern_tree, self._virtual_page_size)
+            self.member_tree = self.modern_tree
+            self._bind_member_tree_events()
 
     # override to load nodes into virtual tree
     def show_treeview_nodes(self, nodes, context, icon_map=None):

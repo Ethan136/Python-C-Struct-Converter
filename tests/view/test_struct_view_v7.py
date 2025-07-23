@@ -79,3 +79,9 @@ class TestStructViewV7:
         self.view.show_treeview_nodes(nodes, ctx)
         assert "highlighted" in self.view.modern_tree.item("a", "tags")
 
+    def test_switch_sets_active_tree_and_bindings(self):
+        self.view._switch_to_v7_gui()
+        assert self.view.member_tree is self.view.modern_tree
+        # context menu binding should exist on active tree
+        assert self.view.member_tree.bind("<Button-3>")
+
