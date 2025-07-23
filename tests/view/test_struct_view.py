@@ -1959,6 +1959,10 @@ class TestStructView(unittest.TestCase):
         # 測試切換到新版
         self.view._on_gui_version_change("modern")
         self.assertEqual(self.presenter.context["gui_version"], "modern")
+
+        # 測試切換到 v7
+        self.view._on_gui_version_change("v7")
+        self.assertEqual(self.presenter.context["gui_version"], "v7")
         
         # 測試切換到舊版
         self.view._on_gui_version_change("legacy")
