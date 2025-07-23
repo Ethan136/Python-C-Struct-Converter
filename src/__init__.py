@@ -3,4 +3,8 @@
 # using the Model-View-Presenter (MVP) architectural pattern.
 
 __version__ = "1.0.0"
-__author__ = "C++ Struct Parser Team" 
+__author__ = "C++ Struct Parser Team"
+
+from .presenter import StructPresenter, V7Presenter
+
+__all__ = ["StructPresenter", "V7Presenter"]

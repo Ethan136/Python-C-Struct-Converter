@@ -145,7 +145,7 @@ class StructView(tk.Tk):
         # GUI 版本切換
         tk.Label(control_frame, text="  GUI 版本：").pack(side=tk.LEFT)
         self.gui_version_var = tk.StringVar(value="legacy")
-        gui_version_options = ["legacy", "modern"]
+        gui_version_options = ["legacy", "modern", "v7"]
         self.gui_version_menu = tk.OptionMenu(control_frame, self.gui_version_var, *gui_version_options, command=self._on_gui_version_change)
         self.gui_version_menu.pack(side=tk.LEFT)
         # 搜尋輸入框
@@ -1441,10 +1441,10 @@ class StructView(tk.Tk):
             self.presenter.on_switch_gui_version(version)
         
         # 切換顯示模式
-        if version == "modern":
-            self._switch_to_modern_gui()
-        else:  # legacy
+        if version == "legacy":
             self._switch_to_legacy_gui()
+        else:
+            self._switch_to_modern_gui()
 
     def _switch_to_legacy_gui(self):
         """切換到舊版平面顯示"""
