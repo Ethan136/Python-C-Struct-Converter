@@ -13,6 +13,7 @@ This directory contains comprehensive documentation for the C++ Struct Memory Pa
 - **[v2_bit_field_design_plan.md](development/v2_bit_field_design_plan.md)** - Bit field support design
 - **[string_refactor_plan.md](development/string_refactor_plan.md)** - String management refactoring
 - **[run_all_tests_usage.md](development/run_all_tests_usage.md)** - Test execution guide
+- **[ast_serialization.md](development/ast_serialization.md)** - ASTNode serialization helpers
 
 ## Analysis Documentation
 
