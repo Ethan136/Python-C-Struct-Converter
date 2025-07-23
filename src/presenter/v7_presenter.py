@@ -31,6 +31,7 @@ class V7Presenter:
             "search": "",
             "filter": "",
             "highlighted_nodes": [],
+            "gui_version": "v7",
             "version": "1.0",
             "extra": {},
             "last_update_time": time.time(),
