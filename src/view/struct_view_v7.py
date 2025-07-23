@@ -21,20 +21,35 @@ class StructViewV7(StructView):
     # override to load nodes into virtual tree
     def show_treeview_nodes(self, nodes, context, icon_map=None):
         if hasattr(self, "virtual"):
-            flat = self._flatten_nodes(nodes)
+            flat = self._flatten_nodes(nodes, context=context)
             self.virtual.set_nodes(flat)
             update_treeview_by_context(self.modern_tree, context)
         else:
             super().show_treeview_nodes(nodes, context, icon_map)
 
-    def _flatten_nodes(self, nodes, depth=0):
+    def _flatten_nodes(self, nodes, depth=0, context=None):
         result = []
+        highlighted = set(context.get("highlighted_nodes", [])) if context else set()
         for n in nodes:
             n2 = n.copy()
             n2["label"] = ("  " * depth) + n2.get("label", n2.get("name", ""))
+            tags = []
+            t = n2.get("type")
+            if t == "struct":
+                tags.append("struct")
+            elif t == "union":
+                tags.append("union")
+            elif t == "bitfield":
+                tags.append("bitfield")
+            elif t == "array":
+                tags.append("array")
+            if n2.get("id") in highlighted:
+                tags.append("highlighted")
+            if tags:
+                n2["tags"] = tags
             result.append(n2)
             if n.get("children"):
-                result.extend(self._flatten_nodes(n["children"], depth + 1))
+                result.extend(self._flatten_nodes(n["children"], depth + 1, context))
         return result
 
     # keyboard shortcuts

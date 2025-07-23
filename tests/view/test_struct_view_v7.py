@@ -1,6 +1,9 @@
 import os
+import sys
 import tkinter as tk
 import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests")
@@ -68,4 +71,11 @@ class TestStructViewV7:
         tree.update()
         self.view._show_node_menu(type('E', (object,), {'x_root':0,'y_root':0,'y':0})(), test_mode=True)
         assert isinstance(self.view._node_menu, tk.Menu)
+
+    def test_highlight_nodes(self):
+        nodes = [{"id": "a", "name": "A", "label": "A", "children": []}]
+        ctx = {"highlighted_nodes": ["a"]}
+        self.view._switch_to_v7_gui()
+        self.view.show_treeview_nodes(nodes, ctx)
+        assert "highlighted" in self.view.modern_tree.item("a", "tags")
 

@@ -40,4 +40,12 @@ class VirtualTreeview:
                 n.get("hex_value", ""),
                 n.get("hex_raw", ""),
             )
-            self.tree.insert("", "end", iid=n["id"], text=n.get("label", n.get("name", "")), values=values)
+            tags = tuple(n.get("tags", []))
+            self.tree.insert(
+                "",
+                "end",
+                iid=n["id"],
+                text=n.get("label", n.get("name", "")),
+                values=values,
+                tags=tags,
+            )

@@ -1,5 +1,10 @@
 """Tests for the V7Presenter class."""
 
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+
 from src.presenter.v7_presenter import V7Presenter
 
 
@@ -49,4 +54,20 @@ class TestV7Presenter:
         layout = presenter.get_flattened_layout()
         assert layout[0].offset == 0
         assert layout[1].offset == layout[0].size
+
+    def test_search_and_filter(self):
+        content = """
+        struct Sample {
+            int a;
+            int b;
+        };
+        """
+        presenter = V7Presenter()
+        presenter.load_struct_definition(content)
+        presenter.on_search("b")
+        assert presenter.context["highlighted_nodes"]
+        presenter.on_filter("b")
+        nodes = presenter.get_display_nodes("tree")
+        assert len(nodes[0]["children"]) == 1
+        assert "b" in nodes[0]["children"][0]["label"]
 
