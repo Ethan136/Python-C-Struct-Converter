@@ -7,6 +7,7 @@ v7 AST 節點實作
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 import uuid
+import pickle
 
 
 @dataclass
@@ -80,6 +81,52 @@ class ASTNode:
             return False
         return True
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the node to a dictionary."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "type": self.type,
+            "children": [c.to_dict() for c in self.children],
+            "is_struct": self.is_struct,
+            "is_union": self.is_union,
+            "is_array": self.is_array,
+            "is_bitfield": self.is_bitfield,
+            "is_anonymous": self.is_anonymous,
+            "array_dims": list(self.array_dims),
+            "bit_size": self.bit_size,
+            "bit_offset": self.bit_offset,
+            "offset": self.offset,
+            "size": self.size,
+            "alignment": self.alignment,
+            "flattened_name": self.flattened_name,
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'ASTNode':
+        """Deserialize a node from a dictionary."""
+        node = cls(
+            id=data.get("id", str(uuid.uuid4())),
+            name=data.get("name", ""),
+            type=data.get("type", "unknown"),
+            is_struct=data.get("is_struct", False),
+            is_union=data.get("is_union", False),
+            is_array=data.get("is_array", False),
+            is_bitfield=data.get("is_bitfield", False),
+            is_anonymous=data.get("is_anonymous", False),
+            array_dims=data.get("array_dims", []),
+            bit_size=data.get("bit_size"),
+            bit_offset=data.get("bit_offset"),
+            offset=data.get("offset", 0),
+            size=data.get("size", 0),
+            alignment=data.get("alignment", 1),
+            flattened_name=data.get("flattened_name", data.get("name", "")),
+            metadata=data.get("metadata", {}),
+        )
+        node.children = [cls.from_dict(c) for c in data.get("children", [])]
+        return node
+
 
 class ASTNodeFactory:
     """AST 節點工廠類別"""
@@ -130,4 +177,14 @@ class ASTNodeFactory:
         return ASTNode(
             name=name,
             type=type_name
-        ) 
+        )
+
+
+def dumps(node: ASTNode) -> bytes:
+    """Serialize an ASTNode into binary form using pickle."""
+    return pickle.dumps(node)
+
+
+def loads(data: bytes) -> ASTNode:
+    """Deserialize an ASTNode from binary pickle data."""
+    return pickle.loads(data)
