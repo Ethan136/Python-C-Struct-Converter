@@ -31,6 +31,7 @@ class VirtualTreeview:
         return "break"
 
     def _render(self):
+        selected = set(self.tree.selection())
         self.tree.delete(*self.tree.get_children())
         end = self.start + self.page_size
         for n in self.nodes[self.start:end]:
@@ -49,3 +50,7 @@ class VirtualTreeview:
                 values=values,
                 tags=tags,
             )
+        # restore selection if possible
+        keep = [i for i in selected if i in self.tree.get_children()]
+        if keep:
+            self.tree.selection_set(keep)
