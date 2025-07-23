@@ -191,6 +191,7 @@ class V7Presenter:
         return result
 
     def _update_context(self):
+        self.context["last_update_time"] = time.time()
         if self.view and hasattr(self.view, "update_display"):
             nodes = self.get_display_nodes(self.context.get("display_mode", "tree"))
             self.view.update_display(nodes, self.context.copy())

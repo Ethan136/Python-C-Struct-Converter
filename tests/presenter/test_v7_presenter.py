@@ -96,3 +96,30 @@ class TestV7Presenter:
         assert view.nodes
         assert view.context["loading"] is False
 
+    def test_switch_display_mode_updates_context(self):
+        class DummyView:
+            def __init__(self):
+                self.called = False
+                self.context = None
+
+            def update_display(self, nodes, context):
+                self.called = True
+                self.context = context
+
+        content = """
+        struct Foo {
+            int a;
+        };
+        """
+        view = DummyView()
+        presenter = V7Presenter(view=view)
+        presenter.load_struct_definition(content)
+
+        prev_time = presenter.context["last_update_time"]
+        presenter.switch_display_mode("flat")
+
+        assert presenter.context["display_mode"] == "flat"
+        assert view.called is True
+        assert view.context["display_mode"] == "flat"
+        assert presenter.context["last_update_time"] >= prev_time
+
