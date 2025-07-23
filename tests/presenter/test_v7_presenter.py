@@ -123,3 +123,14 @@ class TestV7Presenter:
         assert view.context["display_mode"] == "flat"
         assert presenter.context["last_update_time"] >= prev_time
 
+    def test_on_switch_gui_version_updates_context(self):
+        presenter = V7Presenter()
+
+        prev_time = presenter.context["last_update_time"]
+        presenter.on_switch_gui_version("legacy")
+
+        assert presenter.context["gui_version"] == "legacy"
+        assert presenter.context["expanded_nodes"] == ["root"]
+        assert presenter.context["selected_node"] is None
+        assert presenter.context["last_update_time"] >= prev_time
+
