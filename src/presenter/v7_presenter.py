@@ -28,6 +28,9 @@ class V7Presenter:
             "selected_node": None,
             "error": None,
             "loading": False,
+            "search": "",
+            "filter": "",
+            "highlighted_nodes": [],
             "version": "1.0",
             "extra": {},
             "last_update_time": time.time(),
@@ -83,8 +86,45 @@ class V7Presenter:
         if mode is None:
             mode = self.context.get("display_mode", "tree")
         if mode == "tree":
-            return self._convert_ast_to_tree_nodes()
-        return self._convert_flattened_to_tree_nodes()
+            nodes = self._convert_ast_to_tree_nodes()
+        else:
+            nodes = self._convert_flattened_to_tree_nodes()
+        if self.context.get("filter"):
+            nodes = self._filter_nodes(nodes, self.context["filter"])
+        return nodes
+
+    def on_search(self, term: str):
+        self.context["search"] = term
+        highlights: List[str] = []
+        if term:
+            lower = term.lower()
+            def collect(n: Dict[str, Any]):
+                label = n.get("label", "")
+                if lower in label.lower():
+                    highlights.append(n.get("id"))
+                for c in n.get("children", []):
+                    collect(c)
+            for n in self.get_display_nodes(self.context.get("display_mode", "tree")):
+                collect(n)
+        self.context["highlighted_nodes"] = highlights
+        self._update_context()
+
+    def on_filter(self, term: str):
+        self.context["filter"] = term
+        self._update_context()
+
+    def _filter_nodes(self, nodes: List[Dict[str, Any]], text: str) -> List[Dict[str, Any]]:
+        if not text:
+            return nodes
+        lower = text.lower()
+        result = []
+        for n in nodes:
+            children = self._filter_nodes(n.get("children", []), text)
+            if lower in n.get("label", "").lower() or children:
+                n2 = n.copy()
+                n2["children"] = children
+                result.append(n2)
+        return result
 
     # --- internal helpers -------------------------------------------------
     def _convert_ast_to_tree_nodes(self) -> List[Dict[str, Any]]:
