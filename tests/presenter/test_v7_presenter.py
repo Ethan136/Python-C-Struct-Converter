@@ -71,3 +71,28 @@ class TestV7Presenter:
         assert len(nodes[0]["children"]) == 1
         assert "b" in nodes[0]["children"][0]["label"]
 
+    def test_view_update_on_load(self):
+        class DummyView:
+            def __init__(self):
+                self.called = False
+                self.nodes = None
+                self.context = None
+
+            def update_display(self, nodes, context):
+                self.called = True
+                self.nodes = nodes
+                self.context = context
+
+        content = """
+        struct Foo {
+            int a;
+        };
+        """
+        view = DummyView()
+        presenter = V7Presenter(view=view)
+        assert presenter.context["gui_version"] == "v7"
+        assert presenter.load_struct_definition(content) is True
+        assert view.called is True
+        assert view.nodes
+        assert view.context["loading"] is False
+
