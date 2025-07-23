@@ -85,3 +85,29 @@ class TestStructViewV7:
         # context menu binding should exist on active tree
         assert self.view.member_tree.bind("<Button-3>")
 
+    def test_select_all_shortcut(self):
+        self.view._switch_to_v7_gui()
+        tree = self.view.member_tree
+        for i in range(3):
+            tree.insert('', 'end', iid=f'n{i}', text=f'n{i}')
+        self.view.event_generate('<Control-a>'); self.view.update()
+        assert set(tree.selection()) == set(tree.get_children())
+
+    def test_context_menu_selects_node(self):
+        self.view._switch_to_v7_gui()
+        tree = self.view.member_tree
+        tree.insert('', 'end', iid='x', text='x')
+        tree.update()
+        self.view._show_node_menu(type('E',(object,),{'x_root':0,'y_root':0,'y':0})(), test_mode=True)
+        assert tree.selection() == ('x',)
+
+    def test_scroll_preserves_selection(self):
+        self.view._switch_to_v7_gui()
+        nodes = [{"id": f"n{i}", "name": f"N{i}", "label": f"N{i}", "children": []} for i in range(20)]
+        self.view.show_treeview_nodes(nodes, {"highlighted_nodes": []})
+        tree = self.view.member_tree
+        tree.selection_set('n0')
+        # simulate scroll down
+        self.view.virtual._on_scroll(type('E',(object,),{'delta':-120})())
+        assert 'n0' in tree.selection()
+

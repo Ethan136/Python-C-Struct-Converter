@@ -60,6 +60,7 @@ class StructViewV7(StructView):
         self.bind_all("<Control-f>", lambda e: self.search_entry.focus_set())
         self.bind_all("<Control-l>", lambda e: self.filter_entry.focus_set())
         self.bind_all("<Delete>", lambda e: self._on_batch_delete())
+        self.bind_all("<Control-a>", lambda e: self._select_all_nodes())
 
     # context menu for nodes
     def _bind_member_tree_events(self):
@@ -70,6 +71,8 @@ class StructViewV7(StructView):
     def _show_node_menu(self, event, test_mode=False):
         tree = self.member_tree
         item = tree.identify_row(event.y)
+        if item:
+            tree.selection_set(item)
         menu = tk.Menu(tree, tearoff=0)
         menu.add_command(label="Expand", command=lambda: self.presenter.on_expand(item) if self.presenter else None)
         menu.add_command(label="Collapse", command=lambda: self.presenter.on_collapse(item) if self.presenter else None)
@@ -78,4 +81,13 @@ class StructViewV7(StructView):
         self._node_menu = menu
         if not test_mode:
             menu.tk_popup(event.x_root, event.y_root)
+
+    def _select_all_nodes(self):
+        tree = self.member_tree
+        def collect(parent=""):
+            ids = list(tree.get_children(parent))
+            for i in list(ids):
+                ids.extend(collect(i))
+            return ids
+        tree.selection_set(collect())
 
