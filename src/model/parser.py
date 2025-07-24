@@ -4,9 +4,12 @@ v7 解析器實作
 提供優化的結構定義解析功能。
 """
 
+import logging
 import re
 from typing import Optional, List
 from .ast_node import ASTNode, ASTNodeFactory
+
+logger = logging.getLogger(__name__)
 
 
 class V7StructParser:
@@ -44,7 +47,7 @@ class V7StructParser:
             return root_node
             
         except Exception as e:
-            print(f"解析錯誤: {e}")
+            logger.exception("解析錯誤")
             return None
 
     def _extract_array_dims(self, token: str):
