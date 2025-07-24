@@ -5,7 +5,7 @@ PRESENTER_CONTEXT_SCHEMA = {
     "type": "object",
     "properties": {
         "display_mode": {"type": "string"},
-        "gui_version": {"type": "string", "enum": ["legacy", "modern"]},
+        "gui_version": {"type": "string", "enum": ["legacy", "modern", "v7"]},
         "expanded_nodes": {"type": "array", "items": {"type": "string"}},
         "selected_node": {"anyOf": [{"type": "string"}, {"type": "null"}]},
         "error": {"anyOf": [{"type": "string"}, {"type": "null"}]},

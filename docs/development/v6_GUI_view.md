@@ -325,7 +325,7 @@ def _create_modern_gui(self):
 ### 4. Context 擴充
 ```python
 # 在 context schema 中新增
-"gui_version": {"type": "string", "enum": ["legacy", "modern"]}
+"gui_version": {"type": "string", "enum": ["legacy", "modern", "v7"]}
 ```
 
 ### 5. 實作步驟（按照策略文件）

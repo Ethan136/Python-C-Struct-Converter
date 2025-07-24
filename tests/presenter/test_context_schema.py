@@ -44,6 +44,30 @@ class TestPresenterContextSchema(unittest.TestCase):
         with self.assertRaises(Exception):
             validate_presenter_context(context)
 
+    def test_v7_gui_version_allowed(self):
+        context = {
+            "display_mode": "tree",
+            "gui_version": "v7",
+            "expanded_nodes": ["root"],
+            "selected_node": None,
+            "error": None,
+            "filter": None,
+            "search": None,
+            "version": "1.0",
+            "extra": {},
+            "loading": False,
+            "history": [],
+            "user_settings": {},
+            "last_update_time": time.time(),
+            "readonly": False,
+            "pending_action": None,
+            "debug_info": {}
+        }
+        try:
+            validate_presenter_context(context)
+        except Exception as e:
+            self.fail(f"v7 gui_version should be allowed: {e}")
+
     def test_wrong_type(self):
         context = {
             "display_mode": "tree",
