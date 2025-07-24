@@ -483,7 +483,7 @@ class StructPresenter:
     @event_handler("on_switch_gui_version")
     def on_switch_gui_version(self, version):
         """處理 GUI 版本切換事件"""
-        if version not in ["legacy", "modern"]:
+        if version not in ["legacy", "modern", "v7"]:
             raise ValueError(f"Invalid GUI version: {version}")
         self.context["gui_version"] = version
         # 切換時重置一些狀態
