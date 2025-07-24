@@ -324,5 +324,6 @@ class V7StructParser:
                 merged_lines[-1] = merged_lines[-1].strip()
             else:
                 merged_lines.append(line)
-        print("[DEBUG] merged_lines:", merged_lines)
+        # Debug output removed or guarded for production use
+        # print("[DEBUG] merged_lines:", merged_lines)
         return merged_lines 
