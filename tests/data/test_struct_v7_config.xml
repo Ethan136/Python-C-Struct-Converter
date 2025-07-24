@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<v7_struct_tests>
+    <test_case name="complex_nested">
+        <struct_definition><![CDATA[
+            struct Complex {
+                struct { int x; char y; } anon;
+                union {
+                    int a;
+                    struct { unsigned int b1:3; unsigned int :2; unsigned int b2:5; } bits;
+                } u;
+                int arr[2][2];
+            };
+        ]]></struct_definition>
+        <expected_flattened>
+            <node name="anonymous.x" type="int"/>
+            <node name="anonymous.y" type="char"/>
+            <node name="anonymous.a" type="int"/>
+            <node name="anonymous.anonymous.b1" type="unsigned int" bit_size="3" bit_offset="0"/>
+            <node name="anonymous.anonymous.anonymous" type="unsigned int" bit_size="2" bit_offset="3"/>
+            <node name="anonymous.anonymous.b2" type="unsigned int" bit_size="5" bit_offset="5"/>
+            <node name="arr[0][0]" type="int"/>
+            <node name="arr[0][1]" type="int"/>
+            <node name="arr[1][0]" type="int"/>
+            <node name="arr[1][1]" type="int"/>
+        </expected_flattened>
+    </test_case>
+    <test_case name="anonymous_structs">
+        <struct_definition><![CDATA[
+            struct Anonymous {
+                struct { int a; } ;
+                union { int b; char c; } ;
+            };
+        ]]></struct_definition>
+        <expected_flattened>
+            <node name="anonymous_struct.a" type="int"/>
+            <node name="anonymous_union.b" type="int"/>
+            <node name="anonymous_union.c" type="char"/>
+        </expected_flattened>
+    </test_case>
+    <test_case name="nd_array">
+        <struct_definition><![CDATA[
+            struct NDArray {
+                int matrix[2][3][2];
+            };
+        ]]></struct_definition>
+        <expected_flattened>
+            <node name="matrix[0][0][0]" type="int"/>
+            <node name="matrix[0][0][1]" type="int"/>
+            <node name="matrix[0][1][0]" type="int"/>
+            <node name="matrix[0][1][1]" type="int"/>
+            <node name="matrix[0][2][0]" type="int"/>
+            <node name="matrix[0][2][1]" type="int"/>
+            <node name="matrix[1][0][0]" type="int"/>
+            <node name="matrix[1][0][1]" type="int"/>
+            <node name="matrix[1][1][0]" type="int"/>
+            <node name="matrix[1][1][1]" type="int"/>
+            <node name="matrix[1][2][0]" type="int"/>
+            <node name="matrix[1][2][1]" type="int"/>
+        </expected_flattened>
+    </test_case>
+</v7_struct_tests>
