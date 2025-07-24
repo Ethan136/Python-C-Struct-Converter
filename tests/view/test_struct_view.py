@@ -2377,5 +2377,81 @@ class TestStructView(unittest.TestCase):
         self.assertEqual(v2[2], "0x41")
         self.assertEqual(v2[3], "41")
 
+    def test_switch_to_modern_after_parse_updates_display(self):
+        class FilePresenter(PresenterStub):
+            def __init__(self):
+                super().__init__()
+                self._nodes = []
+
+            def browse_file(self):
+                self._nodes = [{
+                    "id": "root",
+                    "label": "Dummy",
+                    "name": "Dummy",
+                    "type": "struct",
+                    "children": [{
+                        "id": "root.a",
+                        "label": "a",
+                        "name": "a",
+                        "type": "int",
+                        "children": []
+                    }]
+                }]
+                return {
+                    "type": "ok",
+                    "file_path": "dummy.h",
+                    "struct_name": "Dummy",
+                    "layout": [{
+                        "name": "a",
+                        "type": "int",
+                        "offset": 0,
+                        "size": 4,
+                        "bit_offset": None,
+                        "bit_size": None,
+                        "is_bitfield": False
+                    }],
+                    "total_size": 4,
+                    "struct_align": 4,
+                    "struct_content": "struct Dummy { int a; }"
+                }
+
+            def parse_hex_data(self):
+                self._nodes[0]["children"][0].update({
+                    "value": "2",
+                    "hex_value": "0x2",
+                    "hex_raw": "02000000"
+                })
+                return {
+                    "type": "ok",
+                    "parsed_values": [{
+                        "name": "a",
+                        "value": "2",
+                        "hex_value": "0x2",
+                        "hex_raw": "02000000"
+                    }],
+                    "debug_lines": []
+                }
+
+            def get_display_nodes(self, mode):
+                return self._nodes
+
+        self.presenter = FilePresenter()
+        self.view.destroy()
+        self.view = StructView(presenter=self.presenter)
+        self.view.update()
+        self.view._on_browse_file()
+        self.view._on_parse_file()
+        # 切換到 modern GUI，應更新顯示
+        self.view._on_gui_version_change("modern")
+        self.view.update()
+        root_id = self.view.modern_tree.get_children("")[0]
+        child_id = self.view.modern_tree.get_children(root_id)[0]
+        values = self.view.modern_tree.item(child_id, "values")
+        self.assertEqual(values[0], "a")
+        self.assertEqual(values[1], "2")
+        layout_item = self.view.layout_tree.get_children("")[0]
+        layout_vals = self.view.layout_tree.item(layout_item, "values")
+        self.assertEqual(layout_vals[0], "a")
+
 if __name__ == "__main__":
     unittest.main()
