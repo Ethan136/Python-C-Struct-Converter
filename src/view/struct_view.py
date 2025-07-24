@@ -1474,6 +1474,15 @@ class StructView(tk.Tk):
         if hasattr(self, "modern_tree"):
             self.member_tree = self.modern_tree
             self._bind_member_tree_events()
+        # 切換後立即刷新顯示內容
+        if (self.presenter and hasattr(self.presenter, "get_display_nodes")
+                and hasattr(self.presenter, "context")):
+            mode = self.presenter.context.get("display_mode", "tree")
+            try:
+                nodes = self.presenter.get_display_nodes(mode)
+            except Exception:
+                nodes = []
+            self.update_display(nodes, self.presenter.context)
 
     def _switch_to_v7_gui(self):
         """切換到 v7 版本 GUI。當前實作與新版 GUI 相同。"""
