@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, messagebox
+from .virtual_tree import VirtualTreeview
 # from src.config import get_string
 from src.model.struct_model import StructModel
 import time
@@ -80,12 +81,14 @@ def create_scrollable_tab_frame(parent):
     return canvas, scrollable_frame
 
 class StructView(tk.Tk):
-    def __init__(self, presenter=None):
+    def __init__(self, presenter=None, enable_virtual=True, virtual_page_size=100):
         super().__init__()
         self._member_table_refresh_count = 0
         self._hex_grid_refresh_count = 0
         self._treeview_refresh_count = 0
         self.presenter = presenter
+        self.enable_virtual = enable_virtual
+        self._virtual_page_size = virtual_page_size
         self.title("C Struct GUI")
         self.geometry("1200x800")
         self._debug_auto_refresh_id = None
@@ -145,7 +148,7 @@ class StructView(tk.Tk):
         # GUI 版本切換
         tk.Label(control_frame, text="  GUI 版本：").pack(side=tk.LEFT)
         self.gui_version_var = tk.StringVar(value="legacy")
-        gui_version_options = ["legacy", "modern", "v7"]
+        gui_version_options = ["legacy", "modern"]
         self.gui_version_menu = tk.OptionMenu(control_frame, self.gui_version_var, *gui_version_options, command=self._on_gui_version_change)
         self.gui_version_menu.pack(side=tk.LEFT)
         # 搜尋輸入框
@@ -1103,6 +1106,8 @@ class StructView(tk.Tk):
                 self.member_tree.heading(col, command=lambda c=col: None)
             self.member_tree.bind("<Button-3>", self._show_treeview_column_menu)
         bind_header_right_click()
+        if self.enable_virtual:
+            self.member_tree.bind("<Button-3>", lambda e: self._show_node_menu(e), add="+")
         # 拖曳排序事件
         self._dragging_item = None
         self._dragging_parent = None
@@ -1222,8 +1227,36 @@ class StructView(tk.Tk):
         elif len(selected) > 1 and hasattr(self.presenter, "on_node_select"):
             self.presenter.on_node_select(list(selected))
 
+    def _show_node_menu(self, event, test_mode=False):
+        tree = self.member_tree
+        item = tree.identify_row(event.y)
+        if item:
+            tree.selection_set(item)
+        menu = tk.Menu(tree, tearoff=0)
+        menu.add_command(label="Expand", command=lambda: self.presenter.on_expand(item) if self.presenter else None)
+        menu.add_command(label="Collapse", command=lambda: self.presenter.on_collapse(item) if self.presenter else None)
+        menu.add_separator()
+        menu.add_command(label="Delete", command=self._on_batch_delete)
+        self._node_menu = menu
+        if not test_mode:
+            menu.tk_popup(event.x_root, event.y_root)
+
+    def _select_all_nodes(self):
+        tree = self.member_tree
+        def collect(parent=""):
+            ids = list(tree.get_children(parent))
+            for i in list(ids):
+                ids.extend(collect(i))
+            return ids
+        tree.selection_set(collect())
+
     def show_treeview_nodes(self, nodes, context, icon_map=None):
         self._treeview_refresh_count += 1
+        if self.enable_virtual and hasattr(self, "virtual"):
+            flat = self._flatten_nodes(nodes, context=context)
+            self.virtual.set_nodes(flat)
+            update_treeview_by_context(self.modern_tree, context)
+            return
         # 依據 user_settings 設定 displaycolumns
         all_columns = tuple(c["name"] for c in MEMBER_TREEVIEW_COLUMNS)
         columns = all_columns
@@ -1296,6 +1329,31 @@ class StructView(tk.Tk):
                 tree.selection_set(filtered)
             else:
                 tree.selection_remove(tree.selection())
+
+    def _flatten_nodes(self, nodes, depth=0, context=None):
+        result = []
+        highlighted = set(context.get("highlighted_nodes", [])) if context else set()
+        for n in nodes:
+            n2 = n.copy()
+            n2["label"] = ("  " * depth) + n2.get("label", n2.get("name", ""))
+            tags = []
+            t = n2.get("type")
+            if t == "struct":
+                tags.append("struct")
+            elif t == "union":
+                tags.append("union")
+            elif t == "bitfield":
+                tags.append("bitfield")
+            elif t == "array":
+                tags.append("array")
+            if n2.get("id") in highlighted:
+                tags.append("highlighted")
+            if tags:
+                n2["tags"] = tags
+            result.append(n2)
+            if n.get("children"):
+                result.extend(self._flatten_nodes(n["children"], depth + 1, context))
+        return result
 
     def update_display(self, nodes, context, icon_map=None):
         # context version/結構自動升級/降級與警告
@@ -1401,6 +1459,10 @@ class StructView(tk.Tk):
                 }
                 nodes = self.presenter.get_display_nodes("tree")
                 self.update_display(nodes, context)
+        self.bind_all("<Control-f>", lambda e: self.search_entry.focus_set())
+        self.bind_all("<Control-l>", lambda e: self.filter_entry.focus_set())
+        self.bind_all("<Delete>", lambda e: self._on_batch_delete())
+        self.bind_all("<Control-a>", lambda e: self._select_all_nodes())
 
     def _on_expand_all(self):
         if self.presenter and hasattr(self.presenter, "on_expand_all"):
@@ -1471,6 +1533,8 @@ class StructView(tk.Tk):
             self.modern_frame.pack(fill="both", expand=True)
         else:
             self._create_modern_gui()
+        if self.enable_virtual:
+            self._enable_virtualization()
         if hasattr(self, "modern_tree"):
             self.member_tree = self.modern_tree
             self._bind_member_tree_events()
@@ -1524,6 +1588,15 @@ class StructView(tk.Tk):
             nodes = self.presenter.get_display_nodes("tree")
             if nodes:
                 self._populate_modern_tree(nodes)
+
+    def _enable_virtualization(self):
+        """Wrap modern_tree with VirtualTreeview when enabled"""
+        if not self.enable_virtual:
+            return
+        if hasattr(self, "modern_tree") and not hasattr(self, "virtual"):
+            self.virtual = VirtualTreeview(self.modern_tree, self._virtual_page_size)
+            self.member_tree = self.modern_tree
+            self._bind_member_tree_events()
 
     def _populate_modern_tree(self, nodes):
         """將節點資料填入新版樹狀顯示"""
