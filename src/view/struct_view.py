@@ -14,6 +14,17 @@ MEMBER_TREEVIEW_COLUMNS = [
     {"name": "hex_raw", "title": "Hex Raw", "width": 150},
 ]
 
+# Columns for struct layout treeviews
+LAYOUT_TREEVIEW_COLUMNS = [
+    {"name": "name", "title": "欄位名稱", "width": 120},
+    {"name": "type", "title": "型別", "width": 100},
+    {"name": "offset", "title": "Offset", "width": 80},
+    {"name": "size", "title": "Size", "width": 80},
+    {"name": "bit_offset", "title": "bit_offset", "width": 80},
+    {"name": "bit_size", "title": "bit_size", "width": 80},
+    {"name": "is_bitfield", "title": "is_bitfield", "width": 80},
+]
+
 def create_member_treeview(parent):
     all_columns = MEMBER_TREEVIEW_COLUMNS
     col_names = tuple(c["name"] for c in all_columns)
@@ -29,6 +40,25 @@ def create_member_treeview(parent):
         tree.column(c["name"], width=c["width"], stretch=False)
     tree["displaycolumns"] = col_names
     tree.pack(fill="x")
+    return tree
+
+
+def create_layout_treeview(parent, yscrollcommand=None):
+    """Create a Treeview for struct layout display."""
+    all_columns = LAYOUT_TREEVIEW_COLUMNS
+    col_names = tuple(c["name"] for c in all_columns)
+    tree = ttk.Treeview(
+        parent,
+        columns=col_names,
+        show="headings",
+        height=10,
+        yscrollcommand=yscrollcommand,
+    )
+    for c in all_columns:
+        tree.heading(c["name"], text=c["title"])
+        tree.column(c["name"], width=c["width"], stretch=False)
+    tree["displaycolumns"] = col_names
+    tree.pack(side="left", fill="both", expand=True)
     return tree
 
 def update_treeview_by_context(tree, context):
@@ -209,15 +239,7 @@ class StructView(tk.Tk):
         layout_frame.pack(fill="both", expand=True, padx=2, pady=2)
         # 新增 scroll bar
         layout_scrollbar = ttk.Scrollbar(layout_frame, orient="vertical")
-        self.layout_tree = ttk.Treeview(layout_frame, columns=("name", "type", "offset", "size", "bit_offset", "bit_size", "is_bitfield"), show="headings", height=10, yscrollcommand=layout_scrollbar.set)
-        self.layout_tree.heading("name", text="欄位名稱")
-        self.layout_tree.heading("type", text="型別")
-        self.layout_tree.heading("offset", text="Offset")
-        self.layout_tree.heading("size", text="Size")
-        self.layout_tree.heading("bit_offset", text="bit_offset")
-        self.layout_tree.heading("bit_size", text="bit_size")
-        self.layout_tree.heading("is_bitfield", text="is_bitfield")
-        self.layout_tree.pack(side="left", fill="both", expand=True)
+        self.layout_tree = create_layout_treeview(layout_frame, yscrollcommand=layout_scrollbar.set)
         layout_scrollbar.config(command=self.layout_tree.yview)
         layout_scrollbar.pack(side="right", fill="y")
 
@@ -294,15 +316,7 @@ class StructView(tk.Tk):
         layout_frame = tk.LabelFrame(scrollable_frame, text="Struct Layout (標準顯示)")
         layout_frame.pack(fill="both", expand=True, padx=2, pady=2)
         layout_scrollbar = ttk.Scrollbar(layout_frame, orient="vertical")
-        self.manual_layout_tree = ttk.Treeview(layout_frame, columns=("name", "type", "offset", "size", "bit_offset", "bit_size", "is_bitfield"), show="headings", height=10, yscrollcommand=layout_scrollbar.set)
-        self.manual_layout_tree.heading("name", text="欄位名稱")
-        self.manual_layout_tree.heading("type", text="型別")
-        self.manual_layout_tree.heading("offset", text="Offset")
-        self.manual_layout_tree.heading("size", text="Size")
-        self.manual_layout_tree.heading("bit_offset", text="bit_offset")
-        self.manual_layout_tree.heading("bit_size", text="bit_size")
-        self.manual_layout_tree.heading("is_bitfield", text="is_bitfield")
-        self.manual_layout_tree.pack(side="left", fill="both", expand=True)
+        self.manual_layout_tree = create_layout_treeview(layout_frame, yscrollcommand=layout_scrollbar.set)
         layout_scrollbar.config(command=self.manual_layout_tree.yview)
         layout_scrollbar.pack(side="right", fill="y")
 
