@@ -14,7 +14,7 @@ pytestmark = pytest.mark.skipif(
     not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests"
 )
 
-from src.view.struct_view import StructView, create_member_treeview
+from src.view.struct_view import StructView, create_member_treeview, create_layout_treeview
 from src.presenter.struct_presenter import StructPresenter
 from src.model.struct_model import StructModel
 
@@ -1556,6 +1556,19 @@ class TestStructView(unittest.TestCase):
         for col in file_tree.cget("columns"):
             self.assertEqual(file_tree.column(col)["width"], manual_tree.column(col)["width"])
         # tkinter/ttk heading fallback 行為：不同平台/版本查詢 heading text 可能回傳欄位 name 而非 title，故不驗證 heading text。
+
+    def test_layout_treeview_column_config一致(self):
+        """驗證 file tab 與 manual tab 的 layout_tree 欄位名稱、寬度、順序完全一致"""
+        view = self.view
+        presenter = self.presenter
+        nodes = presenter.get_display_nodes(presenter.context.get("display_mode", "tree"))
+        view.update_display(nodes, presenter.context)
+        file_tree = view.layout_tree
+        manual_tree = view.manual_layout_tree
+        self.assertEqual(file_tree.cget("columns"), manual_tree.cget("columns"))
+        self.assertEqual(file_tree.cget("displaycolumns"), manual_tree.cget("displaycolumns"))
+        for col in file_tree.cget("columns"):
+            self.assertEqual(file_tree.column(col)["width"], manual_tree.column(col)["width"])
 
     def test_treeview_drag_reorder_nodes(self):
         """TDD: 驗證 Treeview 拖曳排序（同層級節點順序調整）功能。"""
