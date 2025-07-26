@@ -22,6 +22,11 @@
 以下列出需調整的檔案與重點內容：
 1. **`src/view/struct_view.py`**
    - 在 `__init__` 新增 `enable_virtual` 及 `virtual_page_size` 參數，預設開啟虛擬化。
+     `virtual_page_size` 建議 50~200 之間，可依結構大小調整。
+     若舊程式仍使用 `StructViewV7`，可於 `src/view/__init__.py` 提供別名：
+     ```python
+     StructViewV7 = StructView  # 向下相容
+     ```
    - 匯入 `VirtualTreeview`，新增 `_enable_virtualization()` 將 `modern_tree` 包裝成虛擬樹。
    - 移除 OptionMenu 中的 `v7` 選項，僅保留 `legacy` 與 `modern`。
    - 在 `_switch_to_modern_gui()` 內呼叫 `_enable_virtualization()`，並整合快捷鍵與右鍵選單綁定邏輯。
@@ -62,6 +67,12 @@
 - 可提供設定選項以停用虛擬化，避免小型結構額外開銷。
 - 確認舊專案或腳本若仍使用 `v7` 名稱，能順利切換到新的整合介面。
 - 重新檢視 GUI 相關的 CI 測試腳本，確保整合後流程仍可順利執行。
+- 手動定義的 `manual_member_tree` 目前仍使用一般 Treeview，若需大量成員也可考慮
+  套用虛擬化。
+- 拖曳排序與展開/收合等既有事件在啟用虛擬化後需再次驗證，必要時調整相應函式。
+- 測試整併後，`run_all_tests.py` 及 CI 流程應改以參數化方式驗證 `enable_virtual`
+  不同情境。
+- README 與 `GUI_DEVELOPER_GUIDE.md` 需同步更新快捷鍵列表及虛擬化參數範例。
 
 ---
 
