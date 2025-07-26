@@ -62,6 +62,50 @@
 - `view.__init__` 中的 `__all__`
 - 測試檔 `test_struct_view_v7.py` (併入 `test_struct_view.py`)
 
+## 測試腳本更新細節
+
+- **整合方式**：刪除 `tests/view/test_struct_view_v7.py`，於
+  `tests/view/test_struct_view.py` 新增可參數化的 fixture。
+  透過 `@pytest.mark.parametrize("enable_virtual", [False, True])`
+  為 `StructView` 建立兩種實例，確保虛擬化開關皆被測試。
+- **建立共用 fixture**：
+
+  ```python
+  @pytest.fixture(params=[False, True])
+  def view(request):
+      root = tk.Tk(); root.withdraw()
+      v = StructView(presenter=DummyPresenter(),
+                     enable_virtual=request.param,
+                     virtual_page_size=10)
+      yield v
+      v.destroy(); root.destroy()
+  ```
+
+  所有 GUI 測試均以此 `view` fixture 為基礎，無須在測試中自行切換 GUI 版本。
+- **更新執行腳本**：`run_all_tests.py` 僅需執行
+  `tests/view/test_struct_view.py`；原先忽略或獨立執行
+  `test_struct_view_v7.py` 的邏輯可移除。CI 流程亦應採用相同方式。
+- **移除過時檔案**：提交時一併刪除 `test_struct_view_v7.py`，避免混淆。
+
+## 拖曳排序在虛擬化下的實作細節
+
+- **VirtualTreeview 擴充**：
+  - 於 `virtual_tree.py` 新增 `get_global_index(iid)`，回傳節點在完整
+    清單中的索引。
+  - 新增 `reorder_nodes(parent_id, from_idx, to_idx)`，供拖曳時更新
+    `self.nodes` 的順序並重新渲染。
+- **StructView 介接**：
+  - 在 `_on_treeview_drag_start` 透過 `self.virtual.get_global_index()`
+    取得被拖曳節點的原始索引。
+  - `_on_treeview_drag_release` 以同樣方式取得目標位置索引，呼叫
+    `self.virtual.reorder_nodes()` 更新順序後再觸發
+    `presenter.on_reorder_nodes()`。
+  - 如未啟用虛擬化，維持原有邏輯。
+- **狀態同步**：重新渲染時需保留選取與展開狀態，可由
+  `VirtualTreeview` 在 `_render()` 內讀取並恢復 `tree.selection()`。
+- **測試案例**：加入拖曳相關測試，使用上述 fixture 確認在虛擬化與非虛擬化
+  環境皆能正確調整節點順序，並確保 presenter 收到的新順序一致。
+
 
 ## 其他考量
 - 可提供設定選項以停用虛擬化，避免小型結構額外開銷。
