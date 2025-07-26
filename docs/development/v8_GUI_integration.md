@@ -106,17 +106,24 @@
 - **測試案例**：加入拖曳相關測試，使用上述 fixture 確認在虛擬化與非虛擬化
   環境皆能正確調整節點順序，並確保 presenter 收到的新順序一致。
 
+## Presenter 與相容性議題
+- `presenter.on_reorder_nodes()` 目前尚未實作，整合拖曳排序功能時應在
+  `struct_presenter.py` 新增此 callback，以更新內部資料並通知觀察者。
+- 現有 `v7_presenter.py` 是否保留需明確規劃，可考慮改為呼叫新版 Presenter
+  或標記為 deprecated，避免與整合後介面衝突。
+- 移除 `_switch_to_v7_gui()` 後，如程式仍依賴 `context["gui_version"] == "v7"`
+  等判斷，需調整或遷移至新的狀態欄位，確保既有流程不受影響。
+
 
 ## 其他考量
 - 可提供設定選項以停用虛擬化，避免小型結構額外開銷。
 - 確認舊專案或腳本若仍使用 `v7` 名稱，能順利切換到新的整合介面。
 - 重新檢視 GUI 相關的 CI 測試腳本，確保整合後流程仍可順利執行。
-- 手動定義的 `manual_member_tree` 目前仍使用一般 Treeview，若需大量成員也可考慮
-  套用虛擬化。
+- 手動定義的 `manual_member_tree` 目前仍使用一般 Treeview，若需大量成員也可考慮套用虛擬化，啟用後須再次驗證動態列編輯、解析與大小顯示功能是否受影響。
 - 拖曳排序與展開/收合等既有事件在啟用虛擬化後需再次驗證，必要時調整相應函式。
 - 測試整併後，`run_all_tests.py` 及 CI 流程應改以參數化方式驗證 `enable_virtual`
   不同情境。
-- README 與 `GUI_DEVELOPER_GUIDE.md` 需同步更新快捷鍵列表及虛擬化參數範例。
+- README、`GUI_DEVELOPER_GUIDE.md` 與 `PRESENTER_DEVELOPER_GUIDE.md` 需同步更新快捷鍵列表及虛擬化參數範例。
 
 ---
 
