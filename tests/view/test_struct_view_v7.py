@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 pytestmark = pytest.mark.skipif(
     not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests")
 
-from src.view.struct_view_v7 import StructViewV7
+from src.view.struct_view import StructView
 
 
 class DummyPresenter:
@@ -39,7 +39,8 @@ class TestStructViewV7:
     def setup_method(self):
         self.root = tk.Tk(); self.root.withdraw()
         self.presenter = DummyPresenter()
-        self.view = StructViewV7(presenter=self.presenter, page_size=10)
+        self.view = StructView(presenter=self.presenter, enable_virtual=True,
+                              virtual_page_size=10)
         self.view.update()
 
     def teardown_method(self):
@@ -48,7 +49,7 @@ class TestStructViewV7:
     def test_virtual_tree_limits_nodes(self):
         nodes = [{"id": f"n{i}", "name": f"N{i}", "label": f"N{i}", "children": []} for i in range(50)]
         context = {"highlighted_nodes": []}
-        self.view._switch_to_v7_gui()
+        self.view._switch_to_modern_gui()
         self.view.show_treeview_nodes(nodes, context)
         assert len(self.view.modern_tree.get_children()) <= 10
 
@@ -65,7 +66,7 @@ class TestStructViewV7:
         assert self.view.focus_get() is self.view.search_entry
 
     def test_context_menu_calls_presenter(self):
-        self.view._switch_to_v7_gui()
+        self.view._switch_to_modern_gui()
         tree = self.view.member_tree
         tree.insert('', 'end', iid='x', text='x')
         tree.update()
@@ -75,18 +76,18 @@ class TestStructViewV7:
     def test_highlight_nodes(self):
         nodes = [{"id": "a", "name": "A", "label": "A", "children": []}]
         ctx = {"highlighted_nodes": ["a"]}
-        self.view._switch_to_v7_gui()
+        self.view._switch_to_modern_gui()
         self.view.show_treeview_nodes(nodes, ctx)
         assert "highlighted" in self.view.modern_tree.item("a", "tags")
 
     def test_switch_sets_active_tree_and_bindings(self):
-        self.view._switch_to_v7_gui()
+        self.view._switch_to_modern_gui()
         assert self.view.member_tree is self.view.modern_tree
         # context menu binding should exist on active tree
         assert self.view.member_tree.bind("<Button-3>")
 
     def test_select_all_shortcut(self):
-        self.view._switch_to_v7_gui()
+        self.view._switch_to_modern_gui()
         tree = self.view.member_tree
         for i in range(3):
             tree.insert('', 'end', iid=f'n{i}', text=f'n{i}')
@@ -94,7 +95,7 @@ class TestStructViewV7:
         assert set(tree.selection()) == set(tree.get_children())
 
     def test_context_menu_selects_node(self):
-        self.view._switch_to_v7_gui()
+        self.view._switch_to_modern_gui()
         tree = self.view.member_tree
         tree.insert('', 'end', iid='x', text='x')
         tree.update()
@@ -102,7 +103,7 @@ class TestStructViewV7:
         assert tree.selection() == ('x',)
 
     def test_scroll_preserves_selection(self):
-        self.view._switch_to_v7_gui()
+        self.view._switch_to_modern_gui()
         nodes = [{"id": f"n{i}", "name": f"N{i}", "label": f"N{i}", "children": []} for i in range(20)]
         self.view.show_treeview_nodes(nodes, {"highlighted_nodes": []})
         tree = self.view.member_tree
