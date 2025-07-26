@@ -734,6 +734,33 @@ class TestStructModelASTAPI(unittest.TestCase):
         self.assertTrue(any(n['label'] == 'a' for n in nodes_flat))
         self.assertTrue(any(n['label'] == 'b' for n in nodes_flat))
 
+    def test_struct_model_get_struct_ast_nested(self):
+        code = '''
+        struct Outer {
+            struct Inner {
+                int x;
+                char y;
+            } inner;
+            union {
+                short a;
+                float b;
+            } u;
+            int tail;
+        };
+        '''
+        model = StructModel()
+        model.struct_content = code
+        ast = model.get_struct_ast()
+        self.assertEqual(ast['name'], 'Outer')
+        self.assertTrue(any(child['name'] == 'inner' for child in ast['children']))
+        inner = next(c for c in ast['children'] if c['name'] == 'inner')
+        self.assertTrue(inner['is_struct'])
+        self.assertEqual(len(inner['children']), 2)
+        union = next(c for c in ast['children'] if c['is_union'])
+        self.assertEqual(len(union['children']), 2)
+        tail = next(c for c in ast['children'] if c['name'] == 'tail')
+        self.assertEqual(tail['type'], 'int')
+
 
 if __name__ == "__main__":
     unittest.main() 
