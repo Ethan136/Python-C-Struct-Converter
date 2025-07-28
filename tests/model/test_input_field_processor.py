@@ -82,5 +82,14 @@ class TestInputFieldProcessorXMLDriven(unittest.TestCase):
                     result = self.processor.convert_to_raw_bytes(subcase['padded_hex'], subcase['byte_size'], subcase['endianness'])
                     self.assertEqual(result.hex(), subcase['expected'].lower())
 
+
+@unittest.skip("XML-driven tests placeholder")
+class TestInputFieldProcessorXML(unittest.TestCase):
+    """Placeholder for new XML-driven tests (TDD step 1)."""
+
+    def test_placeholder(self):
+        """Dummy test to be implemented in later steps."""
+        self.assertTrue(True)
+
 if __name__ == '__main__':
     unittest.main() 
