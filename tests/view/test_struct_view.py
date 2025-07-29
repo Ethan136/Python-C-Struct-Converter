@@ -2577,5 +2577,17 @@ def test_scroll_preserves_selection(view):
     view.virtual._on_scroll(type('E',(object,),{'delta':-120})())
     assert 'n0' in tree.selection()
 
+
+def test_virtual_tree_reorder_nodes(view):
+    if not view.enable_virtual:
+        pytest.skip("virtual mode only")
+    nodes = [{"id": f"n{i}", "name": f"N{i}", "label": f"N{i}", "children": []} for i in range(3)]
+    ctx = {"highlighted_nodes": []}
+    view._switch_to_modern_gui()
+    view.show_treeview_nodes(nodes, ctx)
+    assert view.virtual.get_global_index("n1") == 1
+    view.virtual.reorder_nodes("", 0, 2)
+    assert list(view.member_tree.get_children("")) == ["n1", "n2", "n0"]
+
 if __name__ == "__main__":
     unittest.main()

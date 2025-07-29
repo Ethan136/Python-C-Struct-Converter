@@ -54,3 +54,20 @@ class VirtualTreeview:
         keep = [i for i in selected if i in self.tree.get_children()]
         if keep:
             self.tree.selection_set(keep)
+
+    def get_global_index(self, iid):
+        """Return the index of ``iid`` within the full node list."""
+        for idx, n in enumerate(self.nodes):
+            if n.get("id") == iid:
+                return idx
+        return -1
+
+    def reorder_nodes(self, parent_id, from_idx, to_idx):
+        """Move node from ``from_idx`` to ``to_idx`` and re-render."""
+        if from_idx < 0 or from_idx >= len(self.nodes):
+            return
+        if to_idx < 0 or to_idx >= len(self.nodes):
+            return
+        node = self.nodes.pop(from_idx)
+        self.nodes.insert(to_idx, node)
+        self._render()
