@@ -18,6 +18,41 @@ from src.view.struct_view import StructView, create_member_treeview, create_layo
 from src.presenter.struct_presenter import StructPresenter
 from src.model.struct_model import StructModel
 
+
+class DummyPresenter:
+    def __init__(self):
+        self.search_called = None
+        self.filter_called = None
+        self.expand_called = None
+        self.collapse_called = None
+        self.delete_called = False
+
+    def on_search(self, s):
+        self.search_called = s
+
+    def on_filter(self, s):
+        self.filter_called = s
+
+    def on_expand(self, i):
+        self.expand_called = i
+
+    def on_collapse(self, i):
+        self.collapse_called = i
+
+    def on_batch_delete(self, nodes):
+        self.delete_called = True
+
+
+@pytest.fixture(params=[False, True])
+def view(request):
+    root = tk.Tk(); root.withdraw()
+    v = StructView(presenter=DummyPresenter(),
+                   enable_virtual=request.param,
+                   virtual_page_size=10)
+    v.update()
+    yield v
+    v.destroy(); root.destroy()
+
 class PresenterStub:
     def __init__(self, context=None):
         self.calls = []
@@ -2465,6 +2500,82 @@ class TestStructView(unittest.TestCase):
         layout_item = self.view.layout_tree.get_children("")[0]
         layout_vals = self.view.layout_tree.item(layout_item, "values")
         self.assertEqual(layout_vals[0], "a")
+
+
+def test_virtual_tree_limits_nodes(view):
+    nodes = [{"id": f"n{i}", "name": f"N{i}", "label": f"N{i}", "children": []} for i in range(50)]
+    ctx = {"highlighted_nodes": []}
+    view._switch_to_modern_gui()
+    view.show_treeview_nodes(nodes, ctx)
+    if view.enable_virtual:
+        assert len(view.modern_tree.get_children()) <= 10
+    else:
+        assert len(view.modern_tree.get_children()) == 50
+
+
+def test_search_and_filter_calls_presenter(view):
+    view.search_var.set("abc")
+    view._on_search_entry_change(None)
+    assert view.presenter.search_called == "abc"
+    view.filter_var.set("def")
+    view._on_filter_entry_change(None)
+    assert view.presenter.filter_called == "def"
+
+
+def test_keyboard_shortcut_focus(view):
+    view.event_generate('<Control-f>'); view.update()
+    assert view.focus_get() is view.search_entry
+
+
+def test_context_menu_calls_presenter(view):
+    view._switch_to_modern_gui()
+    tree = view.member_tree
+    tree.insert('', 'end', iid='x', text='x')
+    tree.update()
+    view._show_node_menu(type('E', (object,), {'x_root':0,'y_root':0,'y':0})(), test_mode=True)
+    assert isinstance(view._node_menu, tk.Menu)
+
+
+def test_highlight_nodes(view):
+    nodes = [{"id": "a", "name": "A", "label": "A", "children": []}]
+    ctx = {"highlighted_nodes": ["a"]}
+    view._switch_to_modern_gui()
+    view.show_treeview_nodes(nodes, ctx)
+    assert "highlighted" in view.modern_tree.item("a", "tags")
+
+
+def test_switch_sets_active_tree_and_bindings(view):
+    view._switch_to_modern_gui()
+    assert view.member_tree is view.modern_tree
+    assert view.member_tree.bind("<Button-3>")
+
+
+def test_select_all_shortcut(view):
+    view._switch_to_modern_gui()
+    tree = view.member_tree
+    for i in range(3):
+        tree.insert('', 'end', iid=f'n{i}', text=f'n{i}')
+    view.event_generate('<Control-a>'); view.update()
+    assert set(tree.selection()) == set(tree.get_children())
+
+
+def test_context_menu_selects_node(view):
+    view._switch_to_modern_gui()
+    tree = view.member_tree
+    tree.insert('', 'end', iid='x', text='x')
+    tree.update()
+    view._show_node_menu(type('E',(object,),{'x_root':0,'y_root':0,'y':0})(), test_mode=True)
+    assert tree.selection() == ('x',)
+
+
+def test_scroll_preserves_selection(view):
+    view._switch_to_modern_gui()
+    nodes = [{"id": f"n{i}", "name": f"N{i}", "label": f"N{i}", "children": []} for i in range(20)]
+    view.show_treeview_nodes(nodes, {"highlighted_nodes": []})
+    tree = view.member_tree
+    tree.selection_set('n0')
+    view.virtual._on_scroll(type('E',(object,),{'delta':-120})())
+    assert 'n0' in tree.selection()
 
 if __name__ == "__main__":
     unittest.main()
