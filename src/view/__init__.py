@@ -2,6 +2,8 @@
 # Contains UI components and display logic
 
 from src.view.struct_view import StructView
-from src.view.struct_view_v7 import StructViewV7
+
+# Backwards compatibility: StructViewV7 maps to StructView
+StructViewV7 = StructView
 
 __all__ = ['StructView', 'StructViewV7']
