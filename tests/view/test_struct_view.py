@@ -2589,5 +2589,16 @@ def test_virtual_tree_reorder_nodes(view):
     view.virtual.reorder_nodes("", 0, 2)
     assert list(view.member_tree.get_children("")) == ["n1", "n2", "n0"]
 
+
+def test_structviewv7_deprecated_warning():
+    import warnings
+    from src.view import StructViewV7
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        v = StructViewV7(presenter=None, page_size=5)
+        v.destroy()
+    assert any(issubclass(warn.category, DeprecationWarning) for warn in w)
+
 if __name__ == "__main__":
     unittest.main()
