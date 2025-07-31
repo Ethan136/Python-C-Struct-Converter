@@ -2600,5 +2600,17 @@ def test_structviewv7_deprecated_warning():
         v.destroy()
     assert any(issubclass(warn.category, DeprecationWarning) for warn in w)
 
+
+def test_structviewv7_wrapper_behavior():
+    """StructViewV7 should be a thin wrapper over StructView."""
+    from src.view import StructView, StructViewV7
+
+    v = StructViewV7(presenter=None, page_size=5)
+    try:
+        assert isinstance(v, StructView)
+        assert v.enable_virtual is True
+    finally:
+        v.destroy()
+
 if __name__ == "__main__":
     unittest.main()
