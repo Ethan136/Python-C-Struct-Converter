@@ -281,6 +281,12 @@ python3 run.py
 - **Safe Defaults**: Automatically converts invalid inputs to safe default values (0) without throwing exceptions
 - **TDD Implementation**: All improvements are thoroughly tested using Test-Driven Development methodology
 
+### GUI Unification & Virtualization (v8)
+- The legacy `v7` interface has been fully merged into the modern GUI.
+- `StructView` now wraps the member tree with `VirtualTreeview` by default for efficient rendering of large structures.
+- Use `enable_virtual=False` when initializing `StructView` if virtualization is not required.
+- `StructViewV7` remains as a thin compatibility alias for `StructView`.
+
 For detailed technical information about recent improvements, see [docs/development/v3_define_struct_input2_design_plan.md](docs/development/v3_define_struct_input2_design_plan.md).
 
 ## Example File

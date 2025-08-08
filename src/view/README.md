@@ -27,5 +27,11 @@
 - 依賴介面：presenter 必須實作 invalidate_cache、compute_member_layout。
 - TDD 驗證：所有觸發點皆有自動化測試（見 tests/test_struct_view.py），確保 cache 行為與 UI 操作同步。
 
+## GUI 整合與虛擬化（v8 更新）
+
+- 舊版 `v7` 介面已完全併入 modern GUI，可透過 `enable_virtual` 參數開關大量節點虛擬化功能。
+- `StructView` 預設啟用虛擬化，使用 `VirtualTreeview` 以減少顯示大量節點時的資源消耗。
+- `StructViewV7` 僅保留為相容別名，實際等同於 `StructView(enable_virtual=True)`。
+
 ## 相關設計文檔
 - [MVP 架構說明](../../docs/architecture/MVP_ARCHITECTURE_COMPLETE.md) 
