@@ -45,6 +45,14 @@
   - 含有頂層 `union` 時 GUI 亦能載入。
   - 確認 `_split_member_lines` 對含註解、多行或位元欄位的 `union` 可維持完整性。
 
+## TDD 開發規劃
+- **撰寫測試先行**：於 `tests/model/test_parser.py` 建立下列失敗測試以明確需求：
+  - `test_parse_top_level_union()`：輸入僅含 `union` 的檔案應建立根節點。
+  - `test_parse_struct_with_pragma_pack()`：帶有 `#pragma pack(push,1)` 的 `struct` 應以對齊資訊解析。
+  - `test_split_member_lines_with_union()`：多行 `union` 或含註解成員應維持單一區塊。
+- **逐步實作**：依序加入頂層 `union` 支援、`pragma pack` 處理與 `_split_member_lines` 改寫，使測試逐一轉為通過。
+- **重構與覆蓋**：重構程式碼並維持測試覆蓋率，必要時調整既有案例避免重複。
+
 ---
 
 本文件提出 v9 階段對 Parser 的增強計畫，目標是完整支援 `top level union`、`pragma pack` 及更健壯的 `_split_member_lines` 邏輯，以便在未來 GUI 與 CLI 操作中正確解析更多 C 語言結構。
