@@ -70,6 +70,20 @@
    - 全面執行 `run_tests.py`，確認所有新舊測試皆通過。
    - 觀察覆蓋率，必要時補齊缺漏測試或重構程式碼。
 
+## 更細緻的 TDD 任務拆解
+1. **頂層 `union`**
+   - *Red*: 建立 `test_parse_top_level_union`，輸入僅含 `union` 定義的檔案，預期產生 `UnionNode` 根節點並以 `assert` 驗證型別與欄位。
+   - *Green*: 擴充解析流程偵測 `union` 關鍵字，回傳對應 AST；重跑測試取得綠燈。
+   - *Refactor*: 整理 `parse_aggregate_definition` 與相關 helper，確保 `struct/union` 共用邏輯清晰。
+2. **`#pragma pack` 指令**
+   - *Red*: 寫入 `test_parse_struct_with_pragma_pack`，測試 `#pragma pack(push,1)` 與 `pop` 情境，驗證節點 `pack` 屬性。
+   - *Green*: 新增 `_handle_directives` 解析 `#pragma`，維護 pack 堆疊並套用到 AST；讓測試通過。
+   - *Refactor*: 將指令解析邏輯抽成獨立函式或類別，並補強錯誤處理與邊界案例。
+3. **強化 `_split_member_lines`**
+   - *Red*: 新增 `test_split_member_lines_with_union`，包含多行 `union`、巢狀結構與註解，確認拆分結果僅一筆。
+   - *Green*: 以括號深度與行續處理重寫 `_split_member_lines`，確保所有測試通過。
+   - *Refactor*: 抽出子函式處理註解與續行符號，降低函式複雜度並補上邊界測試。
+
 ---
 
 本文件提出 v9 階段對 Parser 的增強計畫，目標是完整支援 `top level union`、`pragma pack` 及更健壯的 `_split_member_lines` 邏輯，以便在未來 GUI 與 CLI 操作中正確解析更多 C 語言結構。
