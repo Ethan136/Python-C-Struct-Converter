@@ -53,6 +53,23 @@
 - **逐步實作**：依序加入頂層 `union` 支援、`pragma pack` 處理與 `_split_member_lines` 改寫，使測試逐一轉為通過。
 - **重構與覆蓋**：重構程式碼並維持測試覆蓋率，必要時調整既有案例避免重複。
 
+## TDD 開發步驟
+1. **頂層 `union` 支援**
+   - 建立 `test_parse_top_level_union`，輸入僅含 `union` 的檔案，預期建立 `UnionNode` 根節點。
+   - 實作 `parse_aggregate_definition` 或相關判斷邏輯，讓解析器能處理 `union` 並維持 `struct` 原有流程。
+   - 重新執行測試，確認其他既有案例仍通過。
+2. **`#pragma pack` 指令支援**
+   - 撰寫 `test_parse_struct_with_pragma_pack`，包含 `#pragma pack(push,1)` 與對應 `pop`。
+   - 擴充 `_handle_directives` 解析並保存對齊資訊，於 AST 節點套用 pack 值。
+   - 測試驗證對齊欄位是否與預期一致。
+3. **強化 `_split_member_lines`**
+   - 新增 `test_split_member_lines_with_union`，測試多行 `union`、註解與位元欄位混合情境。
+   - 以括號深度追蹤拆分，確保巢狀聚合型別在 `};` 前都視為同一成員。
+   - 處理行內註解與續行符號 `\`，避免誤切。
+4. **整合與回歸**
+   - 全面執行 `run_tests.py`，確認所有新舊測試皆通過。
+   - 觀察覆蓋率，必要時補齊缺漏測試或重構程式碼。
+
 ---
 
 本文件提出 v9 階段對 Parser 的增強計畫，目標是完整支援 `top level union`、`pragma pack` 及更健壯的 `_split_member_lines` 邏輯，以便在未來 GUI 與 CLI 操作中正確解析更多 C 語言結構。
