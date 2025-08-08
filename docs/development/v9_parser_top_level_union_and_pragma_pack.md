@@ -84,6 +84,39 @@
    - *Green*: 以括號深度與行續處理重寫 `_split_member_lines`，確保所有測試通過。
    - *Refactor*: 抽出子函式處理註解與續行符號，降低函式複雜度並補上邊界測試。
 
+## 測試案例細節與範例
+- `test_parse_top_level_union`
+  - **輸入**：
+    ```c
+    union U {
+        int a;
+        float b;
+    };
+    ```
+  - **預期**：解析器建立 `UnionNode` 作為根節點，並含有兩個成員。
+- `test_parse_struct_with_pragma_pack`
+  - **輸入**：
+    ```c
+    #pragma pack(push,1)
+    struct S {
+        char c;
+        int i;
+    };
+    #pragma pack(pop)
+    ```
+  - **預期**：`StructNode` 的 `pack` 屬性為 `1`，並在 `pop` 後恢復預設。
+- `test_split_member_lines_with_union`
+  - **輸入**：
+    ```c
+    struct S {
+        union {
+            int a;
+            int b;
+        } u;
+    };
+    ```
+  - **預期**：`_split_member_lines` 回傳的列表中，該 `union` 區塊僅佔一個元素，確保後續成員解析不被拆分。
+
 ---
 
 本文件提出 v9 階段對 Parser 的增強計畫，目標是完整支援 `top level union`、`pragma pack` 及更健壯的 `_split_member_lines` 邏輯，以便在未來 GUI 與 CLI 操作中正確解析更多 C 語言結構。
