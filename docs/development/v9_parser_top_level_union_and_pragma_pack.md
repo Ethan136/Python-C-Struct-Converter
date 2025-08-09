@@ -136,6 +136,20 @@
 - 未來若需支援其他前處理指令，`_handle_directives` 應保留擴充點或以類別方式實作。
 - `_split_member_lines` 改寫後應評估效能影響，特別是大型檔案或深度巢狀結構。
 
+## 開發時程與里程碑
+- **週 1：頂層 `union`**
+  - 撰寫 `test_parse_top_level_union`，確立解析結果型別與成員數量。
+  - 完成 `parse_aggregate_definition` 的實作並重跑測試。
+- **週 2：`#pragma pack` 指令**
+  - 建立 `test_parse_struct_with_pragma_pack` 驗證對齊堆疊。
+  - 引入 `_handle_directives` 與 pack 邏輯，測試轉綠後重構。
+- **週 3：強化 `_split_member_lines`**
+  - 新增 `test_split_member_lines_with_union`，涵蓋多行與註解情境。
+  - 以括號深度改寫拆分函式，確保各種巢狀型別皆能正確處理。
+- **週 4：整合與回歸**
+  - 全面執行 `run_tests.py`，檢驗三項功能在既有案例下皆無回歸。
+  - 依測試結果調整文件並準備提交 PR。
+
 ---
 
 本文件提出 v9 階段對 Parser 的增強計畫，目標是完整支援 `top level union`、`pragma pack` 及更健壯的 `_split_member_lines` 邏輯，以便在未來 GUI 與 CLI 操作中正確解析更多 C 語言結構。
