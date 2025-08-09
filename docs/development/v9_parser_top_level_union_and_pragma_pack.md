@@ -117,6 +117,25 @@
     ```
   - **預期**：`_split_member_lines` 回傳的列表中，該 `union` 區塊僅佔一個元素，確保後續成員解析不被拆分。
 
+## 迭代提交建議
+- **第一階段：頂層 `union` 支援**
+  - Commit 1：新增失敗測試 `test_parse_top_level_union`。
+  - Commit 2：實作 `parse_aggregate_definition` 以建立 `UnionNode` 根節點。
+  - Commit 3：重構共用流程並確保既有測試皆通過。
+- **第二階段：`#pragma pack`**
+  - Commit 4：新增 `test_parse_struct_with_pragma_pack` 及對齊驗證。
+  - Commit 5：導入 `_handle_directives` 並維護 pack 堆疊。
+  - Commit 6：整理指令解析函式並補強錯誤處理。
+- **第三階段：強化 `_split_member_lines`**
+  - Commit 7：新增 `test_split_member_lines_with_union` 與註解/續行案例。
+  - Commit 8：以括號深度改寫拆分邏輯並讓測試轉綠。
+  - Commit 9：重構子函式降低複雜度，清理重複程式碼。
+
+## 其他考量
+- `#pragma pack` 僅影響其後聚合型別，需確認巢狀 `struct/union` 的 pack 繼承與還原邏輯。
+- 未來若需支援其他前處理指令，`_handle_directives` 應保留擴充點或以類別方式實作。
+- `_split_member_lines` 改寫後應評估效能影響，特別是大型檔案或深度巢狀結構。
+
 ---
 
 本文件提出 v9 階段對 Parser 的增強計畫，目標是完整支援 `top level union`、`pragma pack` 及更健壯的 `_split_member_lines` 邏輯，以便在未來 GUI 與 CLI 操作中正確解析更多 C 語言結構。
