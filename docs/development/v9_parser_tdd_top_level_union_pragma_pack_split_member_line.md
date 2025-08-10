@@ -45,6 +45,17 @@
   - **輸入**：巢狀 `union` 與註解混雜的 `struct`。
   - **預期**：`_split_member_lines` 回傳的列表將整個 `union` 視為單一元素。
 
+## 進一步測試情境
+- `test_parse_top_level_union_with_anonymous_member`
+  - **輸入**：含匿名 `union` 成員與一般欄位混合的頂層宣告。
+  - **預期**：匿名 `union` 被視為單一節點，其成員正確掛載在根節點下。
+- `test_parse_struct_with_nested_pragma_pack`
+  - **輸入**：外層 `#pragma pack(push,1)`，內層再 `push,4` 後 `pop` 的範例。
+  - **預期**：對齊值依堆疊正確套用與還原，結構大小計算符合預期。
+- `test_split_member_lines_with_bitfields_and_comments`
+  - **輸入**：`struct` 內含位元欄位與行內註解的 `union`。
+  - **預期**：拆分後 `union` 區塊與其位元欄位皆維持完整，註解不影響解析。
+
 ## TDD 迭代建議
 1. Commit 1：新增 `test_parse_top_level_union_returns_ast`（Red）。
 2. Commit 2：實作 `parse_aggregate_definition` 支援 `union`（Green）。
