@@ -73,6 +73,22 @@
 - **週 3**：改寫 `_split_member_lines` 並補齊測試。
 - **週 4**：回歸測試與文件整理，準備提交。
 
+## 任務拆解與提交策略
+- **Commit 1**: 新增 `examples/top_level_union.h`，撰寫失敗測試 `test_parse_top_level_union_returns_ast`。
+- **Commit 2**: 改寫 `parse_struct_definition` 為 `parse_aggregate_definition`，支援 `union` 根節點。
+- **Commit 3**: 重構入口與 `ASTNodeFactory`，確保共用邏輯。
+- **Commit 4**: 加入失敗測試 `test_parse_struct_with_pragma_pack_applies_alignment` 及範例檔。
+- **Commit 5**: 實作 `_handle_directives` 解析 `#pragma pack` 與堆疊。
+- **Commit 6**: 重構指令解析程式並補上例外處理。
+- **Commit 7**: 建立失敗測試 `test_split_member_lines_handles_nested_union`。
+- **Commit 8**: 以括號深度重寫 `_split_member_lines`，使測試通過。
+- **Commit 9**: 文件與範例更新，整理程式碼。
+
+## 潛在風險與對策
+- **指令堆疊失衡**：若 `push`/`pop` 不成對，於 `_handle_directives` 發出警告並恢復預設對齊。
+- **行續與註解處理錯誤**：先以正則移除註解並處理續行符號，避免 `_split_member_lines` 誤判。
+- **效能退化**：針對大型檔案加入基準測試，確保改寫後解析時間仍可接受。
+
 ---
 
 本文件提供 v9 階段針對頂層 `union`、`#pragma pack` 與 `_split_member_lines` 的 TDD 開發規劃，供後續實作與驗證參考。
