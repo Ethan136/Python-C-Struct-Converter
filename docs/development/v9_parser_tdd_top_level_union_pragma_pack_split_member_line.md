@@ -73,6 +73,16 @@
 - **週 3**：改寫 `_split_member_lines` 並補齊測試。
 - **週 4**：回歸測試與文件整理，準備提交。
 
+## 測試腳本更新細節
+- `run_tests.py` 需能自動載入新增的 `test_parser` 測試。
+- 在 CI 與開發流程中執行 `python run_tests.py -t test_parser` 作為基本驗證。
+- 若於 `examples/` 新增示例檔案，記得於 `tests` 引用以避免遺漏。
+
+## 其他考量
+- `#pragma pack` 僅影響其後宣告，測試需涵蓋巢狀 `push/pop` 情境。
+- `_split_member_lines` 改寫後應評估效能，避免大型檔案解析延遲。
+- 頂層 `union` 與 `struct` 解析流程應共用實作以降低維護成本。
+
 ---
 
 本文件提供 v9 階段針對頂層 `union`、`#pragma pack` 與 `_split_member_lines` 的 TDD 開發規劃，供後續實作與驗證參考。
