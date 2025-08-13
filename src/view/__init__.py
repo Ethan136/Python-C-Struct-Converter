@@ -3,7 +3,7 @@
 
 from src.view.struct_view import StructView
 
-# Backwards compatibility: StructViewV7 maps to StructView
-StructViewV7 = StructView
+# Backwards compatibility: StructViewV7 maps to wrapper class
+from .struct_view_v7 import StructViewV7
 
 __all__ = ['StructView', 'StructViewV7']
