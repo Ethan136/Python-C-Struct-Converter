@@ -124,6 +124,8 @@ class StructView(tk.Tk):
         self._debug_auto_refresh_id = None
         self._debug_auto_refresh_enabled = None
         self._debug_auto_refresh_interval = None
+        # 新增：儲存載入檔案的 total_size，供單位切換時使用
+        self.current_file_total_size = 0
         self._create_tab_control()
         # Treeview 事件綁定
         if hasattr(self, "member_tree"):
@@ -713,11 +715,15 @@ class StructView(tk.Tk):
                 self.show_struct_debug(result['struct_content'])
                 self.enable_parse_button()
                 self.clear_results()
+                # 記錄 total_size 供後續切換單位時使用
+                self.current_file_total_size = result['total_size']
                 self.rebuild_hex_grid(result['total_size'], 1)
             else:
                 self.show_error('載入檔案錯誤', result['message'])
                 self.disable_parse_button()
                 self.clear_results()
+                # 清除記錄的 total_size
+                self.current_file_total_size = 0
                 self.rebuild_hex_grid(0, 1)
 
     def _on_parse_file(self):
@@ -824,7 +830,16 @@ class StructView(tk.Tk):
             result = self.presenter.on_unit_size_change()
             unit_size = result.get("unit_size")
             if unit_size is not None and hasattr(self, "rebuild_hex_grid"):
-                self.rebuild_hex_grid(self.model.total_size if hasattr(self, "model") and hasattr(self.model, "total_size") else 0, unit_size)
+                # 優先使用 presenter.model 的 total_size，其次使用本地記錄的值
+                try:
+                    total_size = (
+                        self.presenter.model.total_size
+                        if self.presenter and hasattr(self.presenter, "model") and hasattr(self.presenter.model, "total_size")
+                        else self.current_file_total_size
+                    )
+                except Exception:
+                    total_size = self.current_file_total_size
+                self.rebuild_hex_grid(total_size or 0, unit_size)
 
     def _on_endianness_change(self):
         if self.presenter:
