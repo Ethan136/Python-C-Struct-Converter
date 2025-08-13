@@ -29,7 +29,7 @@ class V7StructParser:
             content = self._clean_content(content)
 
             # 解析聚合型別名稱與種類
-            agg_match = re.match(r'(struct|union)\s+(\w+)\s*\{', content)
+            agg_match = re.match(r'(struct|union)\s+(?:__attribute__\s*\(\(.*?\)\)\s*)*(\w+)\s*\{', content, flags=re.DOTALL)
             if not agg_match:
                 return None
 
@@ -71,7 +71,7 @@ class V7StructParser:
         """
         try:
             # 尋找第一個聚合型別的起始位置
-            agg = re.search(r'(struct|union)\s+\w+\s*\{', content, flags=re.MULTILINE)
+            agg = re.search(r'(struct|union)\s+(?:__attribute__\s*\(\(.*?\)\)\s*)*\w+\s*\{', content, flags=re.MULTILINE | re.DOTALL)
             if not agg:
                 return content, None
 
@@ -89,6 +89,8 @@ class V7StructParser:
                 elif m.group(3):  # pop
                     if pack_stack:
                         pack_stack.pop()
+                    else:
+                        logger.warning("Unmatched '#pragma pack(pop)' encountered before any push")
 
             current_pack = pack_stack[-1] if pack_stack else None
 
