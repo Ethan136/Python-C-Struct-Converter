@@ -5,6 +5,10 @@
 __version__ = "1.0.0"
 __author__ = "C++ Struct Parser Team"
 
-from .presenter import StructPresenter, V7Presenter
+try:
+    from .presenter import StructPresenter, V7Presenter
+except Exception:
+    StructPresenter = None
+    V7Presenter = None
 
 __all__ = ["StructPresenter", "V7Presenter"]

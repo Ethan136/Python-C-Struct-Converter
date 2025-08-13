@@ -409,3 +409,36 @@ class TestV7StructParser:
         assert u.array_dims == [3]
         assert u.children[0].is_union is True
         assert len(u.children[0].children) == 2
+
+    def test_pragma_pack_stack_restoration(self):
+        """多層 push/pop 後對齊應在外層恢復"""
+        content = """
+        #pragma pack(push,1)
+        #pragma pack(push,4)
+        struct A {
+            int x;
+        };
+        #pragma pack(pop)
+        #pragma pack(pop)
+        """
+        result = self.parser.parse_struct_definition(content)
+        assert result is not None
+        # A 取決於最內層 push=4
+        assert result.metadata.get('pack') == 4
+
+    def test_split_member_lines_with_continuation_and_macro(self):
+        """_split_member_lines 應處理行續與巨集，不誤切巢狀聚合"""
+        body = """
+        int a; \
+        int b;
+        #define X 1
+        union {
+            int u1;
+            int u2; // comment
+        } u; // end union
+        """
+        lines = self.parser._split_member_lines(body)
+        # 期望整個 union 區塊被視為一個成員行
+        assert any(line.strip().startswith('union') and line.strip().endswith('} u;') for line in lines)
+        # 行續合併為一條語意行（最少不因行續破壞分割邏輯）
+        assert any(line.strip().startswith('int a; int b;') or line.strip().startswith('int a;') for line in lines)

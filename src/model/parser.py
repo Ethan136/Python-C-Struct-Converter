@@ -64,17 +64,51 @@ class V7StructParser:
         return self.parse_aggregate_definition(content)
 
     def _handle_directives(self, content: str) -> Tuple[str, Optional[int]]:
-        """解析並移除前置處理指令，目前僅支援簡單的 `#pragma pack`"""
-        pack_match = re.match(
-            r"\s*#pragma\s+pack\s*\(\s*push\s*,\s*(\d+)\s*\)\s*(.*?)\s*#pragma\s+pack\s*\(\s*pop\s*\)\s*",
-            content,
-            re.DOTALL,
-        )
-        if pack_match:
-            pack_value = int(pack_match.group(1))
-            content = pack_match.group(2)
-            return content, pack_value
-        return content, None
+        """解析並處理前置處理指令，支援多層 `#pragma pack(push/pop)`。
+
+        - 回傳修剪後僅含第一個頂層聚合型別（struct/union）的內容
+        - 回傳該聚合型別開始處的有效 pack 對齊值（若有）
+        """
+        try:
+            # 尋找第一個聚合型別的起始位置
+            agg = re.search(r'(struct|union)\s+\w+\s*\{', content, flags=re.MULTILINE)
+            if not agg:
+                return content, None
+
+            prefix = content[:agg.start()]
+
+            # 解析 prefix 內的 pragma pack push/pop，維護堆疊
+            pack_stack: List[int] = []
+            directive_pattern = re.compile(
+                r'#pragma\s+pack\s*\(\s*(?:(push)\s*,\s*(\d+)|(pop))\s*\)',
+                re.IGNORECASE,
+            )
+            for m in directive_pattern.finditer(prefix):
+                if m.group(1) and m.group(2):  # push, value
+                    pack_stack.append(int(m.group(2)))
+                elif m.group(3):  # pop
+                    if pack_stack:
+                        pack_stack.pop()
+
+            current_pack = pack_stack[-1] if pack_stack else None
+
+            # 僅取出第一個聚合型別區塊（含結尾分號）
+            brace_open_index = content.find('{', agg.end() - 1)
+            if brace_open_index == -1:
+                return content[agg.start():], current_pack
+            body_close_index = self._find_matching_brace(content, brace_open_index)
+            if body_close_index == -1:
+                return content[agg.start():], current_pack
+            semicolon_index = content.find(';', body_close_index)
+            if semicolon_index == -1:
+                trimmed = content[agg.start(): body_close_index + 1]
+            else:
+                trimmed = content[agg.start(): semicolon_index + 1]
+
+            return trimmed, current_pack
+        except Exception:
+            logger.exception("指令處理錯誤")
+            return content, None
 
     def _extract_array_dims(self, token: str):
         """回傳變數名稱及陣列維度列表"""
@@ -304,14 +338,12 @@ class V7StructParser:
         return basic_node
     
     def _clean_content(self, content: str) -> str:
-        """清理輸入內容"""
+        """清理輸入內容：移除註解，保留原始換行與空白以利後續行處理"""
         # 移除註解
         content = re.sub(r'//.*$', '', content, flags=re.MULTILINE)
         content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
         
-        # 移除多餘空白
-        content = re.sub(r'\s+', ' ', content)
-        
+        # 僅去除前後空白，不壓縮所有空白
         return content.strip()
     
     def _find_matching_brace(self, content: str, start: int) -> int:
@@ -326,13 +358,42 @@ class V7StructParser:
                     return i
         return -1
     
+    def _strip_comments(self, text: str) -> str:
+        """移除單行與多行註解"""
+        text = re.sub(r'//.*$', '', text, flags=re.MULTILINE)
+        text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+        return text
+
+    def _strip_preprocessor_directives(self, text: str) -> str:
+        """移除以 # 開頭的前處理器指令行（例如 #define、#pragma）"""
+        lines: List[str] = []
+        for line in text.splitlines():
+            if re.match(r'^\s*#', line):
+                continue
+            lines.append(line)
+        return "\n".join(lines)
+
+    def _handle_line_continuation(self, text: str) -> str:
+        """合併行末反斜線續行（\\\n）為單行"""
+        return re.sub(r'\\\r?\n', '', text)
+    
     def _split_member_lines(self, body: str) -> List[str]:
-        """語意切分 struct/union 成員，正確處理匿名 bitfield"""
+        """語意切分 struct/union 成員，正確處理匿名 bitfield 與巢狀聚合。
+
+        - 會先移除註解與前處理指令行
+        - 會合併行末反斜線續行
+        - 僅在 brace 深度回到 0 且遇到 ';' 時才切分
+        - 針對位元欄位被換行成兩段（如上一行結尾缺少名稱、下一行以 `: N;` 開頭）合併回上一行
+        """
         import re
-        lines = []
+        preprocessed = self._strip_comments(body)
+        preprocessed = self._strip_preprocessor_directives(preprocessed)
+        preprocessed = self._handle_line_continuation(preprocessed)
+
+        lines: List[str] = []
         current_line = ""
         brace_count = 0
-        for char in body:
+        for char in preprocessed:
             if char == '{':
                 brace_count += 1
             elif char == '}':
@@ -346,13 +407,11 @@ class V7StructParser:
         if current_line.strip():
             lines.append(current_line.strip())
         # 合併只有 ': ... ;' 的片段到上一行，去除上一行分號並 strip
-        merged_lines = []
+        merged_lines: List[str] = []
         for line in lines:
-            if re.match(r'^:\s*\d+\s*;$', line) and merged_lines:
+            if re.match(r'^:\s*\d+\s*;\s*$', line) and merged_lines:
                 merged_lines[-1] = re.sub(r';\s*$', '', merged_lines[-1]) + line
                 merged_lines[-1] = merged_lines[-1].strip()
             else:
                 merged_lines.append(line)
-        # Debug output removed or guarded for production use
-        # print("[DEBUG] merged_lines:", merged_lines)
         return merged_lines
