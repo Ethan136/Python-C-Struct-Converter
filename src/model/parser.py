@@ -6,7 +6,7 @@ v7 解析器實作
 
 import logging
 import re
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from .ast_node import ASTNode, ASTNodeFactory
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,9 @@ class V7StructParser:
     def parse_aggregate_definition(self, content: str) -> Optional[ASTNode]:
         """解析頂層的 struct 或 union 定義"""
         try:
+            # 處理預處理指令
+            content, pack = self._handle_directives(content)
+
             # 清理輸入內容
             content = self._clean_content(content)
 
@@ -35,6 +38,9 @@ class V7StructParser:
                 root_node = self.node_factory.create_struct_node(agg_name)
             else:
                 root_node = self.node_factory.create_union_node(agg_name)
+
+            if pack is not None:
+                root_node.metadata['pack'] = pack
 
             # 解析聚合內容
             body_start = content.find('{') + 1
@@ -56,6 +62,19 @@ class V7StructParser:
     # 舊介面，保留相容性
     def parse_struct_definition(self, content: str) -> Optional[ASTNode]:
         return self.parse_aggregate_definition(content)
+
+    def _handle_directives(self, content: str) -> Tuple[str, Optional[int]]:
+        """解析並移除前置處理指令，目前僅支援簡單的 `#pragma pack`"""
+        pack_match = re.match(
+            r"\s*#pragma\s+pack\s*\(\s*push\s*,\s*(\d+)\s*\)\s*(.*?)\s*#pragma\s+pack\s*\(\s*pop\s*\)\s*",
+            content,
+            re.DOTALL,
+        )
+        if pack_match:
+            pack_value = int(pack_match.group(1))
+            content = pack_match.group(2)
+            return content, pack_value
+        return content, None
 
     def _extract_array_dims(self, token: str):
         """回傳變數名稱及陣列維度列表"""
@@ -336,4 +355,4 @@ class V7StructParser:
                 merged_lines.append(line)
         # Debug output removed or guarded for production use
         # print("[DEBUG] merged_lines:", merged_lines)
-        return merged_lines 
+        return merged_lines
