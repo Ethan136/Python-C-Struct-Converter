@@ -14,41 +14,48 @@ logger = logging.getLogger(__name__)
 
 class V7StructParser:
     """v7 優化的結構解析器"""
-    
+
     def __init__(self):
         self.node_factory = ASTNodeFactory()
         self.current_id = 0
-    
-    def parse_struct_definition(self, content: str) -> Optional[ASTNode]:
-        """解析結構定義"""
+
+    def parse_aggregate_definition(self, content: str) -> Optional[ASTNode]:
+        """解析頂層的 struct 或 union 定義"""
         try:
             # 清理輸入內容
             content = self._clean_content(content)
-            
-            # 解析結構名稱
-            struct_match = re.match(r'struct\s+(\w+)\s*\{', content)
-            if not struct_match:
+
+            # 解析聚合型別名稱與種類
+            agg_match = re.match(r'(struct|union)\s+(\w+)\s*\{', content)
+            if not agg_match:
                 return None
-            
-            struct_name = struct_match.group(1)
-            root_node = self.node_factory.create_struct_node(struct_name)
-            
-            # 解析結構體內容
+
+            agg_type, agg_name = agg_match.groups()
+            if agg_type == 'struct':
+                root_node = self.node_factory.create_struct_node(agg_name)
+            else:
+                root_node = self.node_factory.create_union_node(agg_name)
+
+            # 解析聚合內容
             body_start = content.find('{') + 1
             body_end = self._find_matching_brace(content, body_start - 1)
             if body_end == -1:
                 return None
-            
-            struct_body = content[body_start:body_end]
-            
+
+            agg_body = content[body_start:body_end]
+
             # 解析成員
-            self._parse_members(struct_body, root_node)
-            
+            self._parse_members(agg_body, root_node)
+
             return root_node
-            
-        except Exception as e:
+
+        except Exception:
             logger.exception("解析錯誤")
             return None
+
+    # 舊介面，保留相容性
+    def parse_struct_definition(self, content: str) -> Optional[ASTNode]:
+        return self.parse_aggregate_definition(content)
 
     def _extract_array_dims(self, token: str):
         """回傳變數名稱及陣列維度列表"""

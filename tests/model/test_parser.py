@@ -183,6 +183,27 @@ class TestV7StructParser:
         assert union.children[0].type == "int"
         assert union.children[1].name == "y"
         assert union.children[1].type == "char"
+
+    def test_parse_top_level_union_returns_ast(self):
+        """頂層 union 也應回傳 AST"""
+        content = """
+        union U {
+            int a;
+            float b;
+        };
+        """
+
+        result = self.parser.parse_struct_definition(content)
+
+        assert result is not None
+        assert result.name == "U"
+        assert result.type == "union"
+        assert result.is_union is True
+        assert len(result.children) == 2
+        assert result.children[0].name == "a"
+        assert result.children[0].type == "int"
+        assert result.children[1].name == "b"
+        assert result.children[1].type == "float"
     
     def test_parse_bitfield_member(self):
         """測試位元欄位成員解析"""
