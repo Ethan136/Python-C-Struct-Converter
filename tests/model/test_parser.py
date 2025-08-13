@@ -472,3 +472,30 @@ class TestV7StructParser:
         assert result.name == "S"
         # 確認有警告訊息
         assert any("Unmatched '#pragma pack(pop)'" in r.message for r in caplog.records)
+
+    def test_parse_v9_integration_example_union_first_with_pack_metadata(self):
+        """解析 examples/v9_parser_integration_example.h，應取得頂層 union 並保留 pack 值"""
+        from pathlib import Path
+        header = Path(__file__).resolve().parents[2] / 'examples' / 'v9_parser_integration_example.h'
+        content = header.read_text(encoding='utf-8')
+        result = self.parser.parse_struct_definition(content)
+        assert result is not None
+        # 第一個聚合是 union U，且 pack(push,1) 在其前面
+        assert result.is_union is True
+        assert result.name == 'U'
+        assert result.metadata.get('pack') == 1
+        # union 內含成員 a 與 inner 結構
+        assert any(c.name == 'a' and c.type == 'int' for c in result.children)
+        assert any(c.name == 'inner' and c.is_struct for c in result.children)
+
+    def test_parse_v9_release_example_nested_pack_and_continuation(self):
+        """解析 examples/v9_parser_release_example.h，確認 pack 堆疊與行續處理不會中斷解析"""
+        from pathlib import Path
+        header = Path(__file__).resolve().parents[2] / 'examples' / 'v9_parser_release_example.h'
+        content = header.read_text(encoding='utf-8')
+        # 目前 parser 只回傳第一個聚合，應為 struct P1，且 pack=1
+        result = self.parser.parse_struct_definition(content)
+        assert result is not None
+        assert result.is_struct is True
+        assert result.name == 'P1'
+        assert result.metadata.get('pack') == 1
