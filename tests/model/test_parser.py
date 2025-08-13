@@ -47,6 +47,23 @@ class TestV7StructParser:
         # 檢查第二個成員
         assert result.children[1].name == "y"
         assert result.children[1].type == "char"
+
+    def test_parse_struct_with_pragma_pack_applies_alignment(self):
+        """測試 `#pragma pack` 對齊設定"""
+        content = """
+        #pragma pack(push,1)
+        struct Packed {
+            char c;
+            int i;
+        };
+        #pragma pack(pop)
+        """
+
+        result = self.parser.parse_struct_definition(content)
+
+        assert result is not None
+        assert result.name == "Packed"
+        assert result.metadata.get("pack") == 1
     
     def test_parse_nested_struct(self):
         """測試巢狀結構解析"""
