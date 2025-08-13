@@ -1,6 +1,43 @@
-import tkinter as tk
-from tkinter import ttk
-from tkinter import filedialog, messagebox
+try:
+    import tkinter as tk
+    from tkinter import ttk
+    from tkinter import filedialog, messagebox
+except Exception:
+    class _DummyTkModule:
+        class Tk: ...
+        class Label: ...
+        class LabelFrame: ...
+        class Frame: ...
+        class Entry: ...
+        class Scrollbar: ...
+        END = "end"
+    tk = _DummyTkModule()
+
+    class _DummyTtkModule:
+        class Treeview: ...
+        class Notebook: ...
+        class Frame: ...
+        class Button: ...
+        class Entry: ...
+        class Label: ...
+        class Combobox: ...
+        class LabelFrame: ...
+    ttk = _DummyTtkModule()
+
+    class _DummyMessagebox:
+        def showwarning(*args, **kwargs):
+            return None
+        def showerror(*args, **kwargs):
+            return None
+        def askyesno(*args, **kwargs):
+            return False
+    messagebox = _DummyMessagebox()
+
+    class _DummyFileDialog:
+        def askopenfilename(*args, **kwargs):
+            return None
+    filedialog = _DummyFileDialog()
+
 from .virtual_tree import VirtualTreeview
 # from src.config import get_string
 from src.model.struct_model import StructModel
