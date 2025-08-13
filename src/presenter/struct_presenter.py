@@ -1,6 +1,14 @@
 import re
-import tkinter as tk
-from tkinter import filedialog
+try:
+    import tkinter as tk
+    from tkinter import filedialog
+except Exception:
+    class _DummyTk: ...
+    tk = _DummyTk()
+    class _DummyFileDialog:
+        def askopenfilename(*args, **kwargs):
+            return None
+    filedialog = _DummyFileDialog()
 from src.config import get_string
 from src.model.input_field_processor import InputFieldProcessor
 import time
