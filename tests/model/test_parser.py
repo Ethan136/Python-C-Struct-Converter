@@ -442,3 +442,33 @@ class TestV7StructParser:
         assert any(line.strip().startswith('union') and line.strip().endswith('} u;') for line in lines)
         # 行續合併為一條語意行（最少不因行續破壞分割邏輯）
         assert any(line.strip().startswith('int a; int b;') or line.strip().startswith('int a;') for line in lines)
+
+    def test_parse_top_level_union_with_attribute(self):
+        """頂層 union 帶 __attribute__ 仍可解析"""
+        content = """
+        union __attribute__((packed)) U2 {
+            int a;
+            float b;
+        };
+        """
+        result = self.parser.parse_struct_definition(content)
+        assert result is not None
+        assert result.name == "U2"
+        assert result.is_union is True
+        assert len(result.children) == 2
+
+    def test_unmatched_pragma_pack_pop_warns_but_parses(self, caplog):
+        """未配對 pop 應記錄警告但仍然能解析後續 struct"""
+        import logging
+        caplog.set_level(logging.WARNING)
+        content = """
+        #pragma pack(pop)
+        struct S {
+            int x;
+        };
+        """
+        result = self.parser.parse_struct_definition(content)
+        assert result is not None
+        assert result.name == "S"
+        # 確認有警告訊息
+        assert any("Unmatched '#pragma pack(pop)'" in r.message for r in caplog.records)
