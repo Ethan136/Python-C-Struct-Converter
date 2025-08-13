@@ -417,6 +417,14 @@ class TestStructView(unittest.TestCase):
         # 最後一個 entry 應該有 2 個字元 (1 byte = 2 hex chars)
         self.assertEqual(self.view.hex_entries[2][1], 2)
 
+    def test_hex_grid_last_entry_dynamic_length_unit8(self):
+        # struct 9 byte, unit_size 8
+        self.view.rebuild_hex_grid(9, 8)
+        # 應該有 2 個 entry (9/8 = 1.125 -> 2)
+        self.assertEqual(len(self.view.hex_entries), 2)
+        # 最後一個 entry 應該有 2 個字元 (1 byte = 2 hex chars)
+        self.assertEqual(self.view.hex_entries[1][1], 2)
+
     def test_show_manual_struct_validation_remaining_bits(self):
         # Case 1: 剛好填滿
         self.view.size_var.set(1)  # 8 bits

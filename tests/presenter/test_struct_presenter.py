@@ -1023,6 +1023,17 @@ class TestStructPresenter(unittest.TestCase):
         self.presenter.on_expand("n2")
         self.assertEqual(self.presenter.context["user_settings"], {"theme": "light"})
 
+    def test_on_unit_size_change_returns_unit_when_model_loaded(self):
+        self.model.total_size = 16
+        self.view.get_selected_unit_size.return_value = 4
+        result = self.presenter.on_unit_size_change()
+        self.assertEqual(result["unit_size"], 4)
+
+    def test_on_unit_size_change_returns_none_when_no_struct_loaded(self):
+        self.model.total_size = 0
+        result = self.presenter.on_unit_size_change()
+        self.assertIsNone(result["unit_size"])
+
 # 為每個測試方法加上 timeout 與 debug print
 for name, method in list(TestStructPresenter.__dict__.items()):
     if name.startswith('test_') and callable(method):

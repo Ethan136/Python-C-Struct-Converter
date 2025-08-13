@@ -32,28 +32,37 @@ class VirtualTreeview:
 
     def _render(self):
         selected = set(self.tree.selection())
-        self.tree.delete(*self.tree.get_children())
+        # 刪除非選取中的既有節點，保留選中的節點（即使不在當前頁面）
+        existing = set(self.tree.get_children())
+        for item in list(existing):
+            if item not in selected:
+                self.tree.delete(item)
+        # 插入當前頁面節點
         end = self.start + self.page_size
-        for n in self.nodes[self.start:end]:
-            values = (
-                n.get("name", ""),
-                n.get("value", ""),
-                n.get("hex_value", ""),
-                n.get("hex_raw", ""),
-            )
-            tags = tuple(n.get("tags", []))
-            self.tree.insert(
-                "",
-                "end",
-                iid=n["id"],
-                text=n.get("label", n.get("name", "")),
-                values=values,
-                tags=tags,
-            )
-        # restore selection if possible
-        keep = [i for i in selected if i in self.tree.get_children()]
-        if keep:
-            self.tree.selection_set(keep)
+        window = self.nodes[self.start:end]
+        for n in window:
+            iid = n["id"]
+            if iid not in set(self.tree.get_children()):
+                values = (
+                    n.get("name", ""),
+                    n.get("value", ""),
+                    n.get("hex_value", ""),
+                    n.get("hex_raw", ""),
+                )
+                tags = tuple(n.get("tags", []))
+                self.tree.insert(
+                    "",
+                    "end",
+                    iid=iid,
+                    text=n.get("label", n.get("name", "")),
+                    values=values,
+                    tags=tags,
+                )
+        # 重新設置選取狀態（若選取節點仍存在）
+        if selected:
+            keep = [i for i in selected if i in self.tree.get_children("")]
+            if keep:
+                self.tree.selection_set(keep)
 
     def get_global_index(self, iid):
         """Return the index of ``iid`` within the full node list."""

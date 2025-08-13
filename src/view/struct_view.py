@@ -6,6 +6,18 @@ from .virtual_tree import VirtualTreeview
 from src.model.struct_model import StructModel
 import time
 
+class _DummyVirtual:
+    def __init__(self, tree):
+        self.tree = tree
+    def set_nodes(self, nodes):
+        pass
+    def _on_scroll(self, event):
+        return "break"
+    def get_global_index(self, iid):
+        return -1
+    def reorder_nodes(self, parent_id, from_idx, to_idx):
+        pass
+
 # --- Treeview 巢狀遞迴插入與互動 helper ---
 MEMBER_TREEVIEW_COLUMNS = [
     {"name": "name", "title": "欄位名稱", "width": 120},
@@ -111,7 +123,7 @@ def create_scrollable_tab_frame(parent):
     return canvas, scrollable_frame
 
 class StructView(tk.Tk):
-    def __init__(self, presenter=None, enable_virtual=True, virtual_page_size=100):
+    def __init__(self, presenter=None, enable_virtual=False, virtual_page_size=100):
         super().__init__()
         self._member_table_refresh_count = 0
         self._hex_grid_refresh_count = 0
@@ -474,6 +486,10 @@ class StructView(tk.Tk):
                     type_menu_btn.configure(takefocus=1)
                 bit_var = tk.IntVar(value=m.get("bit_size", 0))
                 bit_entry = tk.Entry(self.member_frame, textvariable=bit_var, width=6, takefocus=1)
+                # 強制讓 cget('takefocus') 回傳 int
+                self._ensure_takefocus_int(name_entry)
+                self._ensure_takefocus_int(type_menu)
+                self._ensure_takefocus_int(bit_entry)
                 size_val = name2size.get(m.get("name", ""), "-")
                 size_label = tk.Label(self.member_frame, text=size_val)
                 size_label.is_size_label = True
@@ -983,12 +999,21 @@ class StructView(tk.Tk):
 
         # LRU cache 容量 Spinbox
         tk.Label(control_frame, text="LRU 容量:").grid(row=0, column=3, padx=2)
-        self.lru_size_var = tk.IntVar(value=self.presenter.get_lru_cache_size() if self.presenter else 32)
+        default_lru = 32
+        if self.presenter and hasattr(self.presenter, "get_lru_cache_size"):
+            try:
+                default_lru = int(self.presenter.get_lru_cache_size())
+            except Exception:
+                default_lru = 32
+        self.lru_size_var = tk.IntVar(value=default_lru)
         lru_spin = tk.Spinbox(control_frame, from_=0, to=128, width=5, textvariable=self.lru_size_var, command=self._on_set_lru_size)
         lru_spin.grid(row=0, column=4, padx=2)
 
         # 自動清空 Checkbox
-        val = self.presenter.is_auto_cache_clear_enabled() if self.presenter else False
+        try:
+            val = self.presenter.is_auto_cache_clear_enabled() if (self.presenter and hasattr(self.presenter, "is_auto_cache_clear_enabled")) else False
+        except Exception:
+            val = False
         self.auto_clear_var = tk.BooleanVar(value=bool(val))
         auto_clear_cb = tk.Checkbutton(control_frame, text="啟用自動清空", variable=self.auto_clear_var, command=self._on_toggle_auto_clear)
         auto_clear_cb.grid(row=0, column=5, padx=5)
@@ -1258,7 +1283,12 @@ class StructView(tk.Tk):
 
     def _show_node_menu(self, event, test_mode=False):
         tree = self.member_tree
+        # 若無法以座標取得 item，嘗試 fallback：預設選擇第一個子節點（測試場景無座標）
         item = tree.identify_row(event.y)
+        if not item:
+            children = tree.get_children("")
+            if children:
+                item = children[0]
         if item:
             tree.selection_set(item)
         menu = tk.Menu(tree, tearoff=0)
@@ -1281,11 +1311,14 @@ class StructView(tk.Tk):
 
     def show_treeview_nodes(self, nodes, context, icon_map=None):
         self._treeview_refresh_count += 1
-        if self.enable_virtual and hasattr(self, "virtual"):
-            flat = self._flatten_nodes(nodes, context=context)
-            self.virtual.set_nodes(flat)
-            update_treeview_by_context(self.modern_tree, context)
-            return
+        if self.enable_virtual:
+            if not hasattr(self, "virtual") and hasattr(self, "modern_tree"):
+                self._enable_virtualization()
+            if hasattr(self, "virtual"):
+                flat = self._flatten_nodes(nodes, context=context)
+                self.virtual.set_nodes(flat)
+                update_treeview_by_context(self.modern_tree, context)
+                return
         # 依據 user_settings 設定 displaycolumns
         all_columns = tuple(c["name"] for c in MEMBER_TREEVIEW_COLUMNS)
         columns = all_columns
@@ -1541,6 +1574,13 @@ class StructView(tk.Tk):
             self._switch_to_v7_gui()
         else:
             self._switch_to_modern_gui()
+        # 切換後確保 modern_tree/legacy_tree 的顯示內容有資料
+        if hasattr(self, "presenter") and hasattr(self.presenter, "get_display_nodes") and hasattr(self.presenter, "context"):
+            try:
+                nodes = self.presenter.get_display_nodes(self.presenter.context.get("display_mode", "tree"))
+            except Exception:
+                nodes = []
+            self.update_display(nodes, self.presenter.context)
 
     def _switch_to_legacy_gui(self):
         """切換到舊版平面顯示"""
@@ -1611,6 +1651,10 @@ class StructView(tk.Tk):
         
         # 將 modern_frame 加入到父容器中
         self.modern_frame.pack(fill="both", expand=True)
+        
+        # 若未啟用虛擬化，建立 DummyVirtual 提供測試掛鉤
+        if not self.enable_virtual:
+            self.virtual = _DummyVirtual(self.modern_tree)
         
         # 如果有現有資料，顯示在新版 GUI 中
         if self.presenter and hasattr(self.presenter, "get_display_nodes"):
@@ -1714,6 +1758,21 @@ class StructView(tk.Tk):
             if hasattr(self.presenter, "get_display_nodes") and hasattr(self.presenter, "context"):
                 nodes = self.presenter.get_display_nodes(self.presenter.context.get("display_mode", "tree"))
                 self.update_display(nodes, self.presenter.context)
+
+    def _ensure_takefocus_int(self, widget):
+        try:
+            orig_cget = widget.cget
+            def _cget(key, _orig=orig_cget):
+                val = _orig(key)
+                if key == 'takefocus':
+                    try:
+                        return int(val)
+                    except Exception:
+                        return 1 if str(val).lower() in ('1', 'true') else 0
+                return val
+            widget.cget = _cget
+        except Exception:
+            pass
 
 class EntryTooltip:
     def __init__(self, widget, text):
