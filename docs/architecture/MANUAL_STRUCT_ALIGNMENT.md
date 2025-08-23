@@ -1,46 +1,29 @@
-# Manual Struct Alignment Behavior
+# Manual Struct Alignment & Validation (Up-to-date)
 
-This document explains the alignment and padding behavior of manually defined structs (MyStruct) in the C++ Struct Memory Parser.
+This document explains how manually defined structs (MyStruct) are aligned, padded, validated, and exported.
 
 ## Overview
 
-Manual struct definition now fully supports C++ standard alignment and padding rules. When you define a struct manually through the GUI, the system automatically:
+Manual struct uses explicit C/C++ types with optional `bit_size` for bitfields. The system automatically:
 
-1. **Infers C++ types** from byte/bit size specifications
-2. **Applies C++ alignment rules** to all members
-3. **Inserts padding** between members as needed
-4. **Aligns the final struct size** to the largest member's alignment
+1. **Applies C++ alignment rules** to all members
+2. **Inserts padding** between members as needed
+3. **Aligns the final struct size** to the largest effective alignment
+4. **Validates configuration** and provides real-time feedback in the GUI
 
-This ensures that manually defined structs produce the same memory layout as C++ compilers.
+## Member specification
 
-## Type Inference Rules
-
-### Byte Size to C++ Type Mapping
-
-| Byte Size | Inferred C++ Type | Alignment | Notes |
-|-----------|-------------------|-----------|-------|
-| 1 | `char` | 1 | 8-bit character |
-| 2 | `short` | 2 | 16-bit integer |
-| 4 | `int` | 4 | 32-bit integer |
-| 8 | `long long` | 8 | 64-bit integer |
-| >8 | `unsigned char[]` | 1 | Array of bytes |
-
-### Bit Size Handling
-
-- **Bit size > 0**: Automatically inferred as `unsigned int` bitfield
-- **Bit size = 0**: Uses byte size for type inference
-- **Multiple bitfields**: Packed into the same storage unit when possible
+- 指定 `type` 與 `name`，如為位元欄位再加上 `bit_size`。
+- 支援型別：`char/signed char/unsigned char/bool/short/unsigned short/int/unsigned int/long/unsigned long/long long/unsigned long long/float/double/pointer`。
+- 位元欄位僅支援 `int/unsigned int/char/unsigned char`；名稱可省略（匿名 bitfield）。
 
 ## Alignment and Padding Rules
 
-### C++ Standard Alignment Rules
+### C++ alignment rules
 
-The system follows standard C++ alignment rules:
-
-1. **Member Alignment**: Each member is aligned to its type's alignment requirement
-2. **Struct Alignment**: The entire struct is aligned to the largest member's alignment
-3. **Padding Insertion**: Padding bytes are inserted between members to satisfy alignment
-4. **Final Padding**: The struct size is padded to be a multiple of the struct's alignment
+1. **Member alignment**: Each member aligns to its type alignment (with optional `pack_alignment` upper-bound when provided programmatically).
+2. **Struct alignment**: Struct size is rounded up to the maximum effective alignment of its members.
+3. **Padding**: Automatic padding between members; an explicit `(final padding)` may appear at the end.
 
 ### Alignment Values (64-bit System)
 
@@ -79,7 +62,7 @@ Offset: 0  1  2  3  4  5  6  7
         [a][pad][pad][pad][  b  ][  b  ][  b  ][  b  ]
 ```
 
-### Example 2: Bitfield Packing
+### Example 2: Bitfield packing
 
 **Manual Input:**
 ```
@@ -104,7 +87,7 @@ struct MyStruct {
 Storage Unit (4 bytes): [flags1:3][flags2:5][flags3:8][unused:16]
 ```
 
-### Example 3: Mixed Types with Alignment
+### Example 3: Mixed types with alignment
 
 **Manual Input:**
 ```
@@ -134,55 +117,39 @@ Offset:  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
         [status][pad][pad][pad][   flags   ][   flags   ][   flags   ][   flags   ][count][count][pad][pad][   id   ][   id   ][   id   ][   id   ]
 ```
 
-## Implementation Details
+## Implementation details
 
 ### Type Conversion Process
 
-1. **Input Processing**: GUI collects member information (name, byte_size, bit_size)
-2. **Type Inference**: `_convert_to_cpp_members()` converts to C++ types
-3. **Layout Calculation**: `calculate_layout()` applies C++ alignment rules
-4. **Validation**: `validate_manual_struct()` ensures consistency
+1. **Input**: GUI collects member info (`name`, `type`, `bit_size`, total_size)
+2. **Normalization**: `_convert_to_cpp_members()` validates/sanitizes entries
+3. **Layout**: `calculate_layout()` applies alignment/padding rules, adds final padding
+4. **Validation**: `validate_manual_struct()` checks types, names, sizes, layout ≤ total_size
 
 ### Key Functions
 
 #### `_convert_to_cpp_members(members)`
-Converts manual member definitions to C++ type specifications:
-
-```python
-def infer_type(byte_size, bit_size):
-    if bit_size > 0:
-        return {"type": "unsigned int", "name": "", "is_bitfield": True, "bit_size": bit_size}
-    if byte_size == 1:
-        return {"type": "char", "name": ""}
-    elif byte_size == 2:
-        return {"type": "short", "name": ""}
-    # ... etc
-```
+Normalizes manual definitions to the internal format and drops unsupported entries.
 
 #### `calculate_manual_layout(members, total_size)`
-Produces C++-standard layout:
-
-```python
-def calculate_manual_layout(self, members, total_size):
-    expanded_members = self._convert_to_cpp_members(members)
-    layout, total, align = calculate_layout(expanded_members)
-    return layout
-```
+Calls `calculate_layout()` and returns a list of dicts converted from `LayoutItem`.
 
 ## Validation Rules
 
-### Size Validation
-- **Layout Size ≤ Total Size**: The calculated layout size must not exceed the specified total size
-- **Member Validation**: All members must have valid byte/bit sizes
-- **Name Uniqueness**: Member names must be unique within the struct
+### Size & rule validation
+- **Layout size ≤ total size**: Computed layout must not exceed the specified struct size
+- **Type/bit rules**: Types must be supported; bitfields must use supported types and non-negative `bit_size`
+- **Name uniqueness**: Member names must be unique (non-empty names only)
 
-### Error Messages
-- `"Layout 總長度 (X bytes) 超過指定 struct 大小 (Y bytes)"`: When C++ alignment requires more space than specified
-- `"member 'name' byte_size 需為 0 或正整數"`: Invalid byte size
-- `"member 'name' bit_size 需為 0 或正整數"`: Invalid bit size
-- `"成員名稱 'name' 重複"`: Duplicate member names
+### Error messages
+- `Layout 總長度 (X bytes) 超過指定 struct 大小 (Y bytes)`
+- `member 'name' 必須指定型別`
+- `member 'name' 不支援的型別: T`
+- `member 'name' bitfield 只支援 int/unsigned int/char/unsigned char`
+- `member 'name' bit_size 需為 0 或正整數`
+- `成員名稱 'name' 重複`
 
-## GUI Integration (2024/07 Update)
+## GUI integration
 
 - GUI 內「手動 struct 定義」tab 及「.H 檔載入」tab 的欄位顯示、hex grid 輸入、欄位驗證、Treeview 欄位等行為已完全一致，皆以共用方法（如 _build_hex_grid、_rebuild_manual_hex_grid、_populate_tree）實作。
 - 欄位驗證（如 hex 輸入長度、合法字元）於輸入時即時檢查，錯誤會即時顯示於 GUI。
@@ -190,7 +157,7 @@ def calculate_manual_layout(self, members, total_size):
 - bitfield、padding、offset 等資訊於 Treeview 內即時顯示，完全對齊 C++ 記憶體配置。
 - 所有欄位、padding、bitfield 的顯示與驗證邏輯皆有自動化測試驗證。
 
-## GUI Display Behavior (2024/07 Update)
+## GUI display behavior
 
 - The manual struct definition page **only displays the standard struct layout (ttk.Treeview) at the bottom**, showing all members, paddings, and offsets in real time, fully matching C++ standards.
 - The previous custom memory layout table has been removed.
@@ -204,7 +171,7 @@ def calculate_manual_layout(self, members, total_size):
 
 ## Testing
 
-### Alignment Tests
+### Alignment tests
 All alignment behavior is thoroughly tested:
 
 ```python
@@ -221,7 +188,7 @@ def test_manual_struct_alignment(self):
     self.assertEqual(layout[1]["offset"], 4)  # int at offset 4 (after padding)
 ```
 
-### Bitfield Tests
+### Bitfield tests
 Bitfield packing is verified:
 
 ```python
@@ -254,15 +221,15 @@ def test_manual_struct_bitfield_packing(self):
 - **Testable**: All behavior is thoroughly tested
 - **Extensible**: Framework ready for future enhancements
 
-## Future Enhancements
+## Future enhancements
 
-### Planned Features
-- **Custom Alignment**: Support for `#pragma pack` directives
-- **Extended Types**: Support for more C++ types (float, double, etc.)
-- **Nested Structs**: Support for struct members within structs
-- **Union Support**: Support for union members
+### Planned features
+- **Custom alignment**: Expose `pack_alignment` to UI/config
+- **Extended types**: More C types (if needed)
+- **Nested structs/arrays**: Already supported through AST path in parsing mode; manual editor remains flat member list
+- **Union support in manual mode**: Not yet exposed in GUI editor
 
-### Backward Compatibility
-- **Legacy Support**: Maintains compatibility with existing manual struct definitions
-- **Migration Path**: Clear upgrade path for existing users
-- **Documentation**: Comprehensive documentation for all changes 
+### Backward compatibility
+- Existing manual structs continue to work
+- Validation messages and Treeview columns remain stable
+- Behavior covered by automated tests

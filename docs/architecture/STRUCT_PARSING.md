@@ -1,106 +1,85 @@
-# C++ Struct Parsing Mechanism
+# C/C++ Struct Parsing & Layout (Up-to-date)
 
-This document explains how `struct_model.py` parses a C++ `struct` and computes its memory layout.
+This document describes how the current code parses C/C++ `struct`/`union`, computes memory layout, and parses hex data.
 
 ## Overview
-- The parser is implemented in `src/model/struct_model.py`.
-- Only `struct` definitions are supported; `union` parsing is not implemented.
-- **Supports bitfield members (e.g., `int a : 1;`), including bitfield packing and storage unit alignment.**
-- **Supports manual struct definition with byte/bit size validation and export functionality.**
-- **Implements comprehensive validation logic with TDD testing approach.**
+- Parsing is provided by `src/model/struct_parser.py` and orchestrated by `src/model/struct_model.py`.
+- Layout is computed by `src/model/layout.py` using `StructLayoutCalculator` and `UnionLayoutCalculator`.
+- **Supports struct and union, nested structs/unions, arrays, and bitfields (including anonymous bitfields).**
+- **Supports base types: char/signed char/unsigned char/bool/short/unsigned short/int/unsigned int/long/unsigned long/long long/unsigned long long/float/double/pointer.**
+- **Manual struct definitions use the same layout engine and validation.**
+- Follows TDD with extensive unit/integration tests.
 
-## Steps
-1. **Regex Extraction (Intermediate Representation)**
-   - `parse_struct_definition()` extracts member types and names (including bitfields) into a temporary list, preserving declaration order. Bitfields are represented as dicts with `is_bitfield` and `bit_size`.
+## Parsing → Layout pipeline
+1. **Parsing**
+   - Legacy (flat) parser: `parse_struct_definition()` uses regex to extract members into tuples/dicts. It recognizes nested declarations but does not materialize inner members in-place (nested items appear as `("struct", name)`/`("union", name)` placeholders). Bitfields are recognized.
+   - AST parser: `parse_struct_definition_ast()` / `parse_c_definition_ast()` produce `StructDef`/`UnionDef` and `MemberDef` objects with `array_dims` and `nested` trees. Supports nested struct/union, arrays, and anonymous bitfields.
 
-2. **Layout Calculation (Final Data Structure)**
-   - The intermediate list is processed by `calculate_layout()`, which computes the final memory layout.
-   - This final layout is stored as a **list of dictionaries**, where each dictionary represents a single member, including padding and bitfield info.
+2. **Layout Calculation**
+   - `calculate_layout(members, pack_alignment=None)` computes the memory layout.
+   - If `members` are AST objects (`MemberDef`), they are processed directly by a layout calculator; otherwise legacy dict/tuple members are normalized.
+   - The resulting layout is a list of `LayoutItem` entries (dataclass), convertible to dict for UI consumption.
 
-### Final Data Structure Details
+### LayoutItem schema
 
-Each struct member (including padding and bitfields) is stored as a dictionary. Example:
+`src/model/layout.py` defines the layout record shape via `LayoutItem`:
 ```python
-[
-    {
-        "name": "status",
-        "type": "char",
-        "size": 1,
-        "offset": 0
-    },
-    {
-        "name": "(padding)",
-        "type": "padding",
-        "size": 7,
-        "offset": 1
-    },
-    {
-        "name": "flags",
-        "type": "int",
-        "size": 4,
-        "offset": 8,
-        "is_bitfield": True,
-        "bit_offset": 0,
-        "bit_size": 3
-    }
-]
+@dataclass
+class LayoutItem:
+    name: Optional[str]
+    type: str
+    size: int
+    offset: int
+    is_bitfield: bool
+    bit_offset: int
+    bit_size: int
 ```
-- `is_bitfield` (bool): 是否為 bitfield 欄位
-- `bit_offset` (int): 在 storage unit 內的 bit offset
-- `bit_size` (int): bitfield 欄位寬度
+The model converts these to dicts for the view. Fields:
+- `name`: member name; may be `None` for anonymous bitfields; `"(padding)"`/`"(final padding)"` for padding.
+- `type`: C/C++ type or `"padding"`.
+- `size`/`offset`: byte size and byte offset.
+- `is_bitfield`/`bit_offset`/`bit_size`: bitfield metadata (bit offset within storage unit and field width).
 
-#### Bitfield Packing/Storage Unit 規則
-- 連續同型別 bitfield 會共用同一 storage unit（如 int 4 bytes 32 bits），依序分配 bit_offset。
-- 若 bitfield 超過 storage unit 大小，或型別不同，則開新 storage unit。
-- storage unit 會依 alignment 規則對齊。
-- 普通欄位與 bitfield 欄位可混用，順序與原始 struct 宣告一致。
+#### Bitfield packing rules
+- 連續且同型別的 bitfield 共用一個 storage unit（例如 `int` 4 bytes = 32 bits），依序分配 `bit_offset`。
+- 若超過 storage unit 容量或型別不同，開啟新的 storage unit（先依 alignment 對齊）。
+- 支援匿名 bitfield（`name = None`）。
+- 普通欄位與 bitfield 可混用，依宣告順序排列。
 
-#### Rationale for this Structure
+#### Arrays and nesting
+- 陣列：多維陣列展開時採 row-major 順序計算偏移，元素大小由基本型別或巢狀型別佈局決定。
+- 巢狀 `struct`/`union`：遞迴計算內部佈局與對齊，並在父結構中以整體對齊插入。
 
-- **Clarity and Readability**: Using dictionaries with keys like `"name"` and `"size"` makes the code self-documenting and easier to maintain than using tuple indices.
-- **Completeness**: The structure contains all necessary information for subsequent operations: `name` (for UI display), `type` (for type-specific logic), `size` (for slicing hex data), and `offset` (for locating the member in memory).
-- **Accurate Memory Representation**: Explicitly including `padding` as a distinct member type creates a precise map of the struct's memory layout, simplifying the parsing of raw hex data.
-- **Extensibility**: Adding new properties to a member in the future (e.g., `is_unsigned: True`) only requires adding a new key-value pair to the dictionary, ensuring backward compatibility.
+#### Alignment and padding
+- 成員依型別對齊；結構總大小補齊至最大對齊倍數（有 `(final padding)`）。
+- 可傳入 `pack_alignment` 參數限制有效對齊（模擬 `#pragma pack`）。若未指定則使用預設對齊。
 
-3. **Hex Data Parsing**
-   - `parse_hex_data()` uses the final layout structure (`self.layout`) to interpret raw hexadecimal input.
-   - It iterates through the list, using each member's `offset` and `size` to slice the byte string correctly.
-   - The bytes for each member are then converted to a value using the user-specified endianness.
+#### Why this structure
+- **Clarity**: `LayoutItem` explicitly captures required fields for display and data slicing.
+- **Accuracy**: Padding entries model true memory layout.
+- **Extensible**: New attributes can be added without breaking consumers.
 
-## Manual Struct Definition System
+3. **Hex data parsing**
+   - `StructModel.parse_hex_data()` uses `self.layout` to interpret hex input.
+   - Input hex is left-padded with zeros to `total_size * 2` via `zfill` to match the memory size.
+   - For bitfields, it reads the storage unit, then applies `(value >> bit_offset) & ((1 << bit_size) - 1)`.
+   - For non-bitfields, `int.from_bytes(..., endian)` is used; `bool` is rendered as `True/False`.
 
-### Overview
-The system supports manual struct definition through GUI interface, allowing users to create structs without external header files.
+## Manual struct definition (GUI)
 
-> **Note:** Manual struct mode now fully supports C++-style alignment and padding. All members are automatically aligned and padded as in C++.
+Manual mode uses explicit C/C++ types and optional `bit_size` (for bitfields). There is no byte-size-to-type inference.
 
-### Manual Layout Calculation
-- **Function**: `calculate_manual_layout(members, total_size)`
-- **Purpose**: Calculate layout for manually defined structs using C++ standard alignment and padding rules
-- **Features**:
-  - Bit-level size tracking
-  - Automatic end padding insertion
-  - **Automatic alignment and padding for all members, matching C++ compiler behavior**
-  - Validation against total struct size
-  - Future-ready for pragma pack/align mechanisms
-- **Implementation Note**: `calculate_manual_layout` now directly calls `calculate_layout` after converting members to C++ types, so the resulting layout is identical to what a C++ compiler would produce.
+### Layout
+- `StructModel.calculate_manual_layout(members, total_size)` normalizes members, then calls `calculate_layout()` to apply C++ alignment and padding and to add final padding.
 
-### Manual Struct Validation
-- **Function**: `validate_manual_struct(members, total_size)`
-- **Purpose**: Comprehensive validation of manual struct definitions
-- **Validation Rules**:
-  - Member name uniqueness
-  - Positive integer size validation
-  - Total size consistency verification
-  - Real-time validation feedback
+### Validation
+- `StructModel.validate_manual_struct(members, total_size)` checks:
+  - Supported type names and bitfield type constraints (`int/unsigned int/char/unsigned char` for bitfields).
+  - Duplicate names.
+  - `total_size` is positive and not smaller than computed layout size.
 
-### Struct Export Functionality
-- **Function**: `export_manual_struct_to_h()`
-- **Purpose**: Export manually defined structs to C header files
-- **Features**:
-  - Generates valid C struct declarations
-  - Proper bitfield syntax formatting
-  - Type compatibility handling
+### Export
+- `StructModel.export_manual_struct_to_h(struct_name)` generates a valid C header snippet with bitfield syntax and a `// total size: N bytes` trailer.
 
 ## Validation Logic
 
@@ -129,8 +108,8 @@ The system supports manual struct definition through GUI interface, allowing use
   - Maintains backward compatibility
   - Supports both old and new data formats
 
-## Extending for `union`
-The current implementation does not recognize `union` definitions. To add support, a new parsing branch would need to detect `union` keywords and adjust layout logic so that all members share offset `0` and the total size equals the largest member.
+## Union support
+Unions are supported in the AST parser (`parse_union_definition_ast`) and layout (`UnionLayoutCalculator`) where all members have offset `0` and the union size equals the largest member rounded up to alignment. Nested unions and arrays of unions are supported via the AST path.
 
 ## Struct Member Value Storage in Memory
 
@@ -231,29 +210,24 @@ The struct parsing system follows TDD principles with comprehensive test coverag
 - **TDD Workflow**: Test-first development approach for all new features
 
 ## 支援限制
-- 不支援 union、enum、typedef、nested struct、#pragma pack、__attribute__ 等 C/C++ 語法。
-- 只支援單一 struct 解析，不支援多 struct 同時解析。
-- bitfield 只支援 int/unsigned int/char/unsigned char 等基本型別，不支援 pointer bitfield。
-- 手動 struct 定義目前不支援 padding，所有成員緊密排列。
-> **Note:** Manual struct mode does not support padding or advanced C features (e.g., union, nested struct, #pragma pack). All members are tightly packed.
+- 不支援 `enum`、`typedef`、`__attribute__` 等完整 C/C++ 語法。
+- 解析/佈局支援 struct 與 union；legacy 平面 parser 對巢狀內容僅作占位，完整巢狀需走 AST 路徑。
+- bitfield 僅支援 `int/unsigned int/char/unsigned char`；不支援 pointer bitfield。
+- `#pragma pack` 未提供 UI 控制；可透過 `pack_alignment` 參數啟用等效行為（預設不啟用）。
 
 ## Future Enhancements
 
 ### Planned Features
-- **Pragma Pack Support**: Bit-level padding foundation ready for alignment mechanisms
-- **Advanced Alignment**: Framework in place for custom alignment rules
-- **Extended Type Support**: Architecture supports additional C types
-- **Union Support**: Framework ready for union parsing implementation
+- **Pragma Pack Controls**: Expose `pack_alignment` to GUI/config.
+- **Extended Types**: Additional C types and attributes as needed.
 
 ### Maintenance Notes
 - **Backward Compatibility**: Maintained for existing functionality
 - **Documentation**: All changes documented and tested
 - **Code Quality**: TDD approach ensures robust implementation
 
-## GUI Integration & Real-time Behavior (2024/07 Update)
+## GUI Integration & real-time behavior
 
-- GUI 內「手動 struct 定義」tab 及「.H 檔載入」tab 的欄位顯示、hex grid 輸入、欄位驗證、Treeview 欄位等行為已完全一致，皆以共用方法（如 _build_hex_grid、_rebuild_manual_hex_grid、_populate_tree）實作。
-- 欄位驗證（如 hex 輸入長度、合法字元）於輸入時即時檢查，錯誤會即時顯示於 GUI。
-- Treeview 於欄位變更、tab 切換、hex grid 變更時自動更新，確保顯示內容與 C++ 標準一致。
-- bitfield、padding、offset 等資訊於 Treeview 內即時顯示，完全對齊 C++ 記憶體配置。
-- 所有欄位、padding、bitfield 的顯示與驗證邏輯皆有自動化測試驗證。
+- 「手動 struct 定義」與「載入 .H」兩個頁籤共用輸入驗證、hex grid、Treeview 顯示等邏輯。
+- 即時驗證 hex 輸入與錯誤提示；Treeview 即時反映 bitfield、padding、offset 等資訊。
+- View 可切換樹狀/平面顯示，並提供 Debug/Cache 視圖（詳見 MVP 文件）。

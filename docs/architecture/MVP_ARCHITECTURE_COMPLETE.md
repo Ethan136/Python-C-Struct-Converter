@@ -1,8 +1,8 @@
-# MVP Architecture - Complete Guide
+# MVP Architecture - Complete Guide (Up-to-date)
 
 ## Overview
 
-This document provides a comprehensive guide to the Model-View-Presenter (MVP) architecture used in the C++ Struct Memory Parser application. It covers the overall architecture design, component responsibilities, and detailed comparisons between different layers.
+This document explains the current MVP design for the C Struct Converter app, including AST-based parsing, layout calculators, real-time GUI behavior, and Presenter context management.
 
 ## Architecture Layers
 
@@ -15,33 +15,33 @@ This document provides a comprehensive guide to the Model-View-Presenter (MVP) a
 
 ## 1. Model Layer (`src/model/`)
 
-### 🎯 **Core Responsibilities**
+### 🎯 **Core responsibilities**
 - **Pure Business Logic**: Handles C++ struct parsing and memory layout calculations
 - **Data Processing**: Parses hexadecimal data and converts to structured data
 - **No UI Dependencies**: Completely independent of user interface
 
-### 📋 **Main Components**
+### 📋 **Main components**
 
 #### `struct_model.py`
-**Core struct parsing logic:**
-- `StructModel` class: Main data model
-- `parse_struct_definition()`: Parses C++ struct definitions
-- `calculate_layout()`: Computes memory layout with padding
-- `parse_hex_data()`: Interprets hexadecimal data
+Core orchestration over parsing/layout/hex parsing:
+- `StructModel`: holds `struct_name`, `members`, `layout`, `total_size`, `struct_align`, `member_values`
+- `load_struct_from_file()`: uses `parse_struct_definition()`; stores original content for AST regeneration
+- `calculate_layout(members, pack_alignment=None)`: legacy and AST-aware path
+- `parse_hex_data()`: left-pads hex and decodes fields (bitfield-aware)
+- Manual mode: `validate_manual_struct()`, `calculate_manual_layout()`, `export_manual_struct_to_h()`
 
-#### `STRUCT_PARSING.md`
-**Documentation for struct parsing mechanism:**
-- Explains how C++ struct definitions are parsed
-- Details memory layout calculation including padding
-- Covers hex data parsing and member extraction
+#### `struct_parser.py`
+Parsers and AST structures:
+- `MemberDef`, `StructDef`, `UnionDef`
+- `parse_struct_definition[_v2]()` (legacy/flat), `parse_struct_definition_ast()`, `parse_union_definition_ast()`, `parse_c_definition_ast()`
 
-### 🔧 **Technical Characteristics**
+### 🔧 **Technical characteristics**
 - **Pure Functional Design**: Most methods are pure functions
 - **Data-Driven**: Based on `TYPE_INFO` dictionary for type processing
 - **Error Handling**: Throws exceptions for upper layers to handle
 - **Stateless Operations**: No UI-related state preservation
 
-### 📋 **Key Functions**
+### 📋 **Key functions**
 
 #### 1. **Struct Definition Parsing**
 ```python
@@ -51,13 +51,12 @@ def parse_struct_definition(file_content):
     # Returns struct_name and members list
 ```
 
-#### 2. **Memory Layout Calculation**
+#### 2. **Memory layout calculation**
 ```python
-def calculate_layout(members):
-    """Calculates struct memory layout including alignment padding"""
-    # Calculates offset for each member
-    # Handles memory alignment and padding
-    # Returns layout, total_size, max_alignment
+def calculate_layout(members, pack_alignment=None):
+    # Accepts AST members (preferred) or legacy dict/tuple members
+    # Delegates to StructLayoutCalculator / UnionLayoutCalculator
+    # Returns (layout_items, total_size, effective_alignment)
 ```
 
 #### 3. **Hexadecimal Data Parsing**
@@ -71,20 +70,18 @@ def parse_hex_data(self, hex_data, byte_order):
 
 ## 2. View Layer (`src/view/`)
 
-### 🎯 **Core Responsibilities**
+### 🎯 **Core responsibilities**
 - **User Interface**: Displays the GUI and handles user interactions
 - **Passive Component**: Contains no business logic
 - **Event Delegation**: Delegates user events to Presenter
 
-### 📋 **Main Components**
+### 📋 **Main components**
 
 #### `struct_view.py`
-**Tkinter GUI implementation:**
-- `StructView` class: Main GUI window
-- File browser interface
-- Struct layout display
-- Hex data input grid
-- Results display area
+Tkinter GUI with two tabs (load .h / manual struct):
+- Shared hex grid builder, Treeview population, debug bytes display
+- Layout Treeview shows name/type/offset/size/bit_offset/bit_size/is_bitfield
+- Debug tab shows Presenter cache statistics and context debug info
 
 ### 🔧 **Technical Characteristics**
 - **UI-Focused**: Pure user interface logic
@@ -94,30 +91,30 @@ def parse_hex_data(self, hex_data, byte_order):
 
 ## 3. Presenter Layer (`src/presenter/`)
 
-### 🎯 **Core Responsibilities**
+### 🎯 **Core responsibilities**
 - **Application Logic**: Coordinates between Model and View
 - **User Event Handling**: Processes user operations from View
 - **Data Transformation**: Converts user input to Model-processable format
 - **Error Handling**: Processes and displays error messages to users
 
-### 📋 **Main Components**
+### 📋 **Main components**
 
 #### `struct_presenter.py`
-**Coordinates between Model and View:**
-- `StructPresenter` class: Main presenter
-- Handles user events from View
-- Processes data through Model
-- Updates View with results
+Coordinates Model and View, and manages context/state:
+- Hex chunk validation and processing via `InputFieldProcessor`
+- LRU cache for manual layout computation; auto-clear timer controls
+- Context with undo/redo history, UI options, and debug info; debounced updates to the View
+- Observer pattern: Presenter observes Model and updates the View on changes
 
-### 🔧 **Technical Characteristics**
+### 🔧 **Technical characteristics**
 - **Event-Driven**: Responds to View user events
 - **State Management**: Manages UI state and data flow
 - **Error Handling**: Catches exceptions and displays user-friendly error messages
 - **Data Transformation**: Converts data formats between Model and View
 
-### 📋 **Key Functions**
+### 📋 **Key functions**
 
-#### 1. **File Browsing and Loading**
+#### 1. **File browsing and loading**
 ```python
 def browse_file(self):
     """Handles file browsing and loading logic"""
@@ -127,7 +124,7 @@ def browse_file(self):
     # Rebuilds hex input grid
 ```
 
-#### 2. **Input Validation and Conversion**
+#### 2. **Input validation and conversion**
 ```python
 def parse_hex_data(self):
     """Handles hex input validation and conversion"""
@@ -137,7 +134,7 @@ def parse_hex_data(self):
     # Calls model.parse_hex_data()
 ```
 
-#### 3. **UI State Management**
+#### 3. **UI state management**
 ```python
 def on_unit_size_change(self, *args):
     """Handles unit size changes"""
@@ -147,12 +144,12 @@ def on_unit_size_change(self, *args):
 
 ## 4. Configuration Layer (`src/config/`)
 
-### 🎯 **Core Responsibilities**
+### 🎯 **Core responsibilities**
 - **Application Configuration**: Manages application settings
 - **Internationalization**: Handles localized UI strings
 - **String Management**: Provides centralized string handling
 
-### 📋 **Main Components**
+### 📋 **Main components**
 
 #### `ui_strings.py`
 **String management utilities:**
@@ -164,82 +161,82 @@ def on_unit_size_change(self, *args):
 - Contains all user-facing strings
 - Supports internationalization
 
-## Detailed Component Comparison
+## Detailed component comparison
 
 ### StructModel vs StructPresenter: Function Differences
 
 | Function Area | StructModel | StructPresenter |
 |---------------|-------------|-----------------|
-| **File Parsing** | ✅ Parses C++ struct syntax | ❌ Does not directly parse files |
-| **Memory Calculation** | ✅ Calculates layout, alignment, padding | ❌ Does not perform calculations |
-| **Data Parsing** | ✅ Parses hex to structured data | ❌ Does not directly parse data |
+| **File Parsing** | ✅ Parses C/C++ struct/union syntax | ❌ Does not directly parse files |
+| **Memory Calculation** | ✅ Calculates layout (struct/union), alignment, padding | ❌ Does not perform calculations |
+| **Data Parsing** | ✅ Parses hex to structured data (bitfield-aware) | ❌ Does not directly parse data |
 | **Input Validation** | ❌ Does not validate user input | ✅ Validates hex format, range |
 | **UI Interaction** | ❌ No UI dependencies | ✅ Handles file dialogs, error display |
-| **State Management** | ❌ No UI state | ✅ Manages button state, grid rebuilding |
+| **State Management** | ❌ No UI state | ✅ Manages context, grid rebuilding, debug | 
 | **Error Handling** | ❌ Throws exceptions | ✅ Shows user-friendly error messages |
 | **Data Transformation** | ❌ Pure data processing | ✅ Input format conversion, byte order handling |
 
-## Collaboration Flow
+## Collaboration flow
 
-### 1. **File Loading Flow**
+### 1. **File loading flow**
 ```
 View (Browse Button) 
     ↓
 Presenter.browse_file()
     ↓
-Model.load_struct_from_file()
+Model.load_struct_from_file() → (also preserves file content for AST on demand)
     ↓
 Presenter updates View display
 ```
 
-### 2. **Data Parsing Flow**
+### 2. **Data parsing flow**
 ```
 View (Parse Button)
     ↓
 Presenter.parse_hex_data()
     ↓ (Input validation and conversion)
-Model.parse_hex_data()
+Model.parse_hex_data() → Presenter updates View results and context
     ↓
 Presenter updates View results
 ```
 
-## Design Principles
+## Design principles
 
-### StructModel Principles
+### StructModel principles
 - **Single Responsibility**: Only responsible for struct parsing and data processing
 - **Purity**: No dependencies on external state or UI
 - **Testability**: Each method can be tested independently
 - **Reusability**: Can be reused with different UI frameworks
 
-### StructPresenter Principles
+### StructPresenter principles
 - **Coordinator**: Coordinates interactions between Model and View
 - **Transformer**: Converts data formats and processes user input
 - **Error Handler**: Provides user-friendly error handling
 - **State Manager**: Manages UI state and data flow
 
-### View Principles
+### View principles
 - **UI-Focused**: Only contains user interface logic
 - **Passive**: Does not contain business logic
 - **Event Delegation**: Delegates user events to Presenter
 - **Display Logic**: Handles all visual updates
 
-## Extensibility Considerations
+## Extensibility considerations
 
 ### Adding New Features
 
-#### Adding New Struct Type Support
+#### Adding new struct type support
 - **Model**: Extend `TYPE_INFO` dictionary, add parsing logic
 - **Presenter**: No changes needed (unless special UI handling required)
 
-#### Adding New Input Format Support
+#### Adding new input format support
 - **Model**: Add parsing methods
 - **Presenter**: Add input validation and conversion logic
 
-#### Adding New Output Format Support
+#### Adding new output format support
 - **Model**: Add formatting methods
 - **Presenter**: Add output processing logic
 
-## Benefits of MVP Architecture
+## Benefits of MVP
 
 1. **Maintainability**: Clear separation of concerns makes code easier to understand and modify
 2. **Testability**: Each layer can be unit tested independently
@@ -247,7 +244,7 @@ Presenter updates View results
 4. **Scalability**: Easy to add new features without affecting existing code
 5. **Team Development**: Different developers can work on different layers
 
-## File Organization
+## File organization
 
 ```
 src/
@@ -255,7 +252,9 @@ src/
 ├── main.py                  # Application entry point
 ├── model/                   # Model layer (business logic)
 │   ├── __init__.py
-│   └── struct_model.py      # Core business logic
+│   ├── layout.py            # Layout calculators and TYPE_INFO
+│   ├── struct_parser.py     # Parsers and AST dataclasses
+│   └── struct_model.py      # Orchestration and hex parsing
 ├── view/                    # View layer (UI)
 │   ├── __init__.py
 │   └── struct_view.py       # GUI implementation
