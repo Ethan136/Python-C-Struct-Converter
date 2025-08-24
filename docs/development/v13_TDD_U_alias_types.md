@@ -98,6 +98,18 @@ types:
 - 檔案：`tests/integration/test_struct_model_integration.py`
   - `test_integration_alias_types_from_header()`：從 `.h` 載入含 Ux 型別的範例，驗證 layout 與解析零值行為。
 
+## 已實作與當前狀態（追蹤）
+
+- 已新增（單元）：
+  - `test_alias_basic`：U8/U16/U32/U64 轉對應無號型別
+  - `test_alias_array_and_bitfield`：`U16 arr[3]`、`U32 f:3`、`U8 g:1`
+  - `test_unknown_alias_rejected`：`U128 x` 被拒
+  - `test_layout_with_aliases`：含 Ux 的佈局 smoke 檢查
+- 待補：
+  - AST/巢狀與 union 情境（含陣列與 bitfield）
+  - 自訂設定檔載入（`type_aliases.yaml`、`custom_types.yaml`）與覆蓋測試
+  - 從 `.h` 的整合測試案例
+
 ## 實作步驟（TDD 流程）
 
 1. 寫 `test_parse_member_line_aliases_basic()`（失敗）
