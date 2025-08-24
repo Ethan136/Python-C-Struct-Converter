@@ -214,6 +214,18 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         self.bitfield_bit_offset += mbit_size
 
     def _process_regular_member(self, member: Union[Tuple[str, str], dict]):
+        # 若此成員為 bitfield，改由 bitfield 流程處理（不可重置 bitfield 單元狀態）
+        is_bf = False
+        try:
+            # 支援 dataclass/dict/tuple 取得屬性
+            is_bf = self._get_attr(member, "is_bitfield", False)
+        except Exception:
+            is_bf = False
+        if is_bf:
+            self._process_bitfield_member(member)
+            return
+
+        # 遇到一般欄位時才重置 bitfield 單元狀態
         self.bitfield_unit_type = None
         self.bitfield_bit_offset = 0
 
