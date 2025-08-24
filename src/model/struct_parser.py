@@ -49,8 +49,25 @@ def _extract_array_dims(name_token):
 
 def _parse_bitfield_declaration(line: str):
     """Parse a bit field declaration and return a member dict or ``None``."""
-    # 支援匿名 bitfield: int : 2;
-    match = re.match(r"(.+?)\s+([\w\[\]]+)\s*:\s*(\d+)$", line)
+    # 先檢查匿名 bitfield（無名稱），避免把 'unsigned int   : 2' 誤判為具名形式
+    match_anon = re.match(r"^(?:unsigned\s+int|int|char|unsigned\s+char)\s*:\s*(\d+)$", line)
+    if match_anon:
+        bits = match_anon.group(1)
+        # 從開頭擷取型別字串（去除尾端 ': digits'）
+        type_str = line.split(':', 1)[0]
+        clean_type = " ".join(type_str.strip().split())
+        if "*" in clean_type:
+            return None
+        if clean_type not in TYPE_INFO:
+            return None
+        return {
+            "type": clean_type,
+            "name": None,
+            "is_bitfield": True,
+            "bit_size": int(bits),
+        }
+    # 具名 bitfield: 'unsigned int b1 : 3'
+    match = re.match(r"^(.+?)\s+([\w\[\]]+)\s*:\s*(\d+)$", line)
     if match:
         type_str, name_token, bits = match.groups()
         clean_type = " ".join(type_str.strip().split())
@@ -68,21 +85,6 @@ def _parse_bitfield_declaration(line: str):
         if dims:
             member["array_dims"] = dims
         return member
-    # 新增：支援匿名 bitfield（無名稱） int : 2;
-    match_anon = re.match(r"(.+?)\s*:\s*(\d+)$", line)
-    if match_anon:
-        type_str, bits = match_anon.groups()
-        clean_type = " ".join(type_str.strip().split())
-        if "*" in clean_type:
-            return None
-        if clean_type not in TYPE_INFO:
-            return None
-        return {
-            "type": clean_type,
-            "name": None,
-            "is_bitfield": True,
-            "bit_size": int(bits),
-        }
     return None
 
 
