@@ -1660,12 +1660,11 @@ class StructView(tk.Tk):
 
     def _create_modern_gui(self):
         """建立新版樹狀顯示 GUI"""
-        # 找到 member_frame 的父容器
+        # 直接放在原本的 Struct Member Value 區塊（LabelFrame）裡
         member_frame = self.member_tree.master
-        parent_frame = member_frame.master
         
-        # 建立新版框架
-        self.modern_frame = tk.Frame(parent_frame)
+        # 建立新版框架（置於 member_frame 以取代 legacy tree 的顯示空間）
+        self.modern_frame = tk.Frame(member_frame)
         
         # 統一引用 MEMBER_TREEVIEW_COLUMNS
         all_columns = MEMBER_TREEVIEW_COLUMNS
@@ -1686,7 +1685,7 @@ class StructView(tk.Tk):
         self.modern_tree.bind("<<TreeviewOpen>>", self._on_modern_tree_open)
         self.modern_tree.bind("<<TreeviewClose>>", self._on_modern_tree_close)
         
-        # 將 modern_frame 加入到父容器中
+        # 將 modern_frame 置於 Struct Member Value 區塊
         self.modern_frame.pack(fill="both", expand=True)
         
         # 若未啟用虛擬化，建立 DummyVirtual 提供測試掛鉤
