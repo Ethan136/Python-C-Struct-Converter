@@ -127,6 +127,15 @@ def parse_member_line(line):
     if member_match:
         type_str, name_token = member_match.groups()
         clean_type = " ".join(type_str.strip().split())
+        # 將自訂簡寫型別（U8/U16/U32/U64）映射為對應無號型別，便於後續處理
+        alias_map = {
+            "U8": "unsigned char",
+            "U16": "unsigned short",
+            "U32": "unsigned int",
+            "U64": "unsigned long long",
+        }
+        if clean_type in alias_map:
+            clean_type = alias_map[clean_type]
         name, dims = _extract_array_dims(name_token)
         if "*" in clean_type:
             return ("pointer", name)
