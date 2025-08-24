@@ -105,10 +105,10 @@ types:
   - `test_alias_array_and_bitfield`：`U16 arr[3]`、`U32 f:3`、`U8 g:1`
   - `test_unknown_alias_rejected`：`U128 x` 被拒
   - `test_layout_with_aliases`：含 Ux 的佈局 smoke 檢查
-- 待補：
-  - AST/巢狀與 union 情境（含陣列與 bitfield）
-  - 自訂設定檔載入（`type_aliases.yaml`、`custom_types.yaml`）與覆蓋測試
-  - 從 `.h` 的整合測試案例
+  - `test_type_registry`：YAML 載入別名與自訂型別（`type_aliases.yaml`、`custom_types.yaml`）
+  - `test_ast_nested_with_aliases`：AST/巢狀與 bitfield 情境（單元 smoke）
+- 已新增（整合）：
+  - `tests/integration/test_alias_integration.py`：從 `examples/alias_integration.h` 載入，含 Ux/巢狀 struct/union/bitfield 的 smoke 驗證
 
 ## 實作步驟（TDD 流程）
 
