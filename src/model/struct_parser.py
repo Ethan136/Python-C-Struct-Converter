@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Union
 from .layout import TYPE_INFO
+from .types import normalize_type
 
 
 @dataclass
@@ -50,12 +51,12 @@ def _extract_array_dims(name_token):
 def _parse_bitfield_declaration(line: str):
     """Parse a bit field declaration and return a member dict or ``None``."""
     # 先檢查匿名 bitfield（無名稱），避免把 'unsigned int   : 2' 誤判為具名形式
-    match_anon = re.match(r"^(?:unsigned\s+int|int|char|unsigned\s+char)\s*:\s*(\d+)$", line)
+    match_anon = re.match(r"^(?:unsigned\s+int|int|char|unsigned\s+char|U32|U8)\s*:\s*(\d+)$", line)
     if match_anon:
         bits = match_anon.group(1)
         # 從開頭擷取型別字串（去除尾端 ': digits'）
         type_str = line.split(':', 1)[0]
-        clean_type = " ".join(type_str.strip().split())
+        clean_type = normalize_type(" ".join(type_str.strip().split()))
         if "*" in clean_type:
             return None
         if clean_type not in TYPE_INFO:
@@ -70,7 +71,7 @@ def _parse_bitfield_declaration(line: str):
     match = re.match(r"^(.+?)\s+([\w\[\]]+)\s*:\s*(\d+)$", line)
     if match:
         type_str, name_token, bits = match.groups()
-        clean_type = " ".join(type_str.strip().split())
+        clean_type = normalize_type(" ".join(type_str.strip().split()))
         if "*" in clean_type:
             return None  # pointer bitfields not supported
         if clean_type not in TYPE_INFO:
@@ -126,16 +127,7 @@ def parse_member_line(line):
     member_match = re.match(r"(.+?)\s+([\w\[\]]+)$", line)
     if member_match:
         type_str, name_token = member_match.groups()
-        clean_type = " ".join(type_str.strip().split())
-        # 將自訂簡寫型別（U8/U16/U32/U64）映射為對應無號型別，便於後續處理
-        alias_map = {
-            "U8": "unsigned char",
-            "U16": "unsigned short",
-            "U32": "unsigned int",
-            "U64": "unsigned long long",
-        }
-        if clean_type in alias_map:
-            clean_type = alias_map[clean_type]
+        clean_type = normalize_type(" ".join(type_str.strip().split()))
         name, dims = _extract_array_dims(name_token)
         if "*" in clean_type:
             return ("pointer", name)
