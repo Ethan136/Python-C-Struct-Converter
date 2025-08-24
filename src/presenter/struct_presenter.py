@@ -58,6 +58,7 @@ class StructPresenter:
         self._debounce_lock = threading.Lock()
         self._debounce_interval = 0.1  # 100ms
         self._pending_context = None
+        self._after_id = None  # Tk after id for main-thread scheduling
         self._history_maxlen = 200
 
     def add_observer(self, observer):
@@ -74,9 +75,12 @@ class StructPresenter:
     def update(self, event_type, model, **kwargs):
         """Observer callback: 當 model 狀態變更時自動呼叫。"""
         if event_type == "file_struct_loaded":
-            # 只有 file_struct_loaded 才呼叫 get_display_nodes
-            if self.view and hasattr(self.view, "update_display"):
-                self.view.update_display(self.model.get_display_nodes("tree"), getattr(self, "context", {}))
+            # 使用主執行緒排程更新顯示，避免在背景執行緒觸碰 Tk 物件
+            try:
+                nodes = self.model.get_display_nodes("tree")
+            except Exception:
+                nodes = []
+            self._schedule_view_update(nodes, getattr(self, "context", {}))
         # 其他事件只做 cache 失效與 observer 通知
         if event_type in ("manual_struct_changed", "file_struct_loaded"):
             self.invalidate_cache()
@@ -426,26 +430,47 @@ class StructPresenter:
                 del api_trace[0:len(api_trace)-self._history_maxlen]
         from src.presenter.context_schema import validate_presenter_context
         validate_presenter_context(self.context)
-        # Debounce/throttle 推送
+        # Debounce/throttle 推送（改為 Tk after）
+        nodes = self.model.get_display_nodes(self.context["display_mode"]) if self.model and hasattr(self.model, "get_display_nodes") else None
+        ctx_copy = self.context.copy()
         if immediate or self._debounce_interval == 0:
-            if self.view and hasattr(self.view, "update_display"):
-                nodes = self.model.get_display_nodes(self.context["display_mode"]) if self.model and hasattr(self.model, "get_display_nodes") else None
-                self.view.update_display(nodes, self.context.copy())
+            self._schedule_view_update(nodes, ctx_copy)
             return
         with self._debounce_lock:
-            self._pending_context = (self.model.get_display_nodes(self.context["display_mode"]) if self.model and hasattr(self.model, "get_display_nodes") else None, self.context.copy())
-            if self._debounce_timer is None:
-                self._debounce_timer = threading.Timer(self._debounce_interval, self._debounce_push)
-                self._debounce_timer.daemon = True
-                self._debounce_timer.start()
+            self._pending_context = (nodes, ctx_copy)
+            # 若已有排程則取消，確保 single-flight
+            try:
+                if self.view and hasattr(self.view, "after_cancel") and self._after_id:
+                    self.view.after_cancel(self._after_id)
+            except Exception:
+                pass
+            delay_ms = int(self._debounce_interval * 1000)
+            if self.view and hasattr(self.view, "after"):
+                self._after_id = self.view.after(delay_ms, self._flush_pending_ui)
+            else:
+                # 無法使用 after（測試/Dummy），退回同步執行
+                self._flush_pending_ui()
 
-    def _debounce_push(self):
+    def _flush_pending_ui(self):
         with self._debounce_lock:
-            if self.view and hasattr(self.view, "update_display") and self._pending_context:
-                nodes, context = self._pending_context
-                self.view.update_display(nodes, context)
-            self._debounce_timer = None
+            pending = self._pending_context
             self._pending_context = None
+            self._after_id = None
+        if pending:
+            nodes, context = pending
+            self._schedule_view_update(nodes, context)
+
+    def _schedule_view_update(self, nodes, context):
+        """主執行緒排程更新 View。"""
+        if self.view and hasattr(self.view, "after"):
+            try:
+                self.view.after(0, lambda: self.view.update_display(nodes, context))
+                return
+            except Exception:
+                pass
+        # 後備：直接呼叫（測試環境或無 Tk）
+        if self.view and hasattr(self.view, "update_display"):
+            self.view.update_display(nodes, context)
 
     def event_handler(event_name=None):
         def decorator(func):
