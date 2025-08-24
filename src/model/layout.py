@@ -5,28 +5,8 @@ from typing import List, Tuple, Union, Optional
 from abc import ABC, abstractmethod
 
 
-# Based on a common 64-bit system (like GCC on x86-64)
-TYPE_INFO = {
-    "char":               {"size": 1, "align": 1},
-    "signed char":        {"size": 1, "align": 1},
-    "unsigned char":      {"size": 1, "align": 1},
-    "U8":                 {"size": 1, "align": 1},
-    "bool":               {"size": 1, "align": 1},
-    "short":              {"size": 2, "align": 2},
-    "unsigned short":     {"size": 2, "align": 2},
-    "U16":                {"size": 2, "align": 2},
-    "int":                {"size": 4, "align": 4},
-    "unsigned int":       {"size": 4, "align": 4},
-    "U32":                {"size": 4, "align": 4},
-    "long":               {"size": 8, "align": 8},
-    "unsigned long":      {"size": 8, "align": 8},
-    "long long":          {"size": 8, "align": 8},
-    "unsigned long long": {"size": 8, "align": 8},
-    "U64":                {"size": 8, "align": 8},
-    "float":              {"size": 4, "align": 4},
-    "double":             {"size": 8, "align": 8},
-    "pointer":            {"size": 8, "align": 8},  # Generic for all pointer types
-}
+from .types import get_type_info, merged_type_info
+TYPE_INFO = merged_type_info()
 
 
 @dataclass
@@ -118,6 +98,12 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         if mtype in TYPE_INFO:
             info = TYPE_INFO[mtype]
             return info["size"], info["align"]
+        # new: resolve via central registry when not found in merged snapshot
+        try:
+            info = get_type_info(mtype)
+            return info["size"], info["align"]
+        except Exception:
+            pass
         # 若是 struct/union 型別，遞迴計算 nested
         if nested is not None:
             nested_members = None
@@ -208,7 +194,7 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         mtype = self._get_attr(member, "type")
         mname = self._get_attr(member, "name")
         mbit_size = self._get_attr(member, "bit_size")
-        info = TYPE_INFO[mtype]
+        info = TYPE_INFO.get(mtype) or get_type_info(mtype)
         size, alignment = info["size"], info["align"]
 
         if self._needs_new_bitfield_unit(mtype, mbit_size):
