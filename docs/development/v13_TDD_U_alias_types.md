@@ -9,7 +9,7 @@
   - U16 → `unsigned short`
   - U32 → `unsigned int`
   - U64 → `unsigned long long`
-- 佈局層（layout）：`TYPE_INFO` 具有 U8/U16/U32/U64 的 size/align，佈局結果與對應無號型別一致。
+- 佈局層（layout）：以統一的型別查詢介面回傳 size/align，佈局結果與對應無號型別一致。
 - bitfield：`U32 x : 3;`、`U8 y : 1;` 等等行為需等同於 `unsigned int` / `unsigned char` 的 bitfield 規則（允許、packing 與 bit_offset 正確）。
 - AST/巢狀/陣列：在巢狀結構、union 以及陣列情境中皆能正確解析與計算。
 
@@ -27,6 +27,40 @@
 4. bitfield packing：連續 `U32` bitfield 的 `bit_offset` 正確累加，跨 storage unit 時開新單元並依 alignment 對齊；`U8` bitfield 以 1 byte 為 storage unit。
 5. End-to-end：從 `.h` 檔讀入使用 Ux 型別的範例，GUI 顯示的 Struct Layout 與解析出的值（在零值情況）皆合理且無例外。
 6. 負向案例：未知型別（如 `U128`）應被拒絕或略過，且不造成例外。
+
+## 設計調整（不先改碼，先規劃）
+
+為避免把自訂型別與別名直接塞進核心 `TYPE_INFO`，改以「基礎表 + 自訂表 + 別名表」三段式設計；所有區塊仍可沿用現有程式，但未來實作時將切換到下列界面。
+
+- BASE_TYPE_INFO：內建標準 C 型別 size/align（現行 `TYPE_INFO` 內容）
+- CUSTOM_TYPE_INFO：使用者或專案層新增/覆蓋的型別 size/align（來源於設定檔）
+- ALIAS_MAP：型別別名 → 標準型別（例如 `U32 -> unsigned int`）
+- normalize_type(t): 以 ALIAS_MAP 正規化型別字串
+- get_type_info(t):
+  1) `t' := normalize_type(t)`
+  2) 若 `t'` 在 CUSTOM_TYPE_INFO → 回傳之
+  3) 否則回傳 BASE_TYPE_INFO[`t'`]；查無則視為不支援
+
+設定檔（僅規劃，未實作）
+```yaml
+# config/type_aliases.yaml
+aliases:
+  U8:  unsigned char
+  U16: unsigned short
+  U32: unsigned int
+  U64: unsigned long long
+
+# config/custom_types.yaml
+types:
+  my_u24:
+    size: 3
+    align: 1
+```
+
+整合點（規劃）
+- Parser：在判斷 bitfield 與一般欄位前，先對 `type_str` 呼叫 `normalize_type`；
+- Layout：不直接讀表，改為 `get_type_info` 取得 size/align；
+- 讀取設定：啟動時載入 YAML（或 JSON），允許以環境變數覆蓋路徑。
 
 ## 測試矩陣與案例
 
@@ -67,11 +101,11 @@
 ## 實作步驟（TDD 流程）
 
 1. 寫 `test_parse_member_line_aliases_basic()`（失敗）
-2. 在 parser 增加 alias 對映與 `TYPE_INFO` 增列（最小變更），使之通過
+2. 在 parser 增加 alias 正規化（先以內建常數硬編，後續切到 ALIAS_MAP 載入），使之通過
 3. 寫 array 與 bitfield 相關測試（失敗）
 4. 確認 parser bitfield 分支能在 alias 正規化後仍走原規則（若需，調整順序）
 5. 寫 layout 尺寸/位移與 bitfield packing 測試（失敗）
-6. 擴充 `TYPE_INFO` 與佈局計算，使測試通過
+6. 佈局層改為透過 `get_type_info` 取得 size/align，使測試通過（先以內建常數模擬，後續切換到設定檔載入）
 7. 寫 AST/巢狀/整合測試（失敗）
 8. 驗證 AST 解析後的 members 會被正確傳入 `calculate_layout`（必要時調整）
 9. 收尾：負向案例、邊界條件、文件更新
@@ -80,7 +114,7 @@
 
 - 別名需在 bitfield 檢查前正規化：避免 `U32 f:3` 被誤判為不支援型別。
 - GUI 舊有快取或重繪邏輯干擾觀察：新增單元測試優先、GUI 僅作 smoke 驗證。
-- 型別對齊在不同平台差異：目前以 x86_64 常見值為準（同 `TYPE_INFO` 註解），若要擴充以 pragma/pack 另行追蹤。
+– 型別對齊在不同平台差異：目前以 x86_64 常見值為準（同 BASE_TYPE_INFO 註解），若要擴充以 pragma/pack 另行追蹤。
 
 ## 完成定義（Definition of Done）
 
