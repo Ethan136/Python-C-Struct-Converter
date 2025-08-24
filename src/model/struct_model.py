@@ -146,13 +146,30 @@ class StructModel:
     def load_struct_from_file(self, file_path):
         with open(file_path, 'r') as f:
             content = f.read()
-        self.struct_content = content  # 修正：同步設置 struct_content
-        struct_name, members = parse_struct_definition(content)
-        if not struct_name or not members:
-            raise ValueError("Could not find a valid struct definition in the file.")
-        self.struct_name = struct_name
-        self.members = self._convert_to_cpp_members(members)
-        self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
+        self.struct_content = content  # 同步保存原始內容供 AST/顯示使用
+
+        # 優先使用 AST 解析以支援巢狀 struct/union 與陣列
+        try:
+            from src.model.struct_parser import parse_c_definition_ast
+            definition = parse_c_definition_ast(content)
+        except Exception:
+            definition = None
+
+        if definition and hasattr(definition, 'name') and hasattr(definition, 'members'):
+            # AST 路徑：完整支援巢狀/union/array/bitfield
+            self.struct_name = definition.name
+            self.ast = definition
+            self.members = list(definition.members)
+            self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
+        else:
+            # 回退到 legacy 路徑（僅平面成員，巢狀僅佔位）
+            struct_name, members = parse_struct_definition(content)
+            if not struct_name or not members:
+                raise ValueError("Could not find a valid struct definition in the file.")
+            self.struct_name = struct_name
+            self.members = self._convert_to_cpp_members(members)
+            self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
+
         self._notify_observers("file_struct_loaded", file_path=file_path)
         return self.struct_name, self.layout, self.total_size, self.struct_align
 
