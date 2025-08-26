@@ -1,5 +1,24 @@
 ## v14 開發計畫：GUI 支援 32-bit / 64-bit 模式切換（Pointer 4/8 bytes）
 
+### 實作架構概覽
+1. **改哪些地方**
+   - `src/model/types.py`：新增 `set_pointer_mode/get_pointer_mode/reset_pointer_mode` 以允許指標大小於執行期切換。
+   - `src/presenter/struct_presenter.py`：在 context 增加 `arch_mode` 並實作 `on_pointer_mode_toggle()` 觸發切換與 cache 失效。
+   - `src/view/struct_view.py`：File 與 Manual 兩個 tab 加入「32-bit 模式」勾選框並綁定事件。
+   - `docs/`、`tests/`：補充對應文件與測試案例。
+2. **32-bit 開關如何影響內部機制**
+   - `set_pointer_mode(32)` 透過覆蓋 `CUSTOM_TYPE_INFO["pointer"]` 讓 `get_type_info()` 回傳 4-byte `size/align`，佈局計算自動套用。
+   - Presenter 呼叫切換後會清空 layout LRU cache 並重新推送 context。
+3. **開啟 32-bit 開關後預期影響**
+   - 任一包含 `pointer` 的結構其 offset/size 以 4-byte 對齊重新計算，總大小可能變小。
+   - GUI 重新渲染佈局表與解析結果，Hex grid 切分邏輯維持不變。
+   - 文件與測試需覆蓋兩種模式，確保行為一致。
+4. **改動順序（內 → 外）**
+   - 先實作 `types.py` 及模型層單元測試。
+   - 驗證佈局計算與相關測試資料。
+   - 加入 Presenter 邏輯。
+   - 最後整合 View 與更新文件/測試。
+
 ### 目標
 - 在 GUI 提供「32-bit 模式」勾選框（預設不勾選=64-bit），即時影響記憶體佈局與解析。
 - 主要差異點：`pointer` 型別在 32-bit 時為 4 bytes（align 4），在 64-bit 時為 8 bytes（align 8）。
@@ -98,6 +117,40 @@ def on_pointer_mode_toggle(self, enable_32bit: bool):
   - Presenter/View 行為測試：
     - 觸發 `on_pointer_mode_change()` 後，LRU cache 被清空、`update_display` 被呼叫、layout 重新計算。
   - 依據偏好，測試用 .h 檔放在 `tests/` 目錄下而非 `examples/`。
+
+### TDD 實作流程
+1. **模型層測試先行**
+   - 在 `tests/model/test_type_registry.py` 撰寫針對 `set_pointer_mode()` 的失敗測試，預期 32-bit 時 `pointer` 為 4 bytes、64-bit 為 8 bytes。
+   - 執行測試確認失敗後，實作 `set_pointer_mode/get_pointer_mode/reset_pointer_mode` 使測試轉綠。
+   - 測試範例：
+     ```python
+     def test_pointer_mode_switch():
+         set_pointer_mode(32)
+         info = get_type_info("pointer")
+         assert (info.size, info.align) == (4, 4)
+         reset_pointer_mode()
+     ```
+2. **佈局計算驗證**
+   - 撰寫包含 `pointer` 欄位的結構範例，先寫測試檔驗證在不同模式下佈局結果（offset/size/padding）。
+   - 實作或調整相關程式碼，再次跑測試確保佈局因模式切換而改變。
+   - 例如：
+     - `struct Sample { char c; void* p; };`
+     - 64-bit：`c` offset 0、`p` offset 8、總大小 16。
+     - 32-bit：`c` offset 0、`p` offset 4、總大小 8。
+3. **Presenter/View 行為**
+   - 為 `on_pointer_mode_change()` 與 View 勾選框撰寫行為測試，模擬使用者切換模式並期待 LRU cache 清空與畫面更新。
+   - 先看測試失敗，再補上 Presenter 與 View 的實作直到測試通過。
+   - 測試可使用 `MagicMock` 檢查：
+     ```python
+     presenter.invalidate_cache = MagicMock()
+     presenter.push_context = MagicMock()
+     presenter.on_pointer_mode_toggle(True)
+     presenter.invalidate_cache.assert_called_once()
+     presenter.push_context.assert_called_once()
+     ```
+4. **重構與迭代**
+   - 在所有測試綠燈的前提下進行程式碼重構，確保資料流清晰且 `reset_pointer_mode()` 能在測試後恢復狀態。
+   - 每次重構都重新執行測試，以維持行為一致。
 
 ### 相容性
 - 預設 64-bit，維持所有既有測試通過。
