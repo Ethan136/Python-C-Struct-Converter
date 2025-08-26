@@ -338,7 +338,8 @@ class UnionLayoutCalculator(BaseLayoutCalculator):
         super().__init__(pack_alignment=pack_alignment)
 
     def _get_type_size_and_align(self, mtype: str) -> Tuple[int, int]:
-        info = TYPE_INFO[mtype]
+        # Resolve via central registry to reflect runtime pointer mode overrides
+        info = get_type_info(mtype)
         return info["size"], info["align"]
 
     def calculate(self, members: List[Union[Tuple[str, str], dict]]):

@@ -1,3 +1,44 @@
+## Manual Struct Alignment Notes
+
+### Pointer size/alignment across modes
+
+- Default mode: 64-bit
+  - `pointer` size: 8 bytes; alignment: 8
+- 32-bit mode:
+  - `pointer` size: 4 bytes; alignment: 4
+
+### Example: struct with pointer
+
+```c
+struct Sample {
+    char c;
+    void* p;
+};
+```
+
+- 64-bit layout:
+  - `c`: offset 0, size 1
+  - padding: 7
+  - `p`: offset 8, size 8
+  - total: 16, align: 8
+
+- 32-bit layout:
+  - `c`: offset 0, size 1
+  - padding: 3
+  - `p`: offset 4, size 4
+  - total: 8, align: 4
+
+### Unions containing pointer
+
+- Union size equals the max(size of members) rounded to union alignment.
+- Under 64-bit: union containing `{char, pointer}` has size 8.
+- Under 32-bit: same union has size 4.
+
+### How to switch
+
+- Runtime API: `set_pointer_mode(32|64)`, `get_pointer_mode()`, `reset_pointer_mode()`
+- Optional environment variable on startup: set `STRUCT_POINTER_MODE=32` to apply 32-bit.
+
 # Manual Struct Alignment & Validation (Up-to-date)
 
 This document explains how manually defined structs (MyStruct) are aligned, padded, validated, and exported.
