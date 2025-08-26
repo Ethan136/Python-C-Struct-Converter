@@ -257,6 +257,9 @@ class StructView(tk.Tk):
         # 批次刪除按鈕
         self.batch_delete_btn = tk.Button(control_frame, text="批次刪除", command=self._on_batch_delete)
         self.batch_delete_btn.pack(side=tk.LEFT, padx=2)
+        # 32-bit 模式切換
+        self.file_pointer32_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(control_frame, text="32-bit 模式", variable=self.file_pointer32_var, command=lambda: self._on_pointer_mode_toggle(self.file_pointer32_var.get())).pack(side=tk.LEFT, padx=6)
         # 檔案選擇按鈕
         tk.Button(main_frame, text="選擇 .h 檔", command=self._on_browse_file).pack(anchor="w", pady=2)
         # 檔案路徑顯示
@@ -342,6 +345,9 @@ class StructView(tk.Tk):
         endian_options = ["Little Endian", "Big Endian"]
         self.manual_endian_menu = tk.OptionMenu(manual_control_frame, self.manual_endian_var, *endian_options, command=lambda _: self._on_manual_endianness_change())
         self.manual_endian_menu.pack(side=tk.LEFT)
+        # 32-bit 模式切換（manual）
+        self.manual_pointer32_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(manual_control_frame, text="32-bit 模式", variable=self.manual_pointer32_var, command=lambda: self._on_pointer_mode_toggle(self.manual_pointer32_var.get())).pack(side=tk.LEFT, padx=6)
 
         # hex grid 輸入區（與 file tab 一致，移到 member_frame 之後）
         self.manual_hex_entries = []
@@ -1809,6 +1815,13 @@ class StructView(tk.Tk):
             widget.cget = _cget
         except Exception:
             pass
+
+    def _on_pointer_mode_toggle(self, enable_32bit: bool):
+        if self.presenter and hasattr(self.presenter, 'on_pointer_mode_toggle'):
+            try:
+                self.presenter.on_pointer_mode_toggle(enable_32bit)
+            except Exception:
+                pass
 
 class EntryTooltip:
     def __init__(self, widget, text):

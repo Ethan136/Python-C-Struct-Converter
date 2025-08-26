@@ -95,10 +95,7 @@ class StructLayoutCalculator(BaseLayoutCalculator):
 
     def _get_type_size_and_align(self, mtype: str, nested=None) -> Tuple[int, int]:
         """Return (size, alignment) for a given C type or struct/union (AST)。"""
-        if mtype in TYPE_INFO:
-            info = TYPE_INFO[mtype]
-            return info["size"], info["align"]
-        # new: resolve via central registry when not found in merged snapshot
+        # Always resolve via central registry to reflect runtime overrides
         try:
             info = get_type_info(mtype)
             return info["size"], info["align"]
@@ -194,7 +191,7 @@ class StructLayoutCalculator(BaseLayoutCalculator):
         mtype = self._get_attr(member, "type")
         mname = self._get_attr(member, "name")
         mbit_size = self._get_attr(member, "bit_size")
-        info = TYPE_INFO.get(mtype) or get_type_info(mtype)
+        info = get_type_info(mtype)
         size, alignment = info["size"], info["align"]
 
         if self._needs_new_bitfield_unit(mtype, mbit_size):

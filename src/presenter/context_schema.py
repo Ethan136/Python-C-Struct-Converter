@@ -19,7 +19,8 @@ PRESENTER_CONTEXT_SCHEMA = {
         "last_update_time": {"type": "number"},
         "readonly": {"type": "boolean"},
         "pending_action": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-        "debug_info": {"type": "object"}
+        "debug_info": {"type": "object"},
+        "arch_mode": {"type": "string", "enum": ["x64", "x86"]}
     },
     "required": ["display_mode", "gui_version", "expanded_nodes", "selected_node", "error", "version", "extra", "loading", "history", "user_settings", "last_update_time", "readonly", "debug_info"],
     "additionalProperties": True

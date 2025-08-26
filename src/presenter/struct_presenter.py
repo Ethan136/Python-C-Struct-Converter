@@ -395,7 +395,8 @@ class StructPresenter:
             },
             "can_edit": True,
             "can_delete": True,
-            "user_role": "admin"
+            "user_role": "admin",
+            "arch_mode": "x64",
         }
 
     def reset_context(self):
@@ -450,6 +451,25 @@ class StructPresenter:
             else:
                 # 無法使用 after（測試/Dummy），退回同步執行
                 self._flush_pending_ui()
+
+    def on_pointer_mode_toggle(self, enable_32bit: bool):
+        """Toggle pointer mode between 64-bit and 32-bit.
+
+        When toggled, update context arch_mode, set pointer size via model.types,
+        invalidate layout cache, and push updated context to view.
+        """
+        try:
+            from src.model.types import set_pointer_mode
+        except Exception:
+            return
+        mode = "x86" if enable_32bit else "x64"
+        self.context["arch_mode"] = mode
+        bits = 32 if enable_32bit else 64
+        set_pointer_mode(bits)
+        self.invalidate_cache()
+        self.context["debug_info"]["last_event"] = "on_pointer_mode_toggle"
+        self.context["debug_info"]["last_event_args"] = {"enable_32bit": enable_32bit}
+        self.push_context()
 
     def _flush_pending_ui(self):
         with self._debounce_lock:

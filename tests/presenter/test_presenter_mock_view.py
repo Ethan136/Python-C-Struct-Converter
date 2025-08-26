@@ -65,5 +65,15 @@ class TestPresenterMockView(unittest.TestCase):
         self.assertTrue(self.view.update_display_called)
         self.assertEqual(self.view.last_context["error"], "Permission denied")
 
+    def test_on_pointer_mode_toggle_triggers_cache_and_push(self):
+        # Spy
+        from unittest.mock import MagicMock
+        self.presenter.invalidate_cache = MagicMock()
+        self.presenter.push_context = MagicMock()
+        self.presenter.on_pointer_mode_toggle(True)
+        self.presenter.invalidate_cache.assert_called_once()
+        self.presenter.push_context.assert_called_once()
+        self.assertEqual(self.presenter.context.get("arch_mode"), "x86")
+
 if __name__ == "__main__":
     unittest.main() 

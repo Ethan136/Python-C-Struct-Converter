@@ -158,28 +158,66 @@ def parse_member_line_v2(line: str) -> Optional[MemberDef]:
 def _extract_struct_body(file_content, keyword="struct"):
     """Return structure name and body substring.
 
-    The ``keyword`` argument allows reuse for future union support.
+    Chooses the last TOP-LEVEL occurrence of the given keyword. Nested struct/union
+    declarations inside other definitions are ignored for selection purposes.
     """
+    import re as _re
     pattern = rf"{keyword}\s+(\w+)\s*\{{"
-    match = re.search(pattern, file_content)
-    if not match:
+    # Preprocess to handle line comments for brace counting
+    text = file_content
+    # Compute brace depth at each position
+    last_top_level_match = None
+    for m in _re.finditer(pattern, text):
+        idx = m.start()
+        # Compute brace depth up to idx, ignoring // comments
+        depth = 0
+        in_line_comment = False
+        i = 0
+        while i < idx:
+            ch = text[i]
+            if in_line_comment:
+                if ch == '\n':
+                    in_line_comment = False
+                i += 1
+                continue
+            if ch == '/' and i + 1 < idx and text[i+1] == '/':
+                in_line_comment = True
+                i += 2
+                continue
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth = max(0, depth - 1)
+            i += 1
+        if depth == 0:
+            last_top_level_match = m
+    if not last_top_level_match:
         return None, None
-    struct_name = match.group(1)
-    start = match.end()
-    brace_count = 1
+    struct_name = last_top_level_match.group(1)
+    start = last_top_level_match.end()
+    # Now extract body from start until matching closing brace at depth returns to 0
+    depth = 1
     i = start
-    while i < len(file_content) and brace_count > 0:
-        char = file_content[i]
-        if char == '{':
-            brace_count += 1
-        elif char == '}':
-            brace_count -= 1
+    in_line_comment = False
+    while i < len(text) and depth > 0:
+        ch = text[i]
+        if in_line_comment:
+            if ch == '\n':
+                in_line_comment = False
+            i += 1
+            continue
+        if ch == '/' and i + 1 < len(text) and text[i+1] == '/':
+            in_line_comment = True
+            i += 2
+            continue
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
         i += 1
-
-    if brace_count != 0:
+    if depth != 0:
         return None, None
-
-    struct_body = file_content[start:i - 1]
+    struct_body = text[start:i - 1]
     return struct_name, struct_body
 
 
@@ -366,6 +404,22 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
         if semi == -1:
             break
         line = struct_body[pos:semi].strip()
+        # 支援引用已命名的 struct/union（無 inline braces），例如：struct N n; union U u1[2];
+        ref_match = re.match(r"^(struct|union)\s+(\w+)\s+(\w+(?:\[\d+\])*)$", line)
+        if ref_match:
+            kind, type_name, var_token = ref_match.groups()
+            var_name, dims = _extract_array_dims(var_token)
+            nested_def = (StructDef if kind == 'struct' else UnionDef)(name=type_name, members=[])
+            members.append(
+                MemberDef(
+                    type=kind,
+                    name=var_name,
+                    array_dims=dims,
+                    nested=nested_def,
+                )
+            )
+            pos = semi + 1
+            continue
         parsed = parse_member_line_v2(line)
         if parsed is not None:
             members.append(parsed)
