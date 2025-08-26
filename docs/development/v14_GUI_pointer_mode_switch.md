@@ -220,3 +220,22 @@ def on_pointer_mode_toggle(self, enable_32bit: bool):
 
 - 文案與 UI 形式微差
   - 設計文使用「位元模式下拉選單」，目前 UI 以單一「32-bit 模式」勾選框呈現；兩者功能等效。建議文件註記實作以勾選框為準（或同時接受兩種等效呈現），不影響驗收標準。
+
+#### 建議實作順序（針對本節）
+
+1. Union 佈局改用集中 registry
+   - 調整 `src/model/layout.py` 的 `UnionLayoutCalculator._get_type_size_and_align`，由 `TYPE_INFO` 改為 `get_type_info(mtype)`。
+   - 新增/調整單元測試：包含 `union { char c; void* p; }` 或 struct 中含 union 的案例，驗證 64-bit 與 32-bit 下 `pointer` 尺寸與對齊變化會反映在 union 佈局。
+2. View 勾選框與 context 同步
+   - 在 `src/view/struct_view.py` 的 `update_display(nodes, context, ...)` 結尾，依 `context.get("arch_mode") == "x86"` 同步 `file_pointer32_var` 與 `manual_pointer32_var`。
+   - 新增 Presenter/View 行為測試：模擬 `arch_mode` 改變後呼叫 `update_display`，兩個 `BooleanVar` 狀態正確更新。
+3. 啟動時環境變數（可選）
+   - 在 `src/model/types.py` 的初始化流程（`_bootstrap_from_config()` 之後）讀取 `STRUCT_POINTER_MODE`，如為 `"32"` 則呼叫 `set_pointer_mode(32)`。
+   - 新增測試：設定環境變數後載入模組或呼叫初始化鉤子，驗證 `get_type_info('pointer')` 為 4/4；測試結尾 `reset_pointer_mode()` 復原。
+4. 文件補強與連結
+   - 新增 `docs/architecture/MANUAL_STRUCT_ALIGNMENT.md`，說明 32/64-bit 下 `pointer` 的 size/align 與 offset/final padding 例子，並自本文件與相關 README 連回。
+5. 文面一致性註記
+   - 於本文件與 `src/view/README.md` 註明實作以「勾選框」呈現，與「下拉選單」表述功能等效；無需程式碼更動。
+6. 回歸測試與驗收
+   - 執行全測，確保既有測試綠燈；新增的 union、view 同步、（可選）環境變數測試皆通過。
+   - 依「驗收標準」再次檢查 GUI 勾選、佈局更新與 cache 失效是否符合預期。
