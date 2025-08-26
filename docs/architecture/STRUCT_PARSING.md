@@ -209,6 +209,18 @@ The struct parsing system follows TDD principles with comprehensive test coverag
 - **XML Configuration Tests**: Automated testing using XML configuration files
 - **TDD Workflow**: Test-first development approach for all new features
 
+## Pointer Size Modes (v14)
+
+- Runtime switching between 64-bit and 32-bit pointer modes is supported.
+- API:
+  - `set_pointer_mode(32|64)`: Overrides `pointer` type to size/align 4/4 or 8/8 via the central type registry.
+  - `get_pointer_mode()`, `reset_pointer_mode()` for querying and test cleanup.
+- Layout calculators always resolve size/align through the registry, so switching pointer mode immediately affects member offsets, sizes, and final padding where `pointer` is present.
+- GUI integration:
+  - Both File and Manual tabs include a “32-bit 模式” checkbox that triggers `presenter.on_pointer_mode_toggle(checked)`.
+  - Presenter updates `context['arch_mode']` to `"x86"`/`"x64"`, clears layout cache, and pushes the refreshed context to the view.
+- Default mode: 64-bit for backward compatibility.
+
 ## 支援限制
 - 不支援 `enum`、`typedef`、`__attribute__` 等完整 C/C++ 語法。
 - 解析/佈局支援 struct 與 union；legacy 平面 parser 對巢狀內容僅作占位，完整巢狀需走 AST 路徑。

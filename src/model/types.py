@@ -50,6 +50,31 @@ CUSTOM_TYPE_INFO: Dict[str, Dict[str, int]] = {}
 ALIAS_MAP: Dict[str, str] = dict(DEFAULT_ALIAS_MAP)
 
 
+# --- Pointer mode runtime switch (v14) ---------------------------------------
+POINTER_BITS: int = 64  # default runtime mode
+
+def set_pointer_mode(bits: int) -> None:
+    """Set pointer mode to 32 or 64 bits at runtime.
+
+    This updates CUSTOM_TYPE_INFO['pointer'] so downstream size/align queries
+    reflect the new pointer size. Align equals size for now.
+    """
+    global POINTER_BITS
+    size = 4 if bits == 32 else 8
+    POINTER_BITS = 32 if bits == 32 else 64
+    CUSTOM_TYPE_INFO["pointer"] = {"size": size, "align": size}
+
+
+def get_pointer_mode() -> int:
+    """Return current pointer width in bits (32 or 64)."""
+    return POINTER_BITS
+
+
+def reset_pointer_mode() -> None:
+    """Reset pointer mode to default 64-bit (used by tests)."""
+    set_pointer_mode(64)
+
+
 def _load_yaml_if_available(path: str) -> Optional[dict]:
     if not os.path.exists(path):
         return None
@@ -119,6 +144,14 @@ def get_type_info(type_name: str) -> Dict[str, int]:
 def merged_type_info() -> Dict[str, Dict[str, int]]:
     merged = dict(BASE_TYPE_INFO)
     merged.update(CUSTOM_TYPE_INFO)
-    return merged
+    # Normalize: ensure align equals size in the merged snapshot for layout/static lookups
+    normalized: Dict[str, Dict[str, int]] = {}
+    for tname, meta in merged.items():
+        try:
+            size = int(meta.get("size", 0))
+        except Exception:
+            size = meta.get("size", 0)
+        normalized[tname] = {"size": size, "align": size}
+    return normalized
 
 

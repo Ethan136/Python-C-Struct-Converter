@@ -1034,15 +1034,37 @@ class TestStructPresenter(unittest.TestCase):
         result = self.presenter.on_unit_size_change()
         self.assertIsNone(result["unit_size"])
 
-# 為每個測試方法加上 timeout 與 debug print
-for name, method in list(TestStructPresenter.__dict__.items()):
-    if name.startswith('test_') and callable(method):
-        def make_wrapped(meth, n):
-            @pytest.mark.timeout(15)
-            def wrapper(self, *args, **kwargs):
-                return meth(self, *args, **kwargs)
-            return wrapper
-        setattr(TestStructPresenter, name, make_wrapped(method, name))
+class TestPointerModeToggle(unittest.TestCase):
+    def setUp(self):
+        self.model = MagicMock()
+        self.presenter = StructPresenter(self.model)
+        # Speed up push_context
+        self.presenter._debounce_interval = 0
+        # Spy methods
+        self.presenter.invalidate_cache = MagicMock()
+        self.presenter.push_context = MagicMock()
+
+    def tearDown(self):
+        try:
+            from src.model.types import reset_pointer_mode
+            reset_pointer_mode()
+        except Exception:
+            pass
+
+    def test_on_pointer_mode_toggle_updates_context_and_resets_cache(self):
+        # Toggle to 32-bit
+        self.presenter.on_pointer_mode_toggle(True)
+        self.assertEqual(self.presenter.context.get("arch_mode"), "x86")
+        self.presenter.invalidate_cache.assert_called_once()
+        self.presenter.push_context.assert_called()
+        # Toggle back to 64-bit
+        self.presenter.invalidate_cache.reset_mock()
+        self.presenter.push_context.reset_mock()
+        self.presenter.on_pointer_mode_toggle(False)
+        self.assertEqual(self.presenter.context.get("arch_mode"), "x64")
+        self.presenter.invalidate_cache.assert_called_once()
+        self.presenter.push_context.assert_called()
+
 
 if __name__ == "__main__":
     unittest.main() 

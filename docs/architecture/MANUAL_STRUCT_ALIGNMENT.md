@@ -25,7 +25,7 @@ Manual struct uses explicit C/C++ types with optional `bit_size` for bitfields. 
 2. **Struct alignment**: Struct size is rounded up to the maximum effective alignment of its members.
 3. **Padding**: Automatic padding between members; an explicit `(final padding)` may appear at the end.
 
-### Alignment Values (64-bit System)
+### Alignment Values (Pointer Mode)
 
 | Type | Size | Alignment |
 |------|------|-----------|
@@ -33,7 +33,16 @@ Manual struct uses explicit C/C++ types with optional `bit_size` for bitfields. 
 | `short` | 2 | 2 |
 | `int` | 4 | 4 |
 | `long long` | 8 | 8 |
-| `pointer` | 8 | 8 |
+| `pointer` | 8 | 8 | (64-bit mode)
+
+In 32-bit mode, `pointer` uses 4-byte size and 4-byte alignment:
+
+| Type | Size | Alignment |
+|------|------|-----------|
+| `pointer` | 4 | 4 | (32-bit mode)
+
+Switching the pointer mode dynamically is supported in the GUI and API. Layout
+recalculations automatically reflect the new pointer size/alignment.
 
 ## Examples
 
