@@ -35,3 +35,10 @@
 
 ## 相關設計文檔
 - [MVP 架構說明](../../docs/architecture/MVP_ARCHITECTURE_COMPLETE.md) 
+
+## 32-bit 模式切換（v14）
+- File 與 Manual 兩個 tab 的控制列提供「32-bit 模式」勾選框（預設關閉=64-bit）。
+- 勾選切換為 32-bit 後：
+  - `pointer` 型別大小/對齊改為 4/4；佈局重新計算，offset/size/final padding 即時更新。
+  - Presenter 會清空 layout LRU cache 並重新推送 context；`context['arch_mode']` 會顯示 `"x86"/"x64"`。
+- 此切換不影響 Hex grid 的單位選擇（1/4/8 Bytes），僅影響型別的大小與對齊。 

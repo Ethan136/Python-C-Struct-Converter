@@ -31,3 +31,8 @@ This directory contains comprehensive documentation for the C++ Struct Memory Pa
 - **GUI 一致性提升**：MyStruct 與載入.h檔的成員表格欄位寬度統一，Debug Bytes 僅於載入.h檔或 Debug Tab 顯示，介面更簡潔。
 
 For detailed technical information, see [v3_define_struct_input2_design_plan.md](development/v3_define_struct_input2_design_plan.md). 
+
+### v14: GUI 32-bit/64-bit Pointer Mode
+- New GUI toggle to switch pointer size/alignment between 32-bit (4/4) and 64-bit (8/8)
+- Runtime API to control pointer mode; layouts are recalculated automatically
+- See: [Pointer Mode User Guide](development/v14_GUI_pointer_mode_switch.md)

@@ -107,6 +107,13 @@ def on_pointer_mode_toggle(self, enable_32bit: bool):
 - 可選：支援環境變數或 CLI 參數覆蓋預設，例如：
   - `STRUCT_POINTER_MODE=32` 啟動時套用 `set_pointer_mode(32)`。
 
+### 使用方式
+- GUI：在 File 與 Manual 兩個 tab 的控制列新增「32-bit 模式」勾選框，預設未勾（64-bit）。
+  - 勾選後，Presenter 會呼叫 `on_pointer_mode_toggle(True)`，即時清除 layout cache 並重新推送畫面。
+  - 取消勾選回到 64-bit 模式。
+- 程式啟動時（可選）：設定環境變數 `STRUCT_POINTER_MODE=32` 可於初始化時套用 32-bit 模式。
+  - 目前預設仍為 64-bit；如需常駐 32-bit，可在進程啟動後於初始化流程呼叫 `set_pointer_mode(32)`。
+
 ### 測試計畫
 - 單元測試（新增/調整）：
   - `tests/model/test_type_registry.py` 或整合到現有 `test_type_registry.py`/`test_struct_model.py`：
