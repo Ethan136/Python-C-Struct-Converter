@@ -36,3 +36,4 @@ For detailed technical information, see [v3_define_struct_input2_design_plan.md]
 - New GUI toggle to switch pointer size/alignment between 32-bit (4/4) and 64-bit (8/8)
 - Runtime API to control pointer mode; layouts are recalculated automatically
 - See: [Pointer Mode User Guide](development/v14_GUI_pointer_mode_switch.md)
+ - Also see: [Manual Struct Alignment Notes](architecture/MANUAL_STRUCT_ALIGNMENT.md)

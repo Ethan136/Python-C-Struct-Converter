@@ -1534,6 +1534,16 @@ class StructView(tk.Tk):
             can_redo = bool(context.get("redo_history", []))
             self.redo_btn.config(state="normal" if can_redo else "disabled")
 
+        # 同步 32-bit 勾選框狀態與 context['arch_mode']（File 與 Manual 兩處）
+        try:
+            is_32 = bool(context.get("arch_mode") == "x86")
+            if hasattr(self, "file_pointer32_var"):
+                self.file_pointer32_var.set(is_32)
+            if hasattr(self, "manual_pointer32_var"):
+                self.manual_pointer32_var.set(is_32)
+        except Exception:
+            pass
+
     def _init_presenter_view_binding(self):
         if self.presenter:
             self.presenter.view = self

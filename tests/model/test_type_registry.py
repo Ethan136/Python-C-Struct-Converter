@@ -71,6 +71,26 @@ class TestPointerModeSwitch(unittest.TestCase):
         self.assertEqual(ptr_items32[0].size, 4)
         self.assertEqual(total32, 8)
 
+    def test_union_layout_respects_pointer_mode(self):
+        # Union that contains a char and a pointer should change size with pointer mode
+        from src.model.struct_model import calculate_layout
+        # Simulate a union by passing members to UnionLayoutCalculator through nested structure
+        # Here we directly test union as top-level using layout calculator on legacy dict format
+        union_members = [
+            {"type": "char", "name": "c", "is_bitfield": False},
+            {"type": "pointer", "name": "p", "is_bitfield": False},
+        ]
+        # Default 64-bit: union size should be max(size(char)=1, size(ptr)=8) = 8
+        from src.model.layout import UnionLayoutCalculator
+        calc = UnionLayoutCalculator()
+        layout, total, align = calc.calculate(union_members)
+        self.assertEqual(total, 8)
+        # Switch to 32-bit: union size should become 4
+        self._set_pointer_mode(32)
+        calc2 = UnionLayoutCalculator()
+        layout32, total32, align32 = calc2.calculate(union_members)
+        self.assertEqual(total32, 4)
+
 
 if __name__ == '__main__':
     unittest.main()

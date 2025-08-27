@@ -119,6 +119,14 @@ def _bootstrap_from_config() -> None:
 
 _bootstrap_from_config()
 
+# Optional: apply pointer mode from environment at startup
+try:
+    _env_ptr = os.environ.get("STRUCT_POINTER_MODE", "").strip()
+    if _env_ptr == "32":
+        set_pointer_mode(32)
+except Exception:
+    pass
+
 
 def normalize_type(type_name: str) -> str:
     """Normalize a type using alias map (idempotent)."""
