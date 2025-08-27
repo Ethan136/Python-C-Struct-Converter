@@ -260,6 +260,8 @@ def on_pointer_mode_toggle(self, enable_32bit: bool):
   - 長時間運算中避免重入：切換時若正在計算，先忽略第二次點擊或以節流排隊。
   - 切換失敗復原：若 `set_pointer_mode` 或重算失敗，恢復原狀並回寫勾選框狀態，提示錯誤訊息。
   - 與單位大小（1/4/8 Bytes）無關：僅影響型別大小與對齊，不變動 Hex grid 單位設定。
+  - 錯誤回饋策略：Presenter 設定 `context['error']` 與 `debug_info['last_error']`，View 以訊息框（如 `messagebox.showerror`）提示，並將勾選框狀態復原。
+  - 控制項防抖/禁用：切換發生後，短時間暫停勾選框互動或禁用按鈕，待 `push_context` 完成再恢復，避免連點造成狀態抖動。
 
 ### TDD 規劃（GUI 開關）
 
@@ -297,6 +299,17 @@ def on_pointer_mode_toggle(self, enable_32bit: bool):
 - 反覆切換多次不應堆疊快取或造成異常。
 - 切換期間再次觸發切換，應序列化或忽略重入，狀態一致。
 - 測試結尾一律執行 `reset_pointer_mode()`，避免測試間污染。
+
+7a) 錯誤處理測試（Red → Green）
+- 模擬 `set_pointer_mode` 拋出例外（monkeypatch/mock）：
+  - 斷言 Presenter 設定 `context['error']`、`debug_info['last_error']`。
+  - 斷言 View 勾選框狀態被復原（`BooleanVar` 與畫面一致）。
+  - 後續實作在 Presenter 捕捉錯誤、回寫 context，View 端提示錯誤並復原 UI。
+
+7b) 連點/重入測試（Red → Green）
+- 連續多次快速調用 `on_pointer_mode_toggle(True/False)`：
+  - 斷言最終 `context['arch_mode']` 與 BooleanVar 一致。
+  - 斷言快取清空與 `push_context` 至少各執行一次，不因重入而崩潰或狀態錯亂。
 
 8) CI 與驗收
 - 將 Presenter、View、模型與 union 案例測試納入 CI，全綠為門檻。
