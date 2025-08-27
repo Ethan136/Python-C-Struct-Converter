@@ -37,10 +37,10 @@
 - 佈局計算：`src/model/layout.py`
   - 佈局透過 `get_type_info()` 取得型別資訊，切換後會自動生效（無需直接修改佈局邏輯）。
 - Presenter：`src/presenter/struct_presenter.py`
-  - 在 context 新增 `arch_mode`（或 `pointer_mode`）並提供事件處理 `on_pointer_mode_change()`。
+  - 在 context 新增 `arch_mode`（或 `pointer_mode`）並提供事件處理 `on_pointer_mode_toggle()`。
   - 切換時更新型別註冊器的 `pointer` 設定、清空 layout LRU cache、要求 View 重繪。
 - View：`src/view/struct_view.py`
-  - 在 File tab 與 Manual tab 的控制列新增「位元模式」下拉選單（32-bit/64-bit）。
+  - 在 File tab 與 Manual tab 的控制列新增「32-bit 模式」勾選框（預設未勾選=64-bit）。
   - 綁定事件呼叫 Presenter 切換模式，並觸發 layout/畫面更新。
 - 文件與測試資料：`docs/`、`tests/`
   - 新增與更新範例與測試，確保兩種模式下的指標大小/對齊與佈局正確。
@@ -104,8 +104,8 @@ def on_pointer_mode_toggle(self, enable_32bit: bool):
 
 #### 4) 初始化與環境變數（可選）
 - 預設 `64-bit`，與現有行為相容（`BASE_TYPE_INFO["pointer"] == 8`）。
-- 可選：支援環境變數或 CLI 參數覆蓋預設，例如：
-  - `STRUCT_POINTER_MODE=32` 啟動時套用 `set_pointer_mode(32)`。
+- 已支援透過環境變數覆蓋預設：`STRUCT_POINTER_MODE=32` 啟動時套用 `set_pointer_mode(32)`。
+- ~~或 CLI 參數覆蓋預設~~（先不做）。
 
 ### 使用方式
 - GUI：在 File 與 Manual 兩個 tab 的控制列新增「32-bit 模式」勾選框，預設未勾（64-bit）。
@@ -119,10 +119,10 @@ def on_pointer_mode_toggle(self, enable_32bit: bool):
   - `tests/model/test_type_registry.py` 或整合到現有 `test_type_registry.py`/`test_struct_model.py`：
     - 驗證 `set_pointer_mode(32/64)` 對 `get_type_info("pointer")` 之 `size/align` 輸出。
     - 切換模式前後，佈局中 `pointer` 欄位的 `size/offset` 與末端 padding 變化。
-  - 資料驅動 XML（位於 `tests/data/`）：
-    - 新增 32-bit 佈局案例，檢查 `pointer` 為 4 bytes 對齊，與 64-bit 為 8 bytes 對比。
+  - ~~資料驅動 XML（位於 `tests/data/`）~~（先不做）：
+    - 目前以單元測試直接建構案例覆蓋 32/64-bit 差異；如未來需要再補 XML。
   - Presenter/View 行為測試：
-    - 觸發 `on_pointer_mode_change()` 後，LRU cache 被清空、`update_display` 被呼叫、layout 重新計算。
+    - 觸發 `on_pointer_mode_toggle()` 後，LRU cache 被清空、`update_display` 被呼叫、layout 重新計算。
   - 依據偏好，測試用 .h 檔放在 `tests/` 目錄下而非 `examples/`。
 
 ### TDD 實作流程
@@ -145,7 +145,7 @@ def on_pointer_mode_toggle(self, enable_32bit: bool):
      - 64-bit：`c` offset 0、`p` offset 8、總大小 16。
      - 32-bit：`c` offset 0、`p` offset 4、總大小 8。
 3. **Presenter/View 行為**
-   - 為 `on_pointer_mode_change()` 與 View 勾選框撰寫行為測試，模擬使用者切換模式並期待 LRU cache 清空與畫面更新。
+   - 為 `on_pointer_mode_toggle()` 與 View 勾選框撰寫行為測試，模擬使用者切換模式並期待 LRU cache 清空與畫面更新。
    - 先看測試失敗，再補上 Presenter 與 View 的實作直到測試通過。
    - 測試可使用 `MagicMock` 檢查：
      ```python
@@ -178,7 +178,7 @@ def on_pointer_mode_toggle(self, enable_32bit: bool):
 
 ### 任務拆解（WBS）
 - 模型層：在 `src/model/types.py` 實作 `set_pointer_mode/get_pointer_mode/reset_pointer_mode`。
-- Presenter：加入 `arch_mode` 狀態與 `on_pointer_mode_change()`；切換時清空 cache 並刷新畫面。
+- Presenter：加入 `arch_mode` 狀態與 `on_pointer_mode_toggle()`；切換時清空 cache 並刷新畫面。
 - View：兩個 tab 都加入「32-bit 模式」勾選框與事件綁定。
 - 文件：更新 `docs/architecture/MANUAL_STRUCT_ALIGNMENT.md` 註記 pointer 在 32-bit 的對齊與大小差異。
 - 測試：
@@ -208,27 +208,26 @@ def on_pointer_mode_toggle(self, enable_32bit: bool):
     ```
 
 - View 勾選框狀態與 context 同步
-  - 現狀：已提供 File/Manual 兩處「32-bit 模式」勾選框，但 `update_display(...)` 尚未依 `context["arch_mode"]` 同步 `file_pointer32_var` 與 `manual_pointer32_var`，初始化或外部切換後 UI 可能與實際模式不同步。
-  - 建議：在 `update_display` 結尾處根據 `context.get("arch_mode") == "x86"` 設置兩個 `BooleanVar`，避免 UI 失真。
+  - 已完成：`update_display(...)` 結尾會依 `context["arch_mode"]` 同步 `file_pointer32_var` 與 `manual_pointer32_var`。
 
 - 啟動時環境變數/CLI（可選）
-  - 文檔建議的 `STRUCT_POINTER_MODE=32` 目前未實作，可在 `src/model/types.py` 於 `_bootstrap_from_config()` 之後讀取環境變數並呼叫 `set_pointer_mode(32)`。
-  - 保持預設 64-bit，相容既有行為。
+  - 已支援 `STRUCT_POINTER_MODE=32`；維持預設 64-bit，相容既有行為。
+  - ~~CLI 參數支援~~（先不做）。
 
 - 文檔補強：`MANUAL_STRUCT_ALIGNMENT.md`
-  - 文中提到需更新 `docs/architecture/MANUAL_STRUCT_ALIGNMENT.md`，目前檔案尚未提供。建議新增此文件，明確列出 32/64-bit 下 `pointer` 的 size/align 差異與示例（含 offset/final padding 對照表）。
+  - 已提供該文件並記載 32/64-bit 下 `pointer` 的 size/align 差異與示例。
 
 - 文案與 UI 形式微差
-  - 設計文使用「位元模式下拉選單」，目前 UI 以單一「32-bit 模式」勾選框呈現；兩者功能等效。建議文件註記實作以勾選框為準（或同時接受兩種等效呈現），不影響驗收標準。
+  - 已調整為以「勾選框」呈現，並在文件中與 UI 一致。
 
 #### 建議實作順序（針對本節）
 
 1. Union 佈局改用集中 registry
    - 調整 `src/model/layout.py` 的 `UnionLayoutCalculator._get_type_size_and_align`，由 `TYPE_INFO` 改為 `get_type_info(mtype)`。
    - 新增/調整單元測試：包含 `union { char c; void* p; }` 或 struct 中含 union 的案例，驗證 64-bit 與 32-bit 下 `pointer` 尺寸與對齊變化會反映在 union 佈局。
-2. View 勾選框與 context 同步
-   - 在 `src/view/struct_view.py` 的 `update_display(nodes, context, ...)` 結尾，依 `context.get("arch_mode") == "x86"` 同步 `file_pointer32_var` 與 `manual_pointer32_var`。
-   - 新增 Presenter/View 行為測試：模擬 `arch_mode` 改變後呼叫 `update_display`，兩個 `BooleanVar` 狀態正確更新。
+2. View 勾選框與 context 同步（已完成）
+   - `update_display(nodes, context, ...)` 結尾會依 `context.get("arch_mode") == "x86"` 同步 `file_pointer32_var` 與 `manual_pointer32_var`。
+   - ~~額外針對此同步的 UI 單元測試~~（先不做）。
 3. 啟動時環境變數（可選）
    - 在 `src/model/types.py` 的初始化流程（`_bootstrap_from_config()` 之後）讀取 `STRUCT_POINTER_MODE`，如為 `"32"` 則呼叫 `set_pointer_mode(32)`。
    - 新增測試：設定環境變數後載入模組或呼叫初始化鉤子，驗證 `get_type_info('pointer')` 為 4/4；測試結尾 `reset_pointer_mode()` 復原。
