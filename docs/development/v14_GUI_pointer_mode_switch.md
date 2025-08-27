@@ -239,3 +239,71 @@ def on_pointer_mode_toggle(self, enable_32bit: bool):
 6. 回歸測試與驗收
    - 執行全測，確保既有測試綠燈；新增的 union、view 同步、（可選）環境變數測試皆通過。
    - 依「驗收標準」再次檢查 GUI 勾選、佈局更新與 cache 失效是否符合預期。
+
+### GUI 介面：32-bit 模式開關（新增補充）
+
+- 位置與元件
+  - File tab 與 Manual tab 的控制列各新增一個勾選框。
+  - 標籤：`32-bit 模式`（預設未勾選=64-bit）。
+  - i18n：
+    - zh-TW：`32-bit 模式`
+    - en-US：`32-bit mode`
+- 行為與資料流
+  - 勾選狀態改變時，呼叫 `presenter.on_pointer_mode_toggle(checked)`。
+  - Presenter 更新 `context['arch_mode']` 為 `"x86"/"x64"`，呼叫 `set_pointer_mode(32|64)`，清空 layout LRU cache，並 `push_context()`。
+  - View 於 `update_display(..., context, ...)` 結尾依 `context.get("arch_mode") == "x86"` 同步 File/Manual 兩處的 `BooleanVar`，避免 UI 與狀態不同步。
+- 視覺與易用性
+  - 置於控制列右側、與「單位大小」等操作保持等距間距（px 依現行樣式）。
+  - 狀態提示：在狀態列或 `debug_info` 顯示最近事件 `last_event = "on_pointer_mode_toggle"`。
+  - 可選：提供工具提示（Tooltip）說明影響範圍：「僅影響 pointer 之 size/align 與佈局」。
+- 邊界情境
+  - 長時間運算中避免重入：切換時若正在計算，先忽略第二次點擊或以節流排隊。
+  - 切換失敗復原：若 `set_pointer_mode` 或重算失敗，恢復原狀並回寫勾選框狀態，提示錯誤訊息。
+  - 與單位大小（1/4/8 Bytes）無關：僅影響型別大小與對齊，不變動 Hex grid 單位設定。
+
+### TDD 規劃（GUI 開關）
+
+1) 測試先行：Presenter 行為（Red）
+- 新增（或擴充）`tests/presenter/test_struct_presenter.py`
+  - 斷言 `on_pointer_mode_toggle(True)`：
+    - `context['arch_mode'] == "x86"`
+    - 有呼叫 `set_pointer_mode(32)`
+    - 有清空 LRU cache（可檢查 `invalidate_cache` 被呼叫）
+    - 有 `push_context()`
+  - 斷言 `on_pointer_mode_toggle(False)`：`"x64"` 與 `set_pointer_mode(64)`
+
+2) 實作 Presenter（Green）
+- 依測試需求補齊 Presenter 事件處理與 cache 清空、context 更新、推送流程。
+
+3) 重構（Refactor）
+- 整理重複邏輯、將 `32/64` 位模式轉換抽為純函式（必要時），維持介面不變。
+
+4) 測試先行：View 事件與同步（Red）
+- 新增（或擴充）`tests/presenter/test_presenter_mock_view.py` 或 View 對 Presenter 的互動測試：
+  - 使用 `MagicMock` Presenter，模擬勾選變更時 `view._on_pointer_mode_toggle(True)` 會委派至 `presenter.on_pointer_mode_toggle(True)`。
+  - 呼叫 `update_display(..., context={"arch_mode": "x86"}, ...)` 後，File/Manual 的 `BooleanVar` 皆為 `True`；`"x64"` 時為 `False`。
+
+5) 實作 View 與同步（Green）
+- 加入勾選框與 `_on_pointer_mode_toggle` 事件委派。
+- 在 `update_display` 結尾依 `context['arch_mode']` 同步兩處 `BooleanVar`。
+
+6) 佈局層回歸測試（Red → Green）
+- 在 `tests/model/test_type_registry.py`（或相關檔）新增案例：
+  - `struct Sample { char c; void* p; };`
+  - 64-bit：`c@0, p@8, sizeof=16`；32-bit：`c@0, p@4, sizeof=8`。
+- 若包含 `union`，驗證 `union` 亦透過集中 registry 取得 `pointer` 尺寸，切換可即時生效。
+
+7) 邊界與穩定性測試
+- 反覆切換多次不應堆疊快取或造成異常。
+- 切換期間再次觸發切換，應序列化或忽略重入，狀態一致。
+- 測試結尾一律執行 `reset_pointer_mode()`，避免測試間污染。
+
+8) CI 與驗收
+- 將 Presenter、View、模型與 union 案例測試納入 CI，全綠為門檻。
+- 依「驗收標準」檢查：
+  - 勾選框預設未勾；勾選/取消切換 `pointer size/align` 與佈局正確。
+  - 切換時 cache 失效、畫面更新，無例外。
+
+9) DoD（Definition of Done）
+- 文件已更新（本檔與 `src/view/README.md` 索引指向）、測試綠燈、GUI 可操作並反映狀態。
+- 預設為 64-bit；切換為 32-bit 僅影響 `pointer`。
