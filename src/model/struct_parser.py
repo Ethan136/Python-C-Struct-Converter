@@ -224,6 +224,130 @@ def _extract_struct_body(file_content, keyword="struct"):
     return struct_name, struct_body
 
 
+def _extract_struct_body_by_name(file_content: str, struct_name: str, keyword: str = "struct"):
+    """v16: 依名稱抽出指定 struct/union 的內容（僅頂層）。找不到則回傳 (None, None)。"""
+    import re as _re
+    text = file_content
+    pattern = rf"{keyword}\s+{struct_name}\s*\{{"
+    # 僅在頂層比對
+    for m in _re.finditer(pattern, text):
+        idx = m.start()
+        # 計算到 idx 的 brace 深度（忽略 // 註解）
+        depth = 0
+        in_line_comment = False
+        i = 0
+        while i < idx:
+            ch = text[i]
+            if in_line_comment:
+                if ch == '\n':
+                    in_line_comment = False
+                i += 1
+                continue
+            if ch == '/' and i + 1 < idx and text[i+1] == '/':
+                in_line_comment = True
+                i += 2
+                continue
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth = max(0, depth - 1)
+            i += 1
+        if depth != 0:
+            continue
+        start = m.end()
+        # 向後找匹配的關閉 brace
+        depth = 1
+        i = start
+        in_line_comment = False
+        while i < len(text) and depth > 0:
+            ch = text[i]
+            if in_line_comment:
+                if ch == '\n':
+                    in_line_comment = False
+                i += 1
+                continue
+            if ch == '/' and i + 1 < len(text) and text[i+1] == '/':
+                in_line_comment = True
+                i += 2
+                continue
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+            i += 1
+        if depth != 0:
+            return None, None
+        struct_body = text[start:i - 1]
+        return struct_name, struct_body
+    return None, None
+
+
+def _collect_known_types(file_content: str) -> dict:
+    """v16: 掃描整個檔案，收集頂層具名 struct/union 定義做為型別表。
+
+    僅處理形如 `struct Name { ... };` / `union Name { ... };` 的完整定義，
+    不處理 typedef 與跨檔 include。
+    """
+    text = re.sub(r"//.*", "", file_content)
+    known: dict[str, Union["StructDef", "UnionDef"]] = {}
+    i = 0
+    n = len(text)
+    while i < n:
+        # 僅在頂層搜尋（brace depth == 0）
+        depth = 0
+        j = i
+        while j < n:
+            ch = text[j]
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth = max(0, depth - 1)
+            # 嘗試在頂層比對 struct/union 名稱模式
+            if depth == 0:
+                m = re.match(r"\s*(struct|union)\s+(\w+)\s*\{", text[j:])
+                if m:
+                    kind, type_name = m.groups()
+                    brace_start = j + m.end(0) - 1
+                    k = brace_start + 1
+                    brace = 1
+                    while k < n and brace > 0:
+                        if text[k] == '{':
+                            brace += 1
+                        elif text[k] == '}':
+                            brace -= 1
+                        k += 1
+                    if brace != 0:
+                        # 不完整，跳出
+                        return known
+                    inner = text[brace_start + 1 : k - 1]
+                    # 解析內部成員
+                    nested_members: List[MemberDef] = []
+                    for line in _split_member_lines(inner):
+                        line = line.strip()
+                        if line.startswith('struct') or line.startswith('union'):
+                            temp = parse_struct_definition_ast(f'struct Temp {{ {line}; }}; ', _collect=False)
+                            if temp and temp.members:
+                                nested_members.append(temp.members[0])
+                        else:
+                            parsed = parse_member_line_v2(line)
+                            if parsed is not None:
+                                nested_members.append(parsed)
+                    if kind == 'struct':
+                        known[type_name] = StructDef(name=type_name, members=nested_members)
+                    else:
+                        known[type_name] = UnionDef(name=type_name, members=nested_members)
+                    # 跳到此定義之後（含結尾分號）
+                    # 移動 k 到下個 ';'
+                    while k < n and text[k] != ';':
+                        k += 1
+                    i = k + 1
+                    break
+            j += 1
+        else:
+            break
+    return known
+
+
 def parse_struct_definition(file_content):
     """Parse a C/C++ struct definition string，支援巢狀 struct/union。"""
     struct_name, struct_content = _extract_struct_body(file_content, "struct")
@@ -320,15 +444,27 @@ def parse_struct_definition_v2(file_content: str) -> Tuple[Optional[str], Option
     return struct_name, members
 
 
-def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
-    """Parse a struct definition and return a :class:`StructDef` object (遞迴支援巢狀 struct/union)."""
-    struct_name, struct_body = _extract_struct_body(file_content, "struct")
+def parse_struct_definition_ast(file_content: str, _collect: bool = True, target_name: Optional[str] = None) -> Optional[StructDef]:
+    """Parse a struct definition and return a :class:`StructDef` object (遞迴支援巢狀 struct/union).
+
+    v16: 加入同檔引用型 struct/union 解析支援：
+    - 建立 known_types registry 收錄具名 inline 定義
+    - 結束後進行一次解參考 pass，補齊 forward reference 的 members
+    """
+    # v16: 先收集整個檔案的具名型別（可關閉以避免遞迴收集）
+    known_types: dict[str, Union["StructDef", "UnionDef"]] = _collect_known_types(file_content) if _collect else {}
+
+    if target_name:
+        struct_name, struct_body = _extract_struct_body_by_name(file_content, target_name)
+    else:
+        struct_name, struct_body = _extract_struct_body(file_content, "struct")
     if not struct_name or not struct_body:
         return None
     import re
     struct_body = re.sub(r"//.*", "", struct_body)  # 修正：先移除所有 // 註解
     # print("DEBUG struct_body:", repr(struct_body))
     members = []
+    # 解析當前 struct 內容時，遇到具名 inline 定義會再補入 known_types
     pos = 0
     length = len(struct_body)
     while pos < length:
@@ -372,13 +508,19 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
                 for line in _split_member_lines(inner_content):
                     line = line.strip()
                     if line.startswith('struct') or line.startswith('union'):
-                        temp = parse_struct_definition_ast(f'struct Temp {{ {line}; }};')
+                        temp = parse_struct_definition_ast(f'struct Temp {{ {line}; }}; ', _collect=False)
                         if temp and temp.members:
                             nested_members.append(temp.members[0])
                     else:
                         parsed = parse_member_line_v2(line)
                         if parsed is not None:
                             nested_members.append(parsed)
+                # 若為具名型別，登錄型別定義
+                if nested_name:
+                    if kind == 'struct':
+                        known_types[nested_name] = StructDef(name=nested_name, members=list(nested_members))
+                    else:
+                        known_types[nested_name] = UnionDef(name=nested_name, members=list(nested_members))
                 if var_match:
                     var_token = var_match.group(1)
                     var_name, dims = _extract_array_dims(var_token)
@@ -399,6 +541,7 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
                 elif j < length and struct_body[j] == ';':
                     # 匿名且無變數名稱 -> 展平成員
                     members.extend(nested_members)
+                    # 如為具名型別定義（無變數），仍需登錄型別，已於上方處理
                     pos = j + 1
                     continue
 
@@ -407,12 +550,41 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
         if semi == -1:
             break
         line = struct_body[pos:semi].strip()
-        # 支援引用已命名的 struct/union（無 inline braces），例如：struct N n; union U u1[2];
+        # 支援引用已命名的 struct/union（無 inline braces）
+        # 形如：struct N n; union U u1[2]; 以及指標：struct N *p; struct N *arr[2];
         ref_match = re.match(r"^(struct|union)\s+(\w+)\s+(\w+(?:\[\d+\])*)$", line)
+        ptr_ref_match = None if ref_match else re.match(r"^(struct|union)\s+(\w+)\s+(\*+)\s*(\w+(?:\[\d+\])*)$", line)
         if ref_match:
             kind, type_name, var_token = ref_match.groups()
             var_name, dims = _extract_array_dims(var_token)
-            nested_def = (StructDef if kind == 'struct' else UnionDef)(name=type_name, members=[])
+            # 先嘗試從已知型別取出定義，否則建立 placeholder，待結尾解參考
+            if type_name in known_types:
+                from copy import deepcopy
+                base_def = known_types[type_name]
+                nested_def = (StructDef if kind == 'struct' else UnionDef)(
+                    name=type_name,
+                    members=deepcopy(getattr(base_def, 'members', [])),
+                )
+            else:
+                # 嘗試直接在檔案中抽取該名稱的定義
+                tname, tbody = _extract_struct_body_by_name(file_content, type_name)
+                if tname and tbody:
+                    # 解析內部成員，避免全檔遞迴收集
+                    nested_members = []
+                    for line2 in _split_member_lines(re.sub(r"//.*", "", tbody)):
+                        line2 = line2.strip()
+                        if line2.startswith('struct') or line2.startswith('union'):
+                            temp = parse_struct_definition_ast(f'struct Temp {{ {line2}; }}; ', _collect=False)
+                            if temp and temp.members:
+                                nested_members.append(temp.members[0])
+                        else:
+                            parsed2 = parse_member_line_v2(line2)
+                            if parsed2 is not None:
+                                nested_members.append(parsed2)
+                    nested_def = (StructDef if kind == 'struct' else UnionDef)(name=type_name, members=nested_members)
+                    known_types[type_name] = nested_def
+                else:
+                    nested_def = (StructDef if kind == 'struct' else UnionDef)(name=type_name, members=[])
             members.append(
                 MemberDef(
                     type=kind,
@@ -423,11 +595,49 @@ def parse_struct_definition_ast(file_content: str) -> Optional[StructDef]:
             )
             pos = semi + 1
             continue
+        elif ptr_ref_match:
+            kind, type_name, ptrs, var_token = ptr_ref_match.groups()
+            var_name, dims = _extract_array_dims(var_token)
+            # 指標引用：一律視為 pointer 基本型別，不展開 nested
+            members.append(
+                MemberDef(
+                    type="pointer",
+                    name=var_name,
+                    array_dims=dims,
+                    nested=None,
+                )
+            )
+            pos = semi + 1
+            continue
         parsed = parse_member_line_v2(line)
         if parsed is not None:
             members.append(parsed)
         pos = semi + 1
-    return StructDef(name=struct_name, members=members)
+    root = StructDef(name=struct_name, members=members)
+
+    # v16: 完成後進行一次解參考，處理 forward reference
+    def _resolve_references(defn):
+        from copy import deepcopy
+        def walk(member_list, seen_stack: tuple[str, ...] = (defn.name,)):
+            for m in member_list:
+                nested = getattr(m, 'nested', None)
+                if nested is None:
+                    continue
+                # 若 nested 成員為空，且名稱能在 registry 找到，補齊
+                if (not getattr(nested, 'members', [])) and getattr(nested, 'name', None) in known_types:
+                    tname = nested.name
+                    # 防止自我參照非指標展開（如 struct Node { struct Node child; }; 不合法）
+                    if tname in seen_stack:
+                        continue
+                    base_def = known_types[tname]
+                    nested.members = deepcopy(getattr(base_def, 'members', []))
+                # 遞迴處理子層
+                if getattr(nested, 'members', []):
+                    walk(nested.members, seen_stack + (getattr(nested, 'name', ''),))
+        walk(defn.members)
+
+    _resolve_references(root)
+    return root
 
 
 def parse_c_definition(file_content: str) -> Tuple[Optional[str], Optional[str], Optional[List[dict]]]:
