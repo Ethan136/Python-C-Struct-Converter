@@ -130,6 +130,9 @@ def parse_member_line(line):
         clean_type = normalize_type(" ".join(type_str.strip().split()))
         name, dims = _extract_array_dims(name_token)
         if "*" in clean_type:
+            # v15: 保留指標陣列的 array_dims，否則 layout 無法展開
+            if dims:
+                return {"type": "pointer", "name": name, "array_dims": dims}
             return ("pointer", name)
         if clean_type in TYPE_INFO:
             if dims:
