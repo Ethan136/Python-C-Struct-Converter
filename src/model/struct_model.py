@@ -143,15 +143,25 @@ class StructModel:
         self.manual_struct = {"members": self.members, "total_size": total_size}
         self._notify_observers("manual_struct_changed")
 
-    def load_struct_from_file(self, file_path):
+    def load_struct_from_file(self, file_path, target_name=None):
         with open(file_path, 'r') as f:
             content = f.read()
         self.struct_content = content  # 同步保存原始內容供 AST/顯示使用
+        # v17: 收集頂層可用型別名稱供 Presenter/View 下拉
+        try:
+            from src.model.struct_parser import _collect_known_types
+            known = _collect_known_types(content)
+            self.available_top_level_types = sorted(list(known.keys()))
+        except Exception:
+            self.available_top_level_types = []
 
         # 優先使用 AST 解析以支援巢狀 struct/union 與陣列
         try:
-            from src.model.struct_parser import parse_c_definition_ast
-            definition = parse_c_definition_ast(content)
+            from src.model.struct_parser import parse_c_definition_ast, parse_struct_definition_ast
+            if target_name:
+                definition = parse_struct_definition_ast(content, target_name=target_name)
+            else:
+                definition = parse_c_definition_ast(content)
         except Exception:
             definition = None
 
@@ -172,6 +182,20 @@ class StructModel:
 
         self._notify_observers("file_struct_loaded", file_path=file_path)
         return self.struct_name, self.layout, self.total_size, self.struct_align
+
+    def set_import_target_struct(self, name: str):
+        """v17: 切換匯入的根 struct/union 名稱並更新佈局/AST。"""
+        if not getattr(self, 'struct_content', None):
+            raise ValueError("No struct content loaded to switch target.")
+        from src.model.struct_parser import parse_struct_definition_ast
+        definition = parse_struct_definition_ast(self.struct_content, target_name=name)
+        if not definition:
+            raise ValueError(f"Target struct '{name}' not found.")
+        self.struct_name = definition.name
+        self.ast = definition
+        self.members = list(definition.members)
+        self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
+        self._notify_observers("file_struct_loaded", file_path=None)
 
     def parse_hex_data(self, hex_data, byte_order, layout=None, total_size=None):
         orig_layout = self.layout
@@ -393,15 +417,21 @@ class StructModel:
                 label = f"{label} [struct]"
             elif node.get("is_union"):
                 label = f"{label} [union]"
-            value = value_map.get(node["name"], "")  # 新增
+            value_raw = value_map.get(node["name"], "")  # 新增
+            value = str(value_raw) if value_raw is not None else ""
+            # Ensure offset/size are strings to satisfy view Treeview requirements
+            off = node.get("offset", None)
+            siz = node.get("size", None)
+            offset_str = "" if off is None or off == "" else str(off)
+            size_str = "" if siz is None or siz == "" else str(siz)
             # print(f"[DEBUG] to_treeview_node: name={node['name']} id={node['id']} value={value}")  # debug print
             return {
                 "id": node["id"],
                 "label": label,
                 "type": node["type"],
                 "value": value,  # 新增
-                "offset": node.get("offset", ""),
-                "size": node.get("size", ""),
+                "offset": offset_str,
+                "size": size_str,
                 "children": [to_treeview_node(child) for child in node.get("children", [])],
                 "icon": node.get("type"),
                 "extra": {},

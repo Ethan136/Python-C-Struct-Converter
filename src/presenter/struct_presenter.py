@@ -651,3 +651,17 @@ class StructPresenter:
         if hasattr(self.model, "get_display_nodes"):
             return self.model.get_display_nodes(mode)
         return []
+
+    def set_import_target_struct(self, name: str):
+        """v17: 指定要顯示的根 struct/union 名稱，切換並推送 UI。"""
+        if not hasattr(self.model, "set_import_target_struct"):
+            raise AttributeError("Model does not support target struct switching")
+        self.model.set_import_target_struct(name)
+        # 更新 context 可用型別列表（若 model 暴露）
+        types = getattr(self.model, 'available_top_level_types', None)
+        if types is not None:
+            self.context.setdefault('extra', {})['available_top_level_types'] = list(types)
+        # 立即推送
+        self.context["debug_info"]["last_event"] = "set_import_target_struct"
+        self.context["debug_info"]["last_event_args"] = {"name": name}
+        self.push_context()

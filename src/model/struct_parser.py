@@ -145,6 +145,24 @@ def parse_member_line_v2(line: str) -> Optional[MemberDef]:
     """Parse a struct member line and return a :class:`MemberDef`."""
     parsed = parse_member_line(line)
     if parsed is None:
+        # v17 fallback: directly recognize pointer declarations without relying on legacy parser
+        s = (line or "").strip().rstrip(';').strip()
+        if not s:
+            return None
+        # pointer with optional array dims: e.g., 'int *p', 'int *arr[2][2]'
+        m_ptr = re.match(r"^(.+?)\s+\*+\s*([\w\[\]]+)$", s)
+        if m_ptr:
+            name_token = m_ptr.group(2)
+            name, dims = _extract_array_dims(name_token)
+            return MemberDef(type="pointer", name=name, array_dims=dims)
+        # basic type with array dims, as a safety net
+        m_basic = re.match(r"^(.+?)\s+([\w\[\]]+)$", s)
+        if m_basic:
+            type_str, name_token = m_basic.groups()
+            clean_type = normalize_type(" ".join(type_str.strip().split()))
+            name, dims = _extract_array_dims(name_token)
+            if clean_type:
+                return MemberDef(type=clean_type, name=name, array_dims=dims)
         return None
     if isinstance(parsed, tuple):
         mtype, name = parsed
