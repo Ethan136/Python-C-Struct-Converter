@@ -80,6 +80,13 @@ class StructPresenter:
                 nodes = self.model.get_display_nodes("tree")
             except Exception:
                 nodes = []
+            # v17: 將可用頂層型別帶入 context.extra，供 View 下拉選單使用
+            try:
+                types = getattr(self.model, 'available_top_level_types', None)
+                if types is not None:
+                    self.context.setdefault('extra', {})['available_top_level_types'] = list(types)
+            except Exception:
+                pass
             self._schedule_view_update(nodes, getattr(self, "context", {}))
         # 其他事件只做 cache 失效與 observer 通知
         if event_type in ("manual_struct_changed", "file_struct_loaded"):
