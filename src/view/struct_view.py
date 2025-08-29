@@ -226,6 +226,33 @@ class StructView(tk.Tk):
         display_mode_options = ["tree", "flat"]
         self.display_mode_menu = tk.OptionMenu(control_frame, self.display_mode_var, *display_mode_options, command=self._on_display_mode_change)
         self.display_mode_menu.pack(side=tk.LEFT)
+        # Target Struct 選擇器（v17）
+        tk.Label(control_frame, text="  Target Struct：").pack(side=tk.LEFT)
+        self.target_struct_var = tk.StringVar(value="")
+        try:
+            self.target_struct_combo = ttk.Combobox(control_frame, textvariable=self.target_struct_var, width=18, state="readonly")
+        except Exception:
+            # 在無 ttk 時 fallback 使用 Entry
+            self.target_struct_combo = tk.Entry(control_frame, textvariable=self.target_struct_var, width=18)
+        self.target_struct_combo.pack(side=tk.LEFT)
+        # 綁定選擇事件
+        def _on_target_struct_change(*_):
+            name = self.target_struct_var.get().strip()
+            if not name or not self.presenter or not hasattr(self.presenter, 'set_import_target_struct'):
+                return
+            try:
+                self.presenter.set_import_target_struct(name)
+                # 刷新顯示
+                if hasattr(self.presenter, 'get_display_nodes') and hasattr(self.presenter, 'context'):
+                    nodes = self.presenter.get_display_nodes(self.presenter.context.get('display_mode', 'tree'))
+                    self.update_display(nodes, self.presenter.context)
+            except Exception:
+                pass
+        try:
+            self.target_struct_combo.bind('<<ComboboxSelected>>', lambda e: _on_target_struct_change())
+        except Exception:
+            # fallback for Entry：Enter 觸發
+            self.target_struct_combo.bind('<Return>', lambda e: _on_target_struct_change())
         # GUI 版本切換
         tk.Label(control_frame, text="  GUI 版本：").pack(side=tk.LEFT)
         self.gui_version_var = tk.StringVar(value="legacy")
@@ -824,7 +851,12 @@ class StructView(tk.Tk):
             if hex_raw and len(hex_raw) > 2:
                 hex_raw = "｜".join(hex_raw[i:i+2] for i in range(0, len(hex_raw), 2))
 
-            tree.insert("", "end", values=(item.get("name", ""), value, hex_value, hex_raw))
+            # 確保皆為字串
+            name_str = str(item.get("name", ""))
+            value_str = str(value) if value is not None else ""
+            hex_value_str = str(hex_value) if hex_value is not None else ""
+            hex_raw_str = str(hex_raw) if hex_raw is not None else ""
+            tree.insert("", "end", values=(name_str, value_str, hex_value_str, hex_raw_str))
 
     def _show_debug_text(self, text_widget, debug_lines):
         """Helper to display debug lines in a Text widget."""
@@ -863,14 +895,20 @@ class StructView(tk.Tk):
             # 無論是否 bitfield，都顯示 bit_offset/bit_size，若無則顯示 '-'
             bit_offset_str = str(bit_offset) if bit_offset is not None else "-"
             bit_size_str = str(bit_size) if bit_size is not None else "-"
+            # 確保皆為字串
+            name_str = str(item.get("name", ""))
+            type_str = str(item.get("type", ""))
+            offset_str = str(item.get("offset", ""))
+            size_str = str(item.get("size", ""))
+            is_bf_str = str(item.get("is_bitfield", False))
             self.layout_tree.insert("", "end", values=(
-                item.get("name", ""),
-                item.get("type", ""),
-                item.get("offset", ""),
-                item.get("size", ""),
+                name_str,
+                type_str,
+                offset_str,
+                size_str,
                 bit_offset_str,
                 bit_size_str,
-                str(item.get("is_bitfield", False))
+                is_bf_str
             ))
 
     def clear_results(self):
@@ -1524,6 +1562,30 @@ class StructView(tk.Tk):
             if "api_trace" in debug_info:
                 debug_lines.append(f"api_trace: {debug_info['api_trace']}")
         self.debug_info_label.config(text="\n".join(debug_lines))
+
+        # 同步 Target Struct 下拉清單與當前 root 名稱
+        try:
+            extra = context.get('extra', {}) if isinstance(context, dict) else {}
+            types = extra.get('available_top_level_types', [])
+            if hasattr(self, 'target_struct_combo'):
+                # 設定候選清單
+                try:
+                    # ttk.Combobox
+                    self.target_struct_combo['values'] = tuple(types)
+                except Exception:
+                    pass
+                # 取得目前 struct 名稱
+                current_root = None
+                if self.presenter and hasattr(self.presenter, 'model') and hasattr(self.presenter.model, 'struct_name'):
+                    current_root = self.presenter.model.struct_name
+                # 同步顯示值
+                if current_root:
+                    try:
+                        self.target_struct_var.set(str(current_root))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
         # Undo/Redo 按鈕狀態
         context = self.presenter.context if self.presenter and hasattr(self.presenter, "context") else {}
