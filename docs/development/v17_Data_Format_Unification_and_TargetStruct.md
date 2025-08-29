@@ -133,3 +133,80 @@
 - 若 View 層變更導致暫時性不相容，可先隱藏 Target Struct 控制項，以不影響既有功能為前提進行漸進式整合。
 
 
+
+---
+
+### 目前進度與尚未完成事項（補充）
+
+- Parser（MemberDef 統一）：已完成
+  - `parse_member_line_v2`、`parse_struct_definition_ast`、`parse_c_definition_ast` 皆以 `MemberDef` 為核心回傳值。
+  - 覆蓋 v15（指標 N-D 陣列）與 v16（引用/forward reference）。
+
+- Layout：部分完成（仍保留相容路徑）
+  - 以 `MemberDef` 為輸入可正確展開巢狀 struct/union/array 與 bitfield。
+  - 尚未關閉 tuple/dict legacy 支援路徑：
+    - `src/model/layout.py` 的 `_get_attr` / `calculate(...)` 仍接受 tuple/dict。
+    - `src/model/struct_model.py` 的 `calculate_layout(...)` 對非 AST 仍會展平 legacy 成員。
+
+- Model（Target Struct/型別列表）：已完成
+  - `load_struct_from_file(..., target_name=None)` 產生 `available_top_level_types`。
+  - `set_import_target_struct(name)` 切換根並更新佈局/AST。
+
+- Presenter（Target Struct 切換/字串化 values）：已完成
+  - `set_import_target_struct(name)` 寫入 context 並推送。
+  - 對外顯示的節點 `value`/`offset`/`size` 以字串提供（經由 Model `get_display_nodes`）。
+
+- View：尚未完成
+  - 尚未提供「Target Struct」下拉/輸入控制項。
+  - 未串接 `presenter.set_import_target_struct(name)` 事件。
+  - 應確保 `Treeview.insert(..., values=...)` 僅傳入字串 tuple/list。
+  - 缺少對應測試（見下）。
+
+- API 相容性與移轉：尚未完成
+  - `parse_member_line`（legacy）尚未標記 deprecated；文件與呼叫點尚未統一導向 v2。
+  - Legacy tuple/dict 路徑尚未移除，僅保留相容；需在獨立分支收斂。
+
+
+---
+
+### 待辦清單（短期落地）
+
+1) View 層功能與測試
+   - 實作匯入 .h 頁簽的「Target Struct」下拉/輸入：
+     - 資料來源：Presenter context `extra.available_top_level_types`。
+     - 事件行為：呼叫 `presenter.set_import_target_struct(name)` 後刷新樹。
+   - 確保 `Treeview.insert(..., values=...)` 之 `values` 為字串 tuple/list。
+   - 新增測試（對齊 TDD 計畫中列點）：
+     - `tests/view/test_struct_view_target_struct_dropdown_population`
+     - `tests/view/test_struct_view_insert_values_tuple_type`
+
+2) Legacy 路徑收斂（以相容為前提分階段關閉）
+   - 在 `src/model/layout.py` 中移除對 tuple/dict 的必要性（保留 `_get_attr`，但以 AST 為主）。
+   - 在 `src/model/struct_model.py` 的 `calculate_layout(...)` 移除非 AST 展平支援，或改以明確相容層封裝。
+
+3) API 與文件
+   - 於程式註解與文件標記 `parse_member_line` 為 deprecated，更新對外指引至 `parse_member_line_v2`。
+   - 在 `docs/development` 與對應 README 區段補充上述變更與遷移建議。
+
+4) 驗收補充
+   - 在 CI 中加入 View 層新增測試，並以 v15/v16/v17 全套測試綠燈為門檻。
+
+
+---
+
+### 相關檔案參考（便於開發對齊）
+
+- Model：`src/model/struct_model.py`（`load_struct_from_file`、`set_import_target_struct`、`get_display_nodes`）
+- Presenter：`src/presenter/struct_presenter.py`（`set_import_target_struct`）
+- Layout：`src/model/layout.py`（`StructLayoutCalculator.calculate`、`_get_attr`）
+- Parser：`src/model/struct_parser.py`（`parse_member_line_v2`、`parse_struct_definition_ast`、`_collect_known_types`）
+- View：`src/view/struct_view.py`（新增 Target Struct UI 與 `Treeview.insert` 型別規範）
+- 測試（已有）：
+  - Parser：`tests/model/test_parser_v17_memberdef_only.py`
+  - Layout：`tests/model/test_layout_v17_memberdef_only.py`
+  - Model：`tests/model/test_model_v17_target_struct.py`
+  - Presenter：`tests/presenter/test_presenter_v17_target_struct.py`
+- 測試（待新增）：
+  - View：`tests/view/test_struct_view_target_struct_dropdown_population`
+  - View：`tests/view/test_struct_view_insert_values_tuple_type`
+
