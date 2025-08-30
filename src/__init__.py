@@ -11,4 +11,14 @@ except Exception:
     StructPresenter = None
     V7Presenter = None
 
-__all__ = ["StructPresenter", "V7Presenter"]
+from .model import StructModel  # convenience re-export
+from .export.csv_export import DefaultCsvExportService, CsvExportOptions, CsvExportError
+
+__all__ = [
+    "StructPresenter",
+    "V7Presenter",
+    "StructModel",
+    "DefaultCsvExportService",
+    "CsvExportOptions",
+    "CsvExportError",
+]

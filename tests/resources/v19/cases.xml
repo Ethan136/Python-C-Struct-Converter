@@ -1,0 +1,13 @@
+<TestSuite version="19">
+  <Case id="V19-CSV-E2E-001" name="basic layout+values">
+    <Input file="inputs/basic.h" />
+    <HexInput value="D204000001000000" endianness="little"/>
+    <Options delimiter="," includeHeader="true" encoding="UTF-8" includeBom="false"
+             lineEnding="LF" nullStrategy="empty"
+             columns="entity_name,field_order,field_name,data_type,offset,size,value,hex_raw"
+             sortBy="entity_name:ASC,field_order:ASC" safeCast="true"
+             includeLayout="true" includeValues="true" endianness="little" />
+    <Output file="expected/basic.csv" />
+  </Case>
+</TestSuite>
+
