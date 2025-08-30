@@ -2,6 +2,11 @@
 
 ## [優先開發] 只需修改 View 的功能
 
+> Note (V23): 本文件部分內容（legacy/modern 切換、v7 導引）已被 V23 取代。最新規劃與實作請參考：
+> - `docs/development/v23_Modern_Replaces_Legacy_and_TreeFlat_Visual_Diff_TDD.md`
+> - `docs/development/V23_MIGRATION_GUIDE.md`
+> - `src/view/README.md`（Modern-only 與 Tree/Flat 視覺行為）
+
 ### 1. Treeview/表格欄位設定一致性與共用化  ✅已完成
 - 所有 tab（如 file/manual/debug）都統一引用 MEMBER_TREEVIEW_COLUMNS，動態顯示/隱藏欄位時只重建 widget。
 - 已完成，並有單元測試驗證欄位一致性。

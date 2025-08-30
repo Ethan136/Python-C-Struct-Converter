@@ -1,5 +1,10 @@
 # v6 GUI for Nested Struct and Union — Presenter（邏輯/資料流/狀態管理）
 
+> Note (V23): 關於 legacy/modern 切換與 v7 導引的描述已被 V23 Modern-only 設計取代；請參考：
+> - `docs/development/v23_Modern_Replaces_Legacy_and_TreeFlat_Visual_Diff_TDD.md`
+> - `docs/development/V23_MIGRATION_GUIDE.md`
+> - `src/view/README.md`
+
 ## 1. AST node 結構與資料流
 - AST node 結構：id, name, type, children, is_struct, is_union, value, offset, size, bitfield info...
 - Model 已支援巢狀 AST，Presenter 可直接取得並遞迴處理。

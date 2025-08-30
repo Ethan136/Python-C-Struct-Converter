@@ -1,4 +1,9 @@
-# v7 開發實作規劃 - 巢狀結構 AST 重構與展平優化
+# v7 開發實作規劃 - 巢狀結構 AST 重構與展平優化（Deprecated）
+
+> Note (V23): 本文件為歷史規劃。自 V23 起，Modern 為唯一介面，v7/legacy 切換功能已移除；請參考下列文件了解最新狀態：
+> - `docs/development/v23_Modern_Replaces_Legacy_and_TreeFlat_Visual_Diff_TDD.md`
+> - `docs/development/V23_MIGRATION_GUIDE.md`
+> - `src/view/README.md`
 
 ## 1. 開發目標與範圍
 

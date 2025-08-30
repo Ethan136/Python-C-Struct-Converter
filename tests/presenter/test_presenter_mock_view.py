@@ -33,7 +33,6 @@ class TestPresenterMockView(unittest.TestCase):
         self.presenter.push_context = sync_push_context
         self.presenter.context = {
             "display_mode": "tree",
-            "gui_version": "legacy",
             "expanded_nodes": ["root"],
             "selected_node": None,
             "error": None,

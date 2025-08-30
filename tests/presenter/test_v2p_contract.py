@@ -20,7 +20,6 @@ class TestV2PAPIContract(unittest.TestCase):
         # 預設 context 初始化
         self.presenter.context = {
             "display_mode": "tree",
-            "gui_version": "legacy",
             "expanded_nodes": ["root"],
             "selected_node": None,
             "error": None,

@@ -15,7 +15,6 @@ class TestPresenterCacheState(unittest.TestCase):
         self.presenter = StructPresenter(self.model)
         self.presenter.context = {
             "display_mode": "tree",
-            "gui_version": "legacy",
             "expanded_nodes": ["root"],
             "selected_node": None,
             "error": None,

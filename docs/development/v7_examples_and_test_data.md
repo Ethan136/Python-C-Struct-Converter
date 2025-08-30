@@ -1,4 +1,8 @@
-# v7 範例與測試資料
+# v7 範例與測試資料（Deprecated）
+
+> Note (V23): 本文件為歷史說明，範例仍可參考。系統現已移除 v7/legacy 切換，Modern 為唯一介面。請參閱：
+> - `docs/development/V23_MIGRATION_GUIDE.md`
+> - `src/view/README.md`（現況 GUI 行為）
 
 ## 1. 複雜結構範例
 

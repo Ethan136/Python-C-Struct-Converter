@@ -1,15 +1,13 @@
 # v8 GUI Integration Plan
 
-## 背景
-- 目前 GUI 的 "手動匯入 .H" tab 可切換 legacy、modern、v7 三種介面。
-- v7 與 modern 版面相同，差異僅在 v7 透過 `VirtualTreeview` 支援大量節點虛擬化，並加入快捷鍵與右鍵選單。
-- `StructView._switch_to_v7_gui()` 內僅呼叫 `_switch_to_modern_gui()`，顯示兩者可共用布局。
-- `StructViewV7` 繼承自 `StructView`，額外掛載虛擬化與操作邏輯。
+## 背景（V23 更新）
+- 自 V23 起，GUI 僅提供 Modern 介面；Legacy 與 v7 版本切換已移除。
+- 大量節點的虛擬化顯示由 `VirtualTreeview` 於 Modern 內直接支援（以 `enable_virtual=True` 啟用）。
 
-## 建議
-1. **合併介面**：在 modern 介面中預設啟用（或提供開關）虛擬化與快捷鍵，讓使用者不需再選擇 v7。
-2. **整併測試**：將 `test_struct_view_v7.py` 的案例併入 `test_struct_view.py`，以參數或 fixture 控制虛擬化情境。
-3. **簡化選單**：OptionMenu 僅保留 legacy 與 modern（整合後），或將 v7 視為 modern 的別名。
+## 現況
+1. **介面整併**：Modern 唯一；虛擬化透過 `enable_virtual` 參數。
+2. **測試**：v7 相關測試已綜合至 Modern 測試。
+3. **選單**：已移除 GUI 版本切換選單。
 
 ## 實作步驟
 - 將 `StructViewV7` 的虛擬化、快捷鍵、右鍵選單邏輯併入 `StructView`。
@@ -18,7 +16,7 @@
 - 重構測試，確保虛擬化與一般情況都被覆蓋。
 - 更新文件與使用說明，讓使用者了解 v7 功能已整合至 modern。
 
-## 詳細實作
+## 詳細實作（歷史記錄）
 以下列出需調整的檔案與重點內容：
 1. **`src/view/struct_view.py`**
    - 在 `__init__` 新增 `enable_virtual` 及 `virtual_page_size` 參數，預設開啟虛擬化。
@@ -127,4 +125,4 @@
 
 ---
 
-本文件彙整前述討論，提出在 v8 階段將 modern 與 v7 介面整合的方向與實作要點，以降低維護成本並提升使用體驗。
+本文件保留歷史討論。最新狀態請參考 V23 文件與 `src/view/README.md`。
