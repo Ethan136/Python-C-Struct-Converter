@@ -40,6 +40,7 @@ except Exception:
 
 from .virtual_tree import VirtualTreeview
 # from src.config import get_string
+from src.export.csv_export import DefaultCsvExportService, CsvExportOptions, build_parsed_model_from_struct
 from src.model.struct_model import StructModel
 import time
 
@@ -318,6 +319,10 @@ class StructView(tk.Tk):
         # 解析按鈕
         self.parse_button = tk.Button(main_frame, text="解析", command=self._on_parse_file, state="disabled")
         self.parse_button.pack(anchor="w", pady=5)
+
+        # 匯出 CSV 按鈕（v19 GUI 整合）
+        self.export_csv_button = tk.Button(main_frame, text="匯出 CSV", command=self._on_export_csv, state="disabled")
+        self.export_csv_button.pack(anchor="w", pady=2)
 
         # struct member value 顯示區
         member_frame = tk.LabelFrame(main_frame, text="Struct Member Value")
@@ -927,6 +932,12 @@ class StructView(tk.Tk):
                 bit_size_str,
                 is_bf_str
             ))
+        # 啟用 CSV 匯出（當 layout 存在時）
+        try:
+            if hasattr(self, "export_csv_button"):
+                self.export_csv_button.config(state="normal" if layout else "disabled")
+        except Exception:
+            pass
 
     def clear_results(self):
         for entry, _ in self.hex_entries:
@@ -938,6 +949,81 @@ class StructView(tk.Tk):
         self.debug_text.config(state="disabled")
         # 全檔案移除 self.struct_info_text 相關操作，確保不再存取不存在的 Text 物件。
         pass
+        # 停用 CSV 匯出
+        try:
+            if hasattr(self, "export_csv_button"):
+                self.export_csv_button.config(state="disabled")
+        except Exception:
+            pass
+
+    def _on_export_csv(self):
+        # 檢查 presenter/model 是否可用
+        if not self.presenter or not hasattr(self.presenter, "model") or not self.presenter.model:
+            try:
+                messagebox.showerror("錯誤", "尚未載入 struct，無法匯出 CSV")
+            except Exception:
+                pass
+            return
+        try:
+            # 選擇輸出檔案路徑
+            try:
+                from tkinter import filedialog as _fd
+            except Exception:
+                _fd = filedialog
+            file_path = None
+            try:
+                file_path = _fd.asksaveasfilename(
+                    title="選擇輸出 CSV 檔案",
+                    defaultextension=".csv",
+                    filetypes=(("CSV files", "*.csv"), ("All files", "*.*"))
+                )
+            except Exception:
+                file_path = None
+            if not file_path:
+                return
+
+            # 建構 parsed model
+            parsed_model = build_parsed_model_from_struct(self.presenter.model)
+
+            # 蒐集 hex 輸入（若有），供 value 計算
+            hex_parts = []
+            try:
+                hex_parts = self.get_hex_input_parts()
+            except Exception:
+                hex_parts = []
+            try:
+                hex_input = "".join(raw for raw, _ in hex_parts).replace(" ", "")
+            except Exception:
+                hex_input = ""
+            # 端序
+            try:
+                endian_str = self.get_selected_endianness()
+                endianness = "little" if str(endian_str).lower().startswith("little") else "big"
+            except Exception:
+                endianness = "little"
+
+            # 匯出選項（可擴充成 UI 設定）
+            opts = CsvExportOptions(
+                include_header=True,
+                include_layout=True,
+                include_values=True,
+                endianness=endianness,
+                hex_input=hex_input or None,
+            )
+            svc = DefaultCsvExportService()
+            report = svc.export_to_csv(parsed_model, {"type": "file", "path": file_path}, opts)
+            try:
+                messagebox.showwarning(
+                    "匯出完成",
+                    f"已輸出 {report.records_written} 筆欄位到\n{report.file_path}\n耗時 {report.duration_ms} ms"
+                )
+            except Exception:
+                pass
+        except Exception as e:
+            try:
+                messagebox.showerror("匯出失敗", str(e))
+            except Exception:
+                pass
 
     def _on_unit_size_change(self):
         if self.presenter:
