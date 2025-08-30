@@ -6,6 +6,9 @@
 
 ## 1. 範圍與目標
 - **目標**：在既有的 .H 解析流程完成後，新增 CSV 匯出器，將解析後的結構化資料以 CSV 檔輸出。
+- **補充（v19 擴充需求）**：CSV 需「同一份檔案」同時輸出：
+  - struct layout 資訊（offset、size、bit_offset、bit_size 等）
+  - structure member value（解析值與十六進位原始值）
 - **範圍**：新增 CSV 匯出模組、公開介面、命令列/服務層入口，以及對應單元測試、整合測試、TestXml 驅動的端對端測試。
 - **不變更**：現有 .H 解析器語意與輸出資料模型不變（如有缺欄位，於本功能新增安全映射與預設）。
 
@@ -58,7 +61,7 @@ type ParsedModel = {
 ## 5. CSV 規格與輸出格式
 - **預設分隔符**：`,`（可自訂 `;`、Tab 等）
 - **預設引號字元**：`"`（遇到分隔符、引號、換行、首尾空白則加引號，內部 `"` 以 `""` 轉義）
-- **標頭列**：預設輸出，欄位順序如下：
+- **標頭列**：預設輸出，欄位順序如下（含 layout 與 value 欄位）：
   1. entity_name
   2. field_order
   3. field_name
@@ -73,16 +76,26 @@ type ParsedModel = {
   12. source_file
   13. source_line
   14. tags
+  15. offset                ← struct layout
+  16. size                  ← struct layout
+  17. bit_offset            ← struct layout，若非 bitfield 則空
+  18. bit_size              ← struct layout，若非 bitfield 則空
+  19. value                 ← structure member value（依 endianness 解析）
+  20. hex_raw               ← 原始 bytes 十六進位字串（長度 = size×2）
 - **編碼**：預設 UTF-8（BOM 預設 false，可開關）
 - **換行**：預設 `\n`（可自訂 `\r\n`）
 - **空值呈現**：預設輸出空字串（可改 `NULL`）
 - **欄位排序**：預設依 `entity_name ASC, field_order ASC`（可設定排序鍵）
-- **欄位挑選與重排**：可由選項設定輸出欄位子集合與順序
+- **欄位挑選與重排**：可由選項設定輸出欄位子集合與順序（例如移除 value/hex_raw）
+- **值來源與位元序**：
+  - 若提供 `hex_input` 與 `endianness`，以 layout 計算對應 bytes，產生 `value` 與 `hex_raw`。
+  - 若未提供 `hex_input` 但 `StructModel` 內有 `member_values`，優先使用該值（`hex_raw` 留空）。
+  - 皆無則依空值策略輸出空字串（或 `NULL`/`-`）。
 
 ---
 
 ## 6. 公開介面（Service 與 API）
-服務層匯出介面：
+服務層匯出介面（擴充 value 與 layout 支援）：
 
 ```ts
 // 同步或串流式實作皆可，推薦串流
@@ -99,25 +112,32 @@ type OutputTarget =
   | { type: 'stream', stream: Writable }
 
 type CsvExportOptions = {
-  delimiter?: string             // 預設 ","
-  quoteChar?: string             // 預設 """
-  includeHeader?: boolean        // 預設 true
-  encoding?: 'UTF-8' | 'UTF-8-BOM' | 'MS950' | 'CP932' | string  // 預設 UTF-8
-  lineEnding?: '\n' | '\r\n'     // 預設 '\n'
-  nullStrategy?: 'empty' | 'NULL'| 'dash'                         // 預設 'empty'
-  decimalSeparator?: '.' | ','   // 僅影響數值序列化（若有）
-  includeBom?: boolean           // 預設 false
-  columns?: string[]             // 欲輸出欄位清單（預設第 5 節順序）
-  sortBy?: Array<{ key: string, order: 'ASC'|'DESC' }> // 預設 entity_name, field_order
-  safeCast?: boolean             // 預設 true：不破例，使用安全映射
+  delimiter?: string
+  quoteChar?: string
+  includeHeader?: boolean
+  encoding?: 'UTF-8' | 'UTF-8-BOM' | 'MS950' | 'CP932' | string
+  lineEnding?: '\n' | '\r\n'
+  nullStrategy?: 'empty' | 'NULL'| 'dash'
+  decimalSeparator?: '.' | ','
+  includeBom?: boolean
+  columns?: string[]
+  sortBy?: Array<{ key: string, order: 'ASC'|'DESC' }>
+  safeCast?: boolean
+  // v19 併出 layout+values
+  includeLayout?: boolean        // 預設 true：輸出 offset/size/bit_*
+  includeValues?: boolean        // 預設 true：輸出 value/hex_raw
+  endianness?: 'little' | 'big'  // 預設 'little'
+  hexInput?: string              // 來源 hex 字串（無空白），與 layout 一起解析 value
+  valueProvider?: (row) => any   // 可選，自訂 value 來源（優先於 hexInput）
 }
 
 type ExportReport = {
   recordsWritten: number
   headerWritten: boolean
-  filePath?: string              // 當 target 為 file 時回填
+  filePath?: string
   durationMs: number
   warnings: string[]
+  valuesComputed?: number        // 以 hexInput 解析成功之筆數
 }
 
 class CsvExportError extends Error {
@@ -126,14 +146,16 @@ class CsvExportError extends Error {
 }
 ```
 
-命令列/外部入口（可選）：
+命令列/外部入口（擴充）：
 
 ```
 --export-csv <path> \
   [--delimiter , --no-header --encoding UTF-8 --bom \
    --line-ending CRLF --null NULL \
-   --columns "field_name,data_type" \
+   --columns "field_name,data_type,offset,size,value,hex_raw" \
    --sort "entity_name:ASC,field_order:ASC"]
+   --include-values --include-layout --endianness little \
+   --hex "001122..."   # 若無 --hex，則可由內部 model.member_values 取得（若存在）
 ```
 
 ---
@@ -154,6 +176,16 @@ class CsvExportError extends Error {
   - 使用串流寫出，不一次載入全部字串。每寫入 N 筆 flush。
 - **7.6 排序**：
   - 預設 `entity_name ASC, field_order ASC`。若 `sortBy` 提供不存在欄位，加入 warning 並忽略該鍵。
+
+- **7.7 Layout 與 Value 併出規則**：
+  - layout 欄位：
+    - `offset`、`size` 由計算後的 layout 直接帶出。
+    - `bit_offset`、`bit_size` 僅對 bitfield 有值，非 bitfield 則依空值策略輸出。
+  - value 欄位：
+    - 若提供 `hexInput`：依 layout 之 offset/size 擷取 bytes，依 `endianness` 解析數值（bitfield 先取對應 storage，再 mask/shift）。
+    - `hex_raw` 為擷取之 bytes 的十六進位字串（大端格式輸出，不影響數值解析）。
+    - 若無 `hexInput` 且存在 `valueProvider`：以 provider 回傳值填入 `value`，`hex_raw` 依空值策略。
+    - 皆無資料來源：`value` 與 `hex_raw` 依空值策略。
 
 ---
 
@@ -186,6 +218,11 @@ class CsvExportError extends Error {
 - V19-CSV-UNIT-010 嚴格模式（safeCast=false 遇非法資料拋錯）。
 - V19-CSV-UNIT-011 I/O 例外（目錄不存在、權限不足、磁碟滿模擬）。
 - V19-CSV-UNIT-012 Line ending（LF 與 CRLF 正確）。
+- V19-CSV-UNIT-013 併出 layout 欄位（offset/size/bit_offset/bit_size）。
+- V19-CSV-UNIT-014 併出 value/hex_raw（提供 hexInput，小端/大端比對）。
+- V19-CSV-UNIT-015 bitfield 值解析（mask/shift 正確）。
+- V19-CSV-UNIT-016 無 hexInput 使用 valueProvider 或空值策略。
+- V19-CSV-UNIT-017 columns 子集合含 value 與 layout 的重排輸出。
 
 ---
 
@@ -195,6 +232,8 @@ class CsvExportError extends Error {
 - V19-CSV-IT-003 含中文/日文註解與全形標點之 .H 正確轉碼與引號處理。
 - V19-CSV-IT-004 缺少選填欄位的 .H（如無 `precision/scale`）輸出符合空值策略。
 - V19-CSV-IT-005 自訂 columns 與 sortBy 組合（端對端）。
+- V19-CSV-IT-006 提供 hexInput 之端對端（確認 value 與 hex_raw 正確）。
+- V19-CSV-IT-007 bitfield 端對端（含 storage 對齊與位移）。
 
 ---
 
@@ -206,6 +245,7 @@ class CsvExportError extends Error {
 <TestSuite version="19">
   <Case id="" name="">
     <Input file="inputs/sample1.h" />
+    <HexInput value="0011223344..." endianness="little"/> <!-- 可省略，則 value 空/或由 provider -->
     <Options
       delimiter="," 
       includeHeader="true"
@@ -213,9 +253,12 @@ class CsvExportError extends Error {
       includeBom="false"
       lineEnding="LF"
       nullStrategy="empty"
-      columns="entity_name,field_order,field_name,data_type"
+      columns="entity_name,field_order,field_name,data_type,offset,size,value,hex_raw"
       sortBy="entity_name:ASC,field_order:ASC"
       safeCast="true"
+      includeLayout="true"
+      includeValues="true"
+      endianness="little"
     />
     <Output file="expected/sample1.csv" />
   </Case>
@@ -232,12 +275,13 @@ class CsvExportError extends Error {
 
 ```xml
 <TestSuite version="19">
-  <Case id="V19-CSV-E2E-001" name="Basic export with header">
+  <Case id="V19-CSV-E2E-001" name="Basic export with header (layout+values)">
     <Input file="inputs/basic.h"/>
+    <HexInput value="001122334455..." endianness="little"/>
     <Options delimiter="," includeHeader="true" encoding="UTF-8" includeBom="false"
              lineEnding="LF" nullStrategy="empty"
-             columns="entity_name,field_order,field_name,physical_name,data_type,length,precision,scale,nullable,default,comment,source_file,source_line,tags"
-             sortBy="entity_name:ASC,field_order:ASC" safeCast="true"/>
+             columns="entity_name,field_order,field_name,physical_name,data_type,length,precision,scale,nullable,default,comment,source_file,source_line,tags,offset,size,bit_offset,bit_size,value,hex_raw"
+             sortBy="entity_name:ASC,field_order:ASC" safeCast="true" includeLayout="true" includeValues="true"/>
     <Output file="expected/basic.csv"/>
   </Case>
   <Case id="V19-CSV-E2E-002" name="Semicolon without header">
@@ -260,13 +304,13 @@ class CsvExportError extends Error {
 
 ---
 
-## 13. 輸出 CSV 範例
+## 13. 輸出 CSV 範例（含 layout+values）
 
 ```
-entity_name,field_order,field_name,physical_name,data_type,length,precision,scale,nullable,default,comment,source_file,source_line,tags
-Customer,1,Id,ID,NUMERIC,,10,0,false,,Primary key,customer.h,12,
-Customer,2,Name,NAME,VARCHAR,100,,,,false,,"Customer ""display"" name",customer.h,13,core|pii
-Customer,3,Note,NOTE,VARCHAR,200,,,,true,,May contain newlines,customer.h,14,
+entity_name,field_order,field_name,physical_name,data_type,length,precision,scale,nullable,default,comment,source_file,source_line,tags,offset,size,bit_offset,bit_size,value,hex_raw
+Customer,1,Id,ID,NUMERIC,,10,0,false,,Primary key,customer.h,12,,0,4,,,1234,000004D2
+Customer,2,Name,NAME,VARCHAR,100,,,,false,,"Customer ""display"" name",customer.h,13,core|pii,4,100,,,,,2B2D...  
+Customer,3,Note,NOTE,VARCHAR,200,,,,true,,May contain newlines,customer.h,14,,104,200,,,,,
 ```
 
 ---
@@ -277,6 +321,7 @@ Customer,3,Note,NOTE,VARCHAR,200,,,,true,,May contain newlines,customer.h,14,
   - `export.csv.path`（string，相對或絕對路徑）
   - `export.csv.options.*`（對應 `CsvExportOptions`）
 - CLI：`--export-csv <path>` 與對應選項（同第 6 節）
+  - 新增：`--include-layout`、`--include-values`、`--endianness little|big`、`--hex <HEX>`
 
 ---
 
@@ -286,17 +331,23 @@ Customer,3,Note,NOTE,VARCHAR,200,,,,true,,May contain newlines,customer.h,14,
   - 新增 `CsvRowSerializer`（負責欄位→字串、引號轉義、null 策略）
   - 新增 `CsvWritePipeline`（串流分段寫入、flush、BOM、編碼、換行）
   - 既有 UseCase/Workflow：在「.H 解析完成事件」後掛接「CSV 匯出步驟」（受 `export.csv.enabled` 控制）
+  - 併出支援：
+    - 將 layout 欄位（offset/size/bit_*）加入 rows 映射（由 layout 計算器輸出決定）。
+    - 新增 value 計算邏輯：
+      - 若 options.hexInput 存在：以 offset/size 擷取 bytes，依 endianness 轉數值；bitfield 依 storage/bit_offset/bit_size 計算。
+      - 若 options.valueProvider 存在：以 provider 回傳值填入；hex_raw 依空值策略。
+      - 皆無：value 與 hex_raw 依空值策略。
 - **15.2 資料流**
-  - Input `.H` → 解析器 → `ParsedModel` → `CsvExportService.exportToCsv` → 檔案/串流
+  - Input `.H` → 解析器 → `ParsedModel` →（可選）HexInput/Endianness or ValueProvider → `CsvExportService.exportToCsv` → 檔案/串流
 - **15.3 介面**
   - 公開 `CsvExportService` 與 `CsvExportOptions`（見第 6 節）
   - 既有 UseCase 新增依賴注入點（若使用 DI，註冊為 Scoped/Singleton 規則依專案而定）
 - **15.4 Test**
   - 單元：對 `CsvRowSerializer`、`DefaultCsvExportService`、異常路徑、串流大檔
-  - 整合：解析器 + 匯出整合場景（見第 11 節）
+  - 整合：解析器 + 匯出整合場景（見第 11 節）並覆蓋 value/hex_raw 與 bitfield 路徑
 - **15.5 TestXml**
   - 新增 `tests/resources/v19/inputs/*.h`、`expected/*.csv`、`cases.xml`
-  - 測試執行器支援 v19 `TestSuite` 格式（見第 12 節）
+  - 測試執行器支援 v19 `TestSuite` 格式（見第 12 節），並解析 `<HexInput value endianness/>` 與 `includeLayout/includeValues`
 
 ---
 
@@ -306,6 +357,7 @@ Customer,3,Note,NOTE,VARCHAR,200,,,,true,,May contain newlines,customer.h,14,
 - 大量資料測試於預期記憶體占用內完成，不 OOM。
 - 錯誤處理符合預期：IO、編碼、非法選項、空模型等。
 - 產出 `ExportReport` 數值合理（筆數、耗時、表頭旗標）。
+- 於提供 `hexInput` 時，`value/hex_raw` 與預期對照一致（含 bitfield）；未提供 `hexInput` 時行為符合空值策略或 provider 規格。
 
 ---
 
@@ -323,10 +375,11 @@ Customer,3,Note,NOTE,VARCHAR,200,,,,true,,May contain newlines,customer.h,14,
 4. 串流寫入管線與 BOM/換行測試。
 5. 排序、欄位挑選/重排測試與實作。
 6. 整合測試：接上解析器，端對端輸出比對。
-7. TestXml 執行器案例補齊（含嚴格模式拋錯案例）。
-8. 大量資料與 I/O 例外測試。
-9. 收斂警告訊息格式、ExportReport。
-10. 文件化 CLI/組態與使用說明。
+7. 併出 layout 與 value：加入 hexInput/endianness 測試，bitfield 值解析測試。
+8. TestXml 執行器案例補齊（含嚴格模式拋錯案例）。
+9. 大量資料與 I/O 例外測試。
+10. 收斂警告訊息格式、ExportReport（含 valuesComputed）。
+11. 文件化 CLI/組態與使用說明。
 
 ---
 
