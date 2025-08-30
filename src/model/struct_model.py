@@ -150,6 +150,11 @@ class StructModel:
     def load_struct_from_file(self, file_path, target_name=None):
         with open(file_path, 'r') as f:
             content = f.read()
+        # 保存最後載入的檔案路徑供導出報告/追蹤
+        try:
+            self.last_loaded_file_path = file_path
+        except Exception:
+            pass
         self.struct_content = content  # 同步保存原始內容供 AST/顯示使用
         # v17: 收集頂層可用型別名稱供 Presenter/View 下拉
         try:

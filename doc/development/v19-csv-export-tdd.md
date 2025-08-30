@@ -335,3 +335,10 @@ Customer,3,Note,NOTE,VARCHAR,200,,,,true,,May contain newlines,customer.h,14,
 - 測試：單元/整合/端對端（含 `cases.xml` 與樣本 `.h`/`.csv`）。
 - 文件：本 TDD 規格、使用說明、範例指令。
 
+---
+
+## 附：實作位置（v19）
+- 程式碼：`src/export/csv_export.py`
+- 單元測試：`tests/export/test_csv_export_unittest.py`
+- CLI：`tools/export_csv_from_h.py`
+
