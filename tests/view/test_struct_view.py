@@ -1147,7 +1147,6 @@ class TestStructView(unittest.TestCase):
                 self.calls = []
                 self.context = {
                     "display_mode": "tree",
-                    "gui_version": "legacy",
                     "expanded_nodes": ["root"],
                     "selected_node": "root",
                     "selected_nodes": ["root"],
@@ -1242,7 +1241,6 @@ class TestStructView(unittest.TestCase):
                 self.calls = []
                 self.context = {
                     "display_mode": "tree",
-                    "gui_version": "legacy",
                     "expanded_nodes": ["root"],
                     "selected_node": "root",
                     "selected_nodes": ["root"],
