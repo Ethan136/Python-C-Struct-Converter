@@ -82,6 +82,16 @@ Manual mode uses explicit C/C++ types and optional `bit_size` (for bitfields). T
 - `StructModel.export_manual_struct_to_h(struct_name)` generates a valid C header snippet with bitfield syntax and a `// total size: N bytes` trailer.
 
 ## Validation Logic
+## Import .H 頂層 `#pragma pack` 支援（v18）
+
+- 範圍：僅處理「頂層」pragma，即第一個被 Import .H 選取之聚合（`struct`/`union`）之前的 `#pragma pack(push/pack/pop)`。
+- 規則：計算 pack 對齊值後，將其傳入 layout 計算，對齊以 `min(natural_align, pack_alignment)` 進行。
+- 支援語法：
+  - `#pragma pack(push, N)` 多層堆疊
+  - `#pragma pack(N)` 覆寫當前層；無層時視為第一層
+  - `#pragma pack(pop)` 回退上一層；若無層則記錄警告並忽略
+- 限制：不處理巢狀宣告內部的 pragma；只於 Import .H AST 路徑生效。
+- Target 切換：`set_import_target_struct(name)` 會重新根據該目標計算其前綴有效 pack，並更新 layout。
 
 ### Struct Definition Validation
 - **Function**: `validate_struct_definition()`

@@ -9,6 +9,9 @@ from .layout import LayoutCalculator, LayoutItem, TYPE_INFO
 from .struct_parser import parse_struct_definition, parse_member_line
 from dataclasses import asdict
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -431,17 +434,18 @@ class StructModel:
                     try:
                         stack.append(int(m.group(2)))
                     except Exception:
+                        logger.warning("Invalid '#pragma pack(push, N)': N is not a number")
                         continue
                 elif m.group(3):  # pop
                     if stack:
                         stack.pop()
                     else:
-                        # 忽略孤立 pop
-                        pass
+                        logger.warning("Unmatched '#pragma pack(pop)' encountered before any push")
                 elif m.group(4):  # pack(N)
                     try:
                         n = int(m.group(4))
                     except Exception:
+                        logger.warning("Invalid '#pragma pack(N)': N is not a number")
                         continue
                     if stack:
                         stack[-1] = n

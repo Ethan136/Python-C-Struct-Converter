@@ -148,6 +148,7 @@ This project provides a graphical user interface (GUI) tool built with Python an
 - **Clear Results Display**: Shows the parsed values for each member in both decimal and hexadecimal formats.
 - **Struct Export**: Export manually defined structs to C header files with proper bitfield syntax.
 - **Unified Parsing Logic**: Both `.H file tab` and `Manual Struct tab` use the same underlying parsing engine (`parse_struct_bytes`) for consistent results and maintainable code.
+- **Import .H Top-Level Pragma Pack (v18)**: The `.H file tab` now honors top-level `#pragma pack(push/pack/pop)` before the selected struct/union, applying `min(natural_align, pack)` alignment in layout.
 - **TDD-Driven Development**: Comprehensive test coverage with 31 automated tests covering GUI operations, parsing logic, display functionality, padding, and bitfield handling.
 - **Real-time Size Display**: Each struct member shows its actual memory size in the editing table, helping users understand memory layout.
 - **Debug Tab**: A dedicated Debug tab is always visible in the tab bar for all users. This tab allows inspection of cache, LRU, and auto-refresh status directly from the GUI, with no restrictions or hidden mode.

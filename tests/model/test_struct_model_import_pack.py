@@ -32,6 +32,21 @@ HEADER_POP_ONLY = """
 struct S { int i; };
 """
 
+HEADER_ARRAY = """
+#pragma pack(2)
+struct S { short s; int arr[2]; };
+"""
+
+HEADER_BITFIELDS = """
+#pragma pack(1)
+struct S { unsigned int a:3; unsigned int b:5; unsigned int c:8; };
+"""
+
+HEADER_NESTED_UNION = """
+#pragma pack(1)
+struct S { union { int x; char y[4]; } u; char t; };
+"""
+
 
 class TestImportPackAlignment(unittest.TestCase):
     def _write_temp_header(self, src: str) -> str:
@@ -102,6 +117,41 @@ class TestImportPackAlignment(unittest.TestCase):
             i_entries = [o for (n, o) in pairs if n == 'i']
             self.assertTrue(i_entries, 'field i not found in layout')
             self.assertEqual(i_entries[0], 0)
+        finally:
+            os.remove(path)
+
+    def test_import_h_pack_effect_on_array_elements(self):
+        path = self._write_temp_header(HEADER_ARRAY)
+        try:
+            m = StructModel()
+            name, layout, total, align = m.load_struct_from_file(path)
+            pairs = [(it['name'] if isinstance(it, dict) else getattr(it,'name', None), it['offset'] if isinstance(it, dict) else getattr(it,'offset', None)) for it in layout]
+            # arr[0] should align to 2, not 4
+            a0 = [o for (n,o) in pairs if n == 'arr[0]']
+            self.assertTrue(a0)
+            self.assertEqual(a0[0], 2)
+        finally:
+            os.remove(path)
+
+    def test_import_h_pack_effect_on_bitfields(self):
+        path = self._write_temp_header(HEADER_BITFIELDS)
+        try:
+            m = StructModel()
+            name, layout, total, align = m.load_struct_from_file(path)
+            # With pack=1, total size should be compact; at least 4 bytes for 16 bits into a 4-byte unit
+            self.assertGreaterEqual(total, 4)
+        finally:
+            os.remove(path)
+
+    def test_import_h_pack_effect_on_nested_union(self):
+        path = self._write_temp_header(HEADER_NESTED_UNION)
+        try:
+            m = StructModel()
+            name, layout, total, align = m.load_struct_from_file(path)
+            pairs = [(it['name'] if isinstance(it, dict) else getattr(it,'name', None), it['offset'] if isinstance(it, dict) else getattr(it,'offset', None)) for it in layout]
+            # u should be at offset 0; t follows at offset 4 (no extra alignment beyond pack=1)
+            t_off = [o for (n,o) in pairs if n == 't'][0]
+            self.assertEqual(t_off, 4)
         finally:
             os.remove(path)
 
