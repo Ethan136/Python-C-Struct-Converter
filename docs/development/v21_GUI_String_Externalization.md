@@ -131,8 +131,8 @@ pytest -q tests/config/test_ui_strings.py
 - 預期：
   - 以上測試綠燈（`src/config/ui_strings.py` 現狀已符合）。
 
-#### 階段 2：Presenter 錯誤標題與對話框字串外部化（邏輯層不觸 UI）
-- 目標：將 `StructPresenter` 內錯誤標題映射與檔案對話框標題改為使用 `get_string`。
+#### 階段 2：Presenter 錯誤標題與訊息本文外部化（邏輯層不觸 UI）
+- 目標：將 `StructPresenter` 內錯誤標題映射、檔案對話框標題，以及常見錯誤訊息本文改為使用 `get_string`。
 - 涉及檔案：`src/presenter/struct_presenter.py`
 - 現況摘錄（僅示意）：
 ```12:55:src/presenter/struct_presenter.py
@@ -157,7 +157,13 @@ title_map = {
   - 錯誤標題目前為硬字串中文映射。
 - 實作改動：
   - 將 `title_map` 值改為 `get_string('dialog_invalid_input')` 等對應鍵。
-  - 確認所有錯誤訊息標題皆源自 `get_string`。必要的鍵（`dialog_invalid_input`, `dialog_value_too_large`, `dialog_overflow_error`, `dialog_conversion_error`）已存在於 XML，若缺則補。
+  - 將錯誤訊息本文改為 `get_string(...).format(...)`，例如：
+    - `msg_no_file_selected`
+    - `msg_not_loaded`
+    - `msg_file_load_error`（參數：`{error}`）
+    - `msg_input_too_long`（參數：`{length}`, `{expected}`）
+    - `msg_hex_parse_error`（參數：`{error}`）
+  - 確認所有錯誤訊息標題/本文皆源自 `get_string`。必要的鍵若缺則補。
 - 綠燈依據：上述測試通過。
 
 #### 階段 3：View 視窗標題與分頁標籤外部化（基礎可見文字）
@@ -167,6 +173,7 @@ title_map = {
   - `window_title`（如：`C Struct GUI`）
   - `tab_load_h`（載入.H檔）
   - `tab_manual_struct`（手動設定資料結構）
+  - `tab_debug`（Debug 分頁）
 - 測試新增：`tests/view/test_view_i18n_title_tabs.py`（顯示環境存在時執行）
   - `test_window_title_uses_xml`: 建立 `StructView` 後，斷言 `view.title()` 等於 `get_string('window_title')`。
   - `test_tabs_use_xml`: 斷言兩個分頁標籤文字來源為對應鍵。
@@ -227,7 +234,7 @@ messagebox.showwarning("Context Warning", warning_msg)
 messagebox.showerror("錯誤", str(context["error"]))
 ```
 - 新增鍵：
-  - `dialog_error_title`, `dialog_warning_title`, `dialog_export_failed_title`, `dialog_not_loaded_title`, `dialog_not_loaded_body`, `dialog_context_warning_title`
+  - `dialog_error_title`, `dialog_warning_title`, `dialog_export_failed_title`, `dialog_not_loaded_title`, `dialog_not_loaded_body`, `dialog_context_warning_title`, `dialog_export_h_title`
 - 測試新增：`tests/view/test_view_i18n_messagebox.py`
   - 以 monkeypatch 攔截 `messagebox.showerror/showwarning`，驗證 title/message 來自 `get_string`。
 - 期望紅燈 → 實作改動：
@@ -264,10 +271,10 @@ pytest -q
 
 ### 鍵名清單（初版，實作中可調整命名）
 - 基礎與對話框：
-  - `app_title`, `window_title`, `dialog_select_file`, `dialog_error_title`, `dialog_warning_title`, `dialog_export_failed_title`, `dialog_not_loaded_title`, `dialog_not_loaded_body`, `dialog_context_warning_title`
+  - `app_title`, `window_title`, `dialog_select_file`, `dialog_error_title`, `dialog_warning_title`, `dialog_export_failed_title`, `dialog_not_loaded_title`, `dialog_not_loaded_body`, `dialog_context_warning_title`, `dialog_export_h_title`
   - `dialog_invalid_input`, `dialog_value_too_large`, `dialog_overflow_error`, `dialog_conversion_error`, `dialog_parsing_error`, `dialog_invalid_length`, `dialog_no_struct`
 - 分頁與區塊：
-  - `tab_load_h`, `tab_manual_struct`, `layout_frame_title`, `hex_input_title`, `parsed_values_title`
+  - `tab_load_h`, `tab_manual_struct`, `tab_debug`, `layout_frame_title`, `hex_input_title`, `parsed_values_title`
 - 控制列標籤：
   - `label_unit_size`, `label_endianness`, `label_display_mode`, `label_target_struct`, `label_gui_version`, `label_search`, `label_filter`
 - 按鈕：
@@ -275,6 +282,8 @@ pytest -q
 - Treeview 欄位：
   - Members：`member_col_name`, `member_col_value`, `member_col_hex_value`, `member_col_hex_raw`
   - Layout：`layout_col_name`, `layout_col_type`, `layout_col_offset`, `layout_col_size`, `layout_col_bit_offset`, `layout_col_bit_size`, `layout_col_is_bitfield`
+- Presenter 訊息（本文）：
+  - `msg_no_file_selected`, `msg_not_loaded`, `msg_file_load_error`, `msg_input_too_long`, `msg_hex_parse_error`
 
 ---
 

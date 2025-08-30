@@ -152,7 +152,8 @@ class StructPresenter:
             filetypes=(("Header files", "*.h"), ("All files", "*.*" ))
         )
         if not file_path:
-            return {'type': 'error', 'message': '未選擇檔案'}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_no_file_selected')}
 
         try:
             with open(file_path, 'r') as f:
@@ -168,7 +169,8 @@ class StructPresenter:
                 'struct_content': struct_content
             }
         except Exception as e:
-            return {'type': 'error', 'message': f"載入檔案時發生錯誤: {e}"}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_file_load_error').format(error=str(e))}
 
     async def on_load_file(self, file_path):
         self.context["loading"] = True
@@ -200,7 +202,8 @@ class StructPresenter:
 
     def parse_hex_data(self):
         if not self.model.layout:
-            return {'type': 'error', 'message': '尚未載入 struct 定義檔案'}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_not_loaded')}
 
         hex_parts_with_expected_len = self.view.get_hex_input_parts()
 
@@ -210,22 +213,26 @@ class StructPresenter:
         try:
             hex_data, debug_lines = self._process_hex_parts(hex_parts_with_expected_len, byte_order_for_conversion)
         except HexProcessingError as e:
-            title_map = {
-                "invalid_input": "無效輸入",
-                "value_too_large": "數值過大",
-                "overflow_error": "溢位錯誤",
-                "conversion_error": "轉換錯誤",
+            # v21: externalize error titles
+            title_key_map = {
+                "invalid_input": "dialog_invalid_input",
+                "value_too_large": "dialog_value_too_large",
+                "overflow_error": "dialog_overflow_error",
+                "conversion_error": "dialog_conversion_error",
             }
-            return {'type': 'error', 'message': f"{title_map.get(e.kind, '錯誤')}: {str(e)}"}
+            title = get_string(title_key_map.get(e.kind, "dialog_error_title"))
+            return {'type': 'error', 'message': f"{title}: {str(e)}"}
 
         if len(hex_data) > self.model.total_size * 2:
-            return {'type': 'error', 'message': f"輸入資料長度 ({len(hex_data)}) 超過預期總大小 ({self.model.total_size * 2})"}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_input_too_long').format(length=len(hex_data), expected=self.model.total_size * 2)}
 
         try:
             parsed_values = self.model.parse_hex_data(hex_data, byte_order_for_conversion)
             return {'type': 'ok', 'debug_lines': debug_lines, 'parsed_values': parsed_values}
         except Exception as e:
-            return {'type': 'error', 'message': f"解析 hex 資料時發生錯誤: {e}"}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_hex_parse_error').format(error=str(e))}
 
     def validate_manual_struct(self, struct_data):
         return self.model.validate_manual_struct(struct_data["members"], struct_data["total_size"])
@@ -250,15 +257,18 @@ class StructPresenter:
             parsed_values = self.model.parse_hex_data(hex_data, byte_order, layout=layout, total_size=struct_def['total_size'])
             return {'type': 'ok', 'debug_lines': debug_lines, 'parsed_values': parsed_values}
         except HexProcessingError as e:
-            title_map = {
-                "invalid_input": "無效輸入",
-                "value_too_large": "數值過大",
-                "overflow_error": "溢位錯誤",
-                "conversion_error": "轉換錯誤",
+            # v21: externalize error titles
+            title_key_map = {
+                "invalid_input": "dialog_invalid_input",
+                "value_too_large": "dialog_value_too_large",
+                "overflow_error": "dialog_overflow_error",
+                "conversion_error": "dialog_conversion_error",
             }
-            return {'type': 'error', 'message': f"{title_map.get(e.kind, '錯誤')}: {str(e)}"}
+            title = get_string(title_key_map.get(e.kind, "dialog_error_title"))
+            return {'type': 'error', 'message': f"{title}: {str(e)}"}
         except Exception as e:
-            return {'type': 'error', 'message': f"解析 hex 資料時發生錯誤: {e}"}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_hex_parse_error').format(error=str(e))}
 
     def compute_member_layout(self, members, total_size):
         """計算 struct member 的 layout，回傳 layout list，含 LRU cache 機制。"""
