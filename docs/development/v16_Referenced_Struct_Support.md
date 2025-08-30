@@ -98,6 +98,13 @@
 - 新增單元測試：引用型單一、1D/2D 陣列、union 陣列、forward reference、自我參照指標。
 - 手動驗證：以 `examples/` 與 `tests/data/*.h` 驗證 GUI 展開正確。
 
+### 快速驗證
+- 可使用 `examples/v16_example_struct.h` 驗證以下情境：
+  - 多個頂層定義與目標結構切換（Target Struct）。
+  - 引用型 struct/union（含 1D 陣列、union 陣列）。
+  - forward reference 展開（`Outer` 先於 `Inner` 宣告）。
+  - 指標成員不展開 nested（`struct Inner *p;`）。
+
 ---
 
 ### TDD 開發計畫（v16）

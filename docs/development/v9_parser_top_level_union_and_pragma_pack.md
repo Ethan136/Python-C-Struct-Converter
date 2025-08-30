@@ -11,6 +11,11 @@
 3. **改進 `_split_member_lines`**：在遇到巢狀 `struct/union` 時維持完整區塊，避免錯誤拆分。
 4. **新增測試案例**：針對上述三點建立單元測試，確保解析器可正確處理。
 
+## 當前狀態（v17）
+- 頂層 `union`：已支援（經由 `parse_c_definition_ast`/`parse_union_definition_ast` 進入 union AST 路徑）。
+- `#pragma pack`：尚未支援；`layout` 層具備 `pack_alignment` 參數，但 GUI 目前未提供設定，解析層亦未解析 pragma。
+- `_split_member_lines`：已改良為以括號深度控制並避免在頂層錯誤切分，同時在多處流程移除行註解以提升穩健度。
+
 ## 實作步驟
 - 重構 `parse_struct_definition`，讓其能同時處理 `struct` 與 `union`。
 - 新增 `_handle_directives()` 或於 `_clean_content` 解析 `#pragma` 行，保存 pack 等資訊後再以 `re.search` 找到第一個聚合型別。

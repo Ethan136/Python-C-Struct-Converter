@@ -101,6 +101,11 @@ if "*" in clean_type:
 - 以風險控管與交付效率考量，v15 採用「最小改動」最合適，能即時修正 GUI 顯示與 layout 展開問題。
 - 中長期建議在 v17 啟動資料格式統一，降低 parser → model → layout 的型別分歧，提升整體兼容性與可維護性。
 
+### 補充快速驗證
+- 除了本文件提及的 `examples/v14_features_example.h`，亦可參考 `examples/v16_example_struct.h`：
+  - 用於檢查指標成員的顯示行為（指標本身不展開 nested）。
+  - 若需驗證指標 N-D 陣列展開，請以 `examples/v14_features_example.h` 為主。
+
 ---
 
 ### TDD 開發計畫（v15）
