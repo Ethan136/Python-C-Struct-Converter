@@ -528,7 +528,7 @@ class StructModel:
         if not ast_dict:
             return []  # 修正：沒有 AST 時回傳空 list
         value_map = getattr(self, "member_values", {})  # 新增
-        def to_treeview_node(node):
+        def to_treeview_node(node, strip_children=False):
             label = node["name"]
             if node.get("is_struct"):
                 label = f"{label} [struct]"
@@ -542,21 +542,22 @@ class StructModel:
             offset_str = "" if off is None or off == "" else str(off)
             size_str = "" if siz is None or siz == "" else str(siz)
             # print(f"[DEBUG] to_treeview_node: name={node['name']} id={node['id']} value={value}")  # debug print
-            return {
+            result = {
                 "id": node["id"],
                 "label": label,
                 "type": node["type"],
                 "value": value,  # 新增
                 "offset": offset_str,
                 "size": size_str,
-                "children": [to_treeview_node(child) for child in node.get("children", [])],
+                "children": [] if strip_children else [to_treeview_node(child, strip_children=strip_children) for child in node.get("children", [])],
                 "icon": node.get("type"),
                 "extra": {},
             }
+            return result
         if mode == "tree":
-            return [to_treeview_node(ast_dict)]
+            return [to_treeview_node(ast_dict, strip_children=False)]
         elif mode == "flat":
             flat_nodes = flatten_ast_nodes(ast_dict)
-            return [to_treeview_node(n) for n in flat_nodes]
+            return [to_treeview_node(n, strip_children=True) for n in flat_nodes]
         else:
             raise ValueError(f"Unknown display mode: {mode}")

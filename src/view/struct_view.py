@@ -292,12 +292,7 @@ class StructView(tk.Tk):
         except Exception:
             # fallback for Entry：Enter 觸發
             self.target_struct_combo.bind('<Return>', lambda e: _on_target_struct_change())
-        # GUI 版本切換
-        tk.Label(control_frame, text=get_string("label_gui_version")).pack(side=tk.LEFT)
-        self.gui_version_var = tk.StringVar(value="legacy")
-        gui_version_options = ["legacy", "modern"]
-        self.gui_version_menu = tk.OptionMenu(control_frame, self.gui_version_var, *gui_version_options, command=self._on_gui_version_change)
-        self.gui_version_menu.pack(side=tk.LEFT)
+        # V23: 移除 GUI 版本切換（預設即為 Modern）
         # 搜尋輸入框
         tk.Label(control_frame, text=get_string("label_search")).pack(side=tk.LEFT)
         self.search_var = tk.StringVar()
@@ -349,9 +344,14 @@ class StructView(tk.Tk):
         # struct member value 顯示區
         member_frame = tk.LabelFrame(main_frame, text="Struct Member Value")
         member_frame.pack(fill="x", padx=2, pady=2)
+        # V23: 直接建立 Modern 介面作為預設
+        # 仍使用共用欄位設定建立 Treeview
         self.member_tree = create_member_treeview(member_frame)
-        self.legacy_tree = self.member_tree  # keep reference to legacy tree
-        self._bind_member_tree_events()
+        try:
+            # 若已存在 modern_tree 相關互動綁定，確保綁定
+            self._bind_member_tree_events()
+        except Exception:
+            pass
 
         # debug bytes 顯示區
         debug_frame = tk.LabelFrame(main_frame, text="Debug Bytes")
@@ -1598,13 +1598,24 @@ class StructView(tk.Tk):
 
     def show_treeview_nodes(self, nodes, context, icon_map=None):
         self._treeview_refresh_count += 1
+        # V23: 依 display_mode 調整顯示：tree 顯示樹欄，flat 顯示表頭
+        try:
+            mode = (context or {}).get("display_mode", "tree")
+            if mode == "tree":
+                if hasattr(self, "member_tree"):
+                    self.member_tree.configure(show="tree headings")
+            else:
+                if hasattr(self, "member_tree"):
+                    self.member_tree.configure(show="headings")
+        except Exception:
+            pass
         if self.enable_virtual:
-            if not hasattr(self, "virtual") and hasattr(self, "modern_tree"):
+            if not hasattr(self, "virtual"):
                 self._enable_virtualization()
             if hasattr(self, "virtual"):
                 flat = self._flatten_nodes(nodes, context=context)
                 self.virtual.set_nodes(flat)
-                update_treeview_by_context(self.modern_tree, context)
+                update_treeview_by_context(self.member_tree, context)
                 return
         # 依據 user_settings 設定 displaycolumns
         all_columns = tuple(c["name"] for c in MEMBER_TREEVIEW_COLUMNS)
@@ -1881,66 +1892,7 @@ class StructView(tk.Tk):
             selected = self.member_tree.selection()
             self.presenter.on_batch_delete(list(selected))
 
-    def _on_gui_version_change(self, version):
-        """處理 GUI 版本切換"""
-        if self.presenter and hasattr(self.presenter, "on_switch_gui_version"):
-            self.presenter.on_switch_gui_version(version)
-        
-        # 切換顯示模式
-        if version == "legacy":
-            self._switch_to_legacy_gui()
-        elif version == "modern":
-            self._switch_to_modern_gui()
-        elif version == "v7":
-            self._switch_to_v7_gui()
-        else:
-            self._switch_to_modern_gui()
-        # 切換後確保 modern_tree/legacy_tree 的顯示內容有資料
-        if hasattr(self, "presenter") and hasattr(self.presenter, "get_display_nodes") and hasattr(self.presenter, "context"):
-            try:
-                nodes = self.presenter.get_display_nodes(self.presenter.context.get("display_mode", "tree"))
-            except Exception:
-                nodes = []
-            self.update_display(nodes, self.presenter.context)
-
-    def _switch_to_legacy_gui(self):
-        """切換到舊版平面顯示"""
-        # 隱藏新版元件，顯示舊版元件
-        if hasattr(self, "modern_frame"):
-            self.modern_frame.pack_forget()
-        if hasattr(self, "legacy_tree"):
-            self.member_tree = self.legacy_tree
-        if hasattr(self, "member_tree"):
-            self.member_tree.pack(fill="x")
-            self._bind_member_tree_events()
-
-    def _switch_to_modern_gui(self):
-        """切換到新版樹狀顯示"""
-        # 隱藏舊版元件，顯示新版元件
-        if hasattr(self, "member_tree"):
-            self.member_tree.pack_forget()
-        if hasattr(self, "modern_frame"):
-            self.modern_frame.pack(fill="both", expand=True)
-        else:
-            self._create_modern_gui()
-        if self.enable_virtual:
-            self._enable_virtualization()
-        if hasattr(self, "modern_tree"):
-            self.member_tree = self.modern_tree
-            self._bind_member_tree_events()
-        # 切換後立即刷新顯示內容
-        if (self.presenter and hasattr(self.presenter, "get_display_nodes")
-                and hasattr(self.presenter, "context")):
-            mode = self.presenter.context.get("display_mode", "tree")
-            try:
-                nodes = self.presenter.get_display_nodes(mode)
-            except Exception:
-                nodes = []
-            self.update_display(nodes, self.presenter.context)
-
-    def _switch_to_v7_gui(self):
-        """切換到 v7 版本 GUI。當前實作與新版 GUI 相同。"""
-        self._switch_to_modern_gui()
+    # V23: 移除 GUI 版本切換與 legacy/v7 切換方法
 
     def _create_modern_gui(self):
         """建立新版樹狀顯示 GUI"""
@@ -1983,13 +1935,15 @@ class StructView(tk.Tk):
                 self._populate_modern_tree(nodes)
 
     def _enable_virtualization(self):
-        """Wrap modern_tree with VirtualTreeview when enabled"""
+        """Wrap member_tree with VirtualTreeview when enabled (V23)."""
         if not self.enable_virtual:
             return
-        if hasattr(self, "modern_tree") and not hasattr(self, "virtual"):
-            self.virtual = VirtualTreeview(self.modern_tree, self._virtual_page_size)
-            self.member_tree = self.modern_tree
-            self._bind_member_tree_events()
+        if hasattr(self, "member_tree") and not hasattr(self, "virtual"):
+            self.virtual = VirtualTreeview(self.member_tree, self._virtual_page_size)
+            try:
+                self._bind_member_tree_events()
+            except Exception:
+                pass
 
     def _populate_modern_tree(self, nodes):
         """將節點資料填入新版樹狀顯示"""

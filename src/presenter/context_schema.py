@@ -5,7 +5,6 @@ PRESENTER_CONTEXT_SCHEMA = {
     "type": "object",
     "properties": {
         "display_mode": {"type": "string"},
-        "gui_version": {"type": "string", "enum": ["legacy", "modern", "v7"]},
         "expanded_nodes": {"type": "array", "items": {"type": "string"}},
         "selected_node": {"anyOf": [{"type": "string"}, {"type": "null"}]},
         "error": {"anyOf": [{"type": "string"}, {"type": "null"}]},
@@ -22,7 +21,7 @@ PRESENTER_CONTEXT_SCHEMA = {
         "debug_info": {"type": "object"},
         "arch_mode": {"type": "string", "enum": ["x64", "x86"]}
     },
-    "required": ["display_mode", "gui_version", "expanded_nodes", "selected_node", "error", "version", "extra", "loading", "history", "user_settings", "last_update_time", "readonly", "debug_info"],
+    "required": ["display_mode", "expanded_nodes", "selected_node", "error", "version", "extra", "loading", "history", "user_settings", "last_update_time", "readonly", "debug_info"],
     "additionalProperties": True
 }
 

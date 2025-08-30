@@ -58,7 +58,6 @@ class PresenterStub:
         self.calls = []
         self.context = context or {
             "display_mode": "tree",
-            "gui_version": "legacy",
             "expanded_nodes": ["root"],
             "selected_node": "root",
             "selected_nodes": ["root"],
@@ -2006,52 +2005,20 @@ class TestStructView(unittest.TestCase):
         model.set_manual_struct([{"name": "b", "type": "int", "bit_size": 0}], 4)
         assert not calls1 and calls2, "移除 obs1 後只剩 obs2 收到通知"
 
-    def test_gui_version_switch_ui_and_presenter_call(self):
-        """測試 GUI 版本切換 UI 和 presenter 呼叫"""
-        # 測試切換選單存在
-        self.assertIsNotNone(self.view.gui_version_var)
-        self.assertEqual(self.view.gui_version_var.get(), "legacy")
-        
-        # 測試切換到新版
-        self.view._on_gui_version_change("modern")
-        self.assertEqual(self.presenter.context["gui_version"], "modern")
+    # V23: 移除 GUI 版本切換測試
 
-        # 測試切換到 v7
-        self.view._on_gui_version_change("v7")
-        self.assertEqual(self.presenter.context["gui_version"], "v7")
-        
-        # 測試切換到舊版
-        self.view._on_gui_version_change("legacy")
-        self.assertEqual(self.presenter.context["gui_version"], "legacy")
-
-    def test_modern_gui_creation(self):
-        """測試新版 GUI 建立"""
-        # 切換到新版
-        self.view._on_gui_version_change("modern")
-        
-        # 驗證新版元件存在
-        self.assertIsNotNone(self.view.modern_frame)
-        self.assertIsNotNone(self.view.modern_tree)
-        
-        # 驗證基本功能
-        self.assertTrue(hasattr(self.view, "_on_modern_tree_open"))
-        self.assertTrue(hasattr(self.view, "_on_modern_tree_close"))
-
-    def test_gui_version_switch_ui_visibility(self):
-        """測試 GUI 版本切換時的 UI 可見性"""
-        # 初始狀態應該是舊版顯示
+    def test_modern_default_exists(self):
+        """V23: 初始化即為 Modern，member_tree 可用"""
         self.assertTrue(hasattr(self.view, "member_tree"))
-        
-        # 切換到新版
-        self.view._on_gui_version_change("modern")
-        # 新版應該存在
-        self.assertTrue(hasattr(self.view, "modern_frame"))
-        self.assertTrue(hasattr(self.view, "modern_tree"))
-        
-        # 切換回舊版
-        self.view._on_gui_version_change("legacy")
-        # 舊版應該存在
-        self.assertTrue(hasattr(self.view, "member_tree"))
+        # 嘗試插入一個節點以確認 tree 存在
+        try:
+            self.view.member_tree.insert("", "end", iid="t1", values=("n", "v", "h", "r"))
+            ok = True
+        except Exception:
+            ok = False
+        self.assertTrue(ok)
+
+    # V23: 移除 GUI 版本可見性切換測試
 
     def test_modern_tree_population(self):
         """測試新版樹狀顯示的資料填入"""
@@ -2078,10 +2045,12 @@ class TestStructView(unittest.TestCase):
             }
         ]
         
-        # 切換到新版
-        self.view._on_gui_version_change("modern")
-        
-        # 填入測試資料
+        # 直接填入測試資料到現代樹視圖（初始化即為 modern）
+        # 若不存在 modern_tree，建立一次
+        if not hasattr(self.view, "modern_tree"):
+            # 觸發建立 modern_tree 的流程
+            if hasattr(self.view, "_create_modern_gui"):
+                self.view._create_modern_gui()
         self.view._populate_modern_tree(test_nodes)
         
         # 驗證資料正確填入
@@ -2105,12 +2074,8 @@ class TestStructView(unittest.TestCase):
         """驗證 modern_tree（新版 GUI）欄位名稱、順序、寬度與 file/manual tab 完全一致，且都來自 MEMBER_TREEVIEW_COLUMNS。"""
         view = self.view
         presenter = self.presenter
-        # 先切換到 modern GUI
-        if hasattr(view, '_on_gui_version_change'):
-            view._on_gui_version_change('modern')
-        # 觸發一次 update_display，確保 modern_tree 會被正確建立
+        # 觸發一次 update_display，確保 modern_tree 會被正確建立（V23 初始化後需要）
         nodes = presenter.get_display_nodes('tree')
-        presenter.context["gui_version"] = "modern"
         view.update_display(nodes, presenter.context)
         # modern_tree
         modern_tree = getattr(view, 'modern_tree', None)
