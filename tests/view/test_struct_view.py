@@ -1782,7 +1782,6 @@ class TestStructView(unittest.TestCase):
         # 舊版 context（缺少 highlighted_nodes）
         old_context = {
             "display_mode": "tree",
-            "gui_version": "legacy",
             "expanded_nodes": ["root"],
             "selected_node": "root",
             "version": "1.0",
@@ -1791,7 +1790,6 @@ class TestStructView(unittest.TestCase):
         # 新版 context（有 highlighted_nodes）
         new_context = {
             "display_mode": "tree",
-            "gui_version": "legacy",
             "expanded_nodes": ["root"],
             "selected_node": "root",
             "highlighted_nodes": ["child1"],
