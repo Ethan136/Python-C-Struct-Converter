@@ -97,6 +97,29 @@
    - 驗證：
      - 使用 `set_import_target_struct(name)` 切換時，對應目標 struct 的有效 pack 正確計算並影響 layout。
 
+6. 進階覆蓋（array/bitfield/union）
+   - `test_import_h_pack_effect_on_array_elements`
+     - 內容：
+       ```c
+       #pragma pack(2)
+       struct S { short s; int arr[2]; };
+       ```
+     - 驗證：`arr[0]` offset 以 2 對齊而非 4；總大小符合 pack=2。
+   - `test_import_h_pack_effect_on_bitfields`
+     - 內容：
+       ```c
+       #pragma pack(1)
+       struct S { unsigned int a:3; unsigned int b:5; unsigned int c:8; };
+       ```
+     - 驗證：bitfield 單元以對應基本型別對齊，且最終 struct 對齊/大小受 pack=1 限制。
+   - `test_import_h_pack_effect_on_nested_union`
+     - 內容：
+       ```c
+       #pragma pack(1)
+       struct S { union { int x; char y[4]; } u; char t; };
+       ```
+     - 驗證：`u` 對齊以 min(align(int), 1) 計算；`t` 的 offset 與尾端 padding 受 pack 影響。
+
 ### 實作細節建議
 - 以 regex 掃描 pragma 指令，範例：
   - `r"#pragma\s+pack\s*\(\s*(?:push\s*,\s*(\d+)|pop|(\d+))\s*\)"`，群組1=push 值、群組2=單一 pack 值；大小寫忽略。
