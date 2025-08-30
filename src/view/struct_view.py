@@ -814,7 +814,8 @@ class StructView(tk.Tk):
     def show_exported_struct(self, h_content):
         # 可彈出新視窗顯示匯出內容
         win = tk.Toplevel(self)
-        win.title("匯出 .h 檔內容")
+        from src.config import get_string
+        win.title(get_string("dialog_export_h_title"))
         txt = tk.Text(win, width=60, height=20)
         txt.pack()
         txt.insert("1.0", h_content)
@@ -1162,7 +1163,8 @@ class StructView(tk.Tk):
             if result['type'] == 'ok':
                 self.show_manual_parsed_values(result['parsed_values'])
             else:
-                self.show_error('解析錯誤', result['message'])
+                from src.config import get_string
+                self.show_error(get_string('dialog_parsing_error'), result['message'])
         else:
             pass  # presenter/model 尚未實作解析
 
@@ -1174,7 +1176,8 @@ class StructView(tk.Tk):
 
     def _create_debug_tab(self):
         self.debug_tab = ttk.Frame(self.tab_control)
-        self.tab_control.add(self.debug_tab, text="Debug")
+        from src.config import get_string
+        self.tab_control.add(self.debug_tab, text=get_string("tab_debug"))
         self.debug_info_label = tk.Label(self.debug_tab, text="", anchor="w", justify="left", font=("Courier", 11))
         self.debug_info_label.pack(fill="x", padx=10, pady=10)
 

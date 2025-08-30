@@ -5,6 +5,7 @@
     <string name="browse_button">Browse...</string>
     <string name="tab_load_h">載入.H檔</string>
     <string name="tab_manual_struct">手動設定資料結構</string>
+    <string name="tab_debug">Debug</string>
     <string name="layout_frame_title">Struct Layout</string>
     <string name="hex_input_title">Hex Data Input</string>
     <string name="input_unit_size">Input Unit Size:</string>
@@ -72,6 +73,9 @@
     <string name="dialog_invalid_length">Invalid Length</string>
     <string name="dialog_parsing_error">Parsing Error</string>
     <string name="dialog_no_struct">No Struct</string>
+    <string name="msg_no_file_selected">未選擇檔案</string>
+    <string name="msg_not_loaded">尚未載入 struct 定義檔案</string>
+    <string name="dialog_export_h_title">匯出 .h 檔內容</string>
     <string name="dialog_not_loaded_title">錯誤</string>
     <string name="dialog_not_loaded_body">尚未載入 struct，無法匯出 CSV</string>
     <string name="dialog_export_done_title">匯出完成</string>

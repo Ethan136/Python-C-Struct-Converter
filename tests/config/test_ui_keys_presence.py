@@ -12,7 +12,7 @@ def test_ui_strings_contains_required_keys():
 
     required = {
         # titles/tabs
-        "window_title", "tab_load_h", "tab_manual_struct",
+        "window_title", "tab_load_h", "tab_manual_struct", "tab_debug",
         # control labels
         "label_unit_size", "label_endianness", "label_display_mode", "label_target_struct",
         "label_gui_version", "label_search", "label_filter", "label_struct_name", "label_total_size_bytes",
@@ -25,10 +25,12 @@ def test_ui_strings_contains_required_keys():
         "member_col_name", "member_col_value", "member_col_hex_value", "member_col_hex_raw",
         "layout_col_name", "layout_col_type", "layout_col_offset", "layout_col_size",
         "layout_col_bit_offset", "layout_col_bit_size", "layout_col_is_bitfield",
-        # dialogs
+        # dialogs and messages
         "dialog_error_title", "dialog_select_file", "dialog_file_error", "dialog_parsing_error",
         "dialog_export_failed_title", "dialog_export_done_title", "dialog_export_done_body",
-        "dialog_context_warning_title", "dialog_not_loaded_body",
+        "dialog_context_warning_title", "dialog_not_loaded_body", "dialog_export_h_title",
+        # presenter messages
+        "msg_no_file_selected", "msg_not_loaded",
     }
 
     missing = sorted(required - keys)

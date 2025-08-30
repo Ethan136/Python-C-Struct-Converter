@@ -152,7 +152,8 @@ class StructPresenter:
             filetypes=(("Header files", "*.h"), ("All files", "*.*" ))
         )
         if not file_path:
-            return {'type': 'error', 'message': '未選擇檔案'}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_no_file_selected')}
 
         try:
             with open(file_path, 'r') as f:
@@ -200,7 +201,8 @@ class StructPresenter:
 
     def parse_hex_data(self):
         if not self.model.layout:
-            return {'type': 'error', 'message': '尚未載入 struct 定義檔案'}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_not_loaded')}
 
         hex_parts_with_expected_len = self.view.get_hex_input_parts()
 
