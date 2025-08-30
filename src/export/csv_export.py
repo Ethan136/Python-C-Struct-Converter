@@ -218,24 +218,25 @@ class DefaultCsvExportService:
                     continue
                 member_bytes = data_bytes[offset: offset + size]
                 byteorder = 'little' if (opts.endianness or 'little').lower() == 'little' else 'big'
-                # hex_raw normalized to big-endian string
-                try:
-                    row["hex_raw"] = int.from_bytes(member_bytes, 'big').to_bytes(size, 'big').hex()
-                except Exception:
-                    row["hex_raw"] = member_bytes.hex()
                 try:
                     if (row.get("bit_size") or 0) and (row.get("bit_offset") is not None):
                         storage_int = int.from_bytes(member_bytes, byteorder)
                         bit_offset = int(row.get("bit_offset", 0))
                         bit_size = int(row.get("bit_size", 0))
                         mask = (1 << bit_size) - 1
-                        row["value"] = (storage_int >> bit_offset) & mask
+                        computed_val = (storage_int >> bit_offset) & mask
+                        row["value"] = computed_val
                     else:
-                        val = int.from_bytes(member_bytes, byteorder)
+                        computed_val = int.from_bytes(member_bytes, byteorder)
                         if str(row.get("data_type", "")).lower() == 'bool':
-                            row["value"] = True if val != 0 else False
+                            row["value"] = True if computed_val != 0 else False
                         else:
-                            row["value"] = val
+                            row["value"] = computed_val
+                    # hex_raw normalized to big-endian of numeric value, padded to size
+                    try:
+                        row["hex_raw"] = int(computed_val).to_bytes(size, 'big').hex()
+                    except Exception:
+                        row["hex_raw"] = member_bytes.hex()
                     values_computed += 1
                 except Exception as e:
                     warnings.append(f"value compute failed at offset {offset}: {e}")
@@ -264,16 +265,18 @@ class DefaultCsvExportService:
                 warnings.append(f"sort_by ignored due to error: {e}")
 
         # Columns
-        # v19: allow layout and values columns by default when include flags are set
-        columns = list(opts.columns) if opts.columns else list(DEFAULT_COLUMNS)
-        if opts.include_layout:
-            for k in ["offset", "size", "bit_offset", "bit_size"]:
-                if k not in columns:
-                    columns.append(k)
-        if opts.include_values:
-            for k in ["value", "hex_raw"]:
-                if k not in columns:
-                    columns.append(k)
+        # v19: if user explicitly sets columns, respect exact selection; otherwise augment defaults
+        explicit_cols = opts.columns is not None
+        columns = list(opts.columns) if explicit_cols else list(DEFAULT_COLUMNS)
+        if not explicit_cols:
+            if opts.include_layout:
+                for k in ["offset", "size", "bit_offset", "bit_size"]:
+                    if k not in columns:
+                        columns.append(k)
+            if opts.include_values:
+                for k in ["value", "hex_raw"]:
+                    if k not in columns:
+                        columns.append(k)
         # Validate columns
         for c in columns:
             if not isinstance(c, str) or not c:
