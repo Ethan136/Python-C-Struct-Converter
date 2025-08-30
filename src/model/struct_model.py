@@ -8,6 +8,7 @@ from src.model.input_field_processor import InputFieldProcessor
 from .layout import LayoutCalculator, LayoutItem, TYPE_INFO
 from .struct_parser import parse_struct_definition, parse_member_line
 from dataclasses import asdict
+import re
 
 
 
@@ -170,7 +171,8 @@ class StructModel:
             self.struct_name = definition.name
             self.ast = definition
             self.members = list(definition.members)
-            self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
+            pack_alignment = self._extract_top_level_pack_alignment(content, target_name or self.struct_name)
+            self.layout, self.total_size, self.struct_align = calculate_layout(self.members, pack_alignment=pack_alignment)
         else:
             # 回退到 legacy 路徑（僅平面成員，巢狀僅佔位）
             struct_name, members = parse_struct_definition(content)
@@ -194,7 +196,8 @@ class StructModel:
         self.struct_name = definition.name
         self.ast = definition
         self.members = list(definition.members)
-        self.layout, self.total_size, self.struct_align = calculate_layout(self.members)
+        pack_alignment = self._extract_top_level_pack_alignment(self.struct_content, name)
+        self.layout, self.total_size, self.struct_align = calculate_layout(self.members, pack_alignment=pack_alignment)
         self._notify_observers("file_struct_loaded", file_path=None)
 
     def parse_hex_data(self, hex_data, byte_order, layout=None, total_size=None):
@@ -404,6 +407,111 @@ class StructModel:
             self.ast = parse_struct_definition_ast(self.struct_content)
             return ast_to_dict(self.ast)
         return None  # 修正：沒有 AST 時回傳 None
+
+    # --- v18: Import .H 頂層 pragma pack 支援 ---------------------------------
+    def _extract_top_level_pack_alignment(self, content: str, target_name=None):
+        """解析在選定之頂層 struct/union 之前的 `#pragma pack` 指令，回傳有效對齊值。
+
+        僅掃描被 Import .H 流程選定之聚合的『前綴』區塊：
+        - 支援 `#pragma pack(push, N)`、`#pragma pack(N)`、`#pragma pack(pop)` 多層堆疊。
+        - 單一 `#pragma pack(N)` 視為覆寫當前層；若堆疊為空則視為建立第一層。
+        - 遇到多個頂層聚合時，遵循 AST 選擇邏輯：
+          - 若指定 target_name：鎖定該名稱的頂層 struct 或 union；
+          - 否則：沿用 `parse_c_definition_ast` 行為，預設選擇最後一個頂層 struct（或如 header 判定為 union，則最後一個頂層 union）。
+        """
+        try:
+            start_index = self._find_selected_aggregate_start_index(content, target_name)
+            if start_index is None:
+                return None
+            prefix = content[:start_index]
+            pattern = re.compile(r"#pragma\s+pack\s*\(\s*(?:(push)\s*,\s*(\d+)|(pop)|(\d+))\s*\)", re.IGNORECASE)
+            stack = []
+            for m in pattern.finditer(prefix):
+                if m.group(1) and m.group(2):  # push, N
+                    try:
+                        stack.append(int(m.group(2)))
+                    except Exception:
+                        continue
+                elif m.group(3):  # pop
+                    if stack:
+                        stack.pop()
+                    else:
+                        # 忽略孤立 pop
+                        pass
+                elif m.group(4):  # pack(N)
+                    try:
+                        n = int(m.group(4))
+                    except Exception:
+                        continue
+                    if stack:
+                        stack[-1] = n
+                    else:
+                        stack.append(n)
+            return stack[-1] if stack else None
+        except Exception:
+            return None
+
+    def _find_selected_aggregate_start_index(self, content: str, target_name=None):
+        """回傳被 Import .H 選定的頂層 struct/union 定義起始位置（關鍵字起點）。"""
+        # 若有 target_name，優先比對 struct，再比對 union
+        if target_name:
+            idx = self._find_top_level_keyword_start(content, 'struct', target_name)
+            if idx is not None:
+                return idx
+            idx = self._find_top_level_keyword_start(content, 'union', target_name)
+            if idx is not None:
+                return idx
+            return None
+        # 無 target_name：模擬 parse_c_definition_ast 選擇
+        header = content.strip().split('{', 1)[0]
+        if header.strip().startswith('union'):
+            return self._find_last_top_level_keyword_start(content, 'union')
+        return self._find_last_top_level_keyword_start(content, 'struct')
+
+    def _find_top_level_keyword_start(self, text: str, keyword: str, name: str = None):
+        """尋找頂層 `keyword name {` 的起點索引。若 name 為 None，回傳第一個命中。"""
+        if name:
+            pattern = rf"{keyword}\s+{name}\s*\{{"
+        else:
+            pattern = rf"{keyword}\s+\w+\s*\{{"
+        for m in re.finditer(pattern, text):
+            idx = m.start()
+            if self._is_top_level_position(text, idx):
+                return idx
+        return None
+
+    def _find_last_top_level_keyword_start(self, text: str, keyword: str):
+        """尋找最後一個頂層 `keyword <Name> {` 的起點索引。"""
+        last = None
+        pattern = rf"{keyword}\s+\w+\s*\{{"
+        for m in re.finditer(pattern, text):
+            idx = m.start()
+            if self._is_top_level_position(text, idx):
+                last = idx
+        return last
+
+    def _is_top_level_position(self, text: str, position: int) -> bool:
+        """檢查 position 之前的 brace 深度是否為 0（忽略 // 行註解）。"""
+        depth = 0
+        in_line_comment = False
+        i = 0
+        while i < position:
+            ch = text[i]
+            if in_line_comment:
+                if ch == '\n':
+                    in_line_comment = False
+                i += 1
+                continue
+            if ch == '/' and i + 1 < position and text[i+1] == '/':
+                in_line_comment = True
+                i += 2
+                continue
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth = max(0, depth - 1)
+            i += 1
+        return depth == 0
 
     def get_display_nodes(self, mode='tree'):
         """回傳符合 V2P API 文件的 Treeview node 結構。"""
