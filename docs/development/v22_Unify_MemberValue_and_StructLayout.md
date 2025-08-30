@@ -40,6 +40,41 @@
   - Or: reconstruct the unified rows by zipping `layout` and `parsed_values` and reinsert (simpler and deterministic).
 - Keep manual struct tab behavior unchanged in V22; consider unification there in a later version.
 
+### 6.1) Concrete edit points
+- File: `src/view/struct_view.py`
+  - Constants:
+    - Extend `LAYOUT_TREEVIEW_COLUMNS` by appending:
+      - `{ "name": "value", "title": "member_col_value", "width": 100 }`
+      - `{ "name": "hex_value", "title": "member_col_hex_value", "width": 100 }`
+      - `{ "name": "hex_raw", "title": "member_col_hex_raw", "width": 120 }`
+    - Rationale: reuse existing i18n keys already used by `MEMBER_TREEVIEW_COLUMNS`.
+  - StructView state:
+    - Add view-level flag: `self.enable_unified_layout_values: bool = True` (constructor). Optionally allow injection via env/config in future.
+    - Add cached references: `self._last_layout: list | None = None`, `self._last_parsed_values: list | None = None` (to support refresh/rebuild flows).
+  - Methods:
+    - `show_struct_layout(struct_name, layout, total_size, struct_align)`
+      - Assign `self._last_layout = layout`
+      - If `enable_unified_layout_values`:
+        - Build rows with layout columns filled; set `value/hex_value/hex_raw` to empty strings; insert into `self.layout_tree`.
+      - Else: current behavior (no value columns) — legacy mode.
+      - Preserve CSV export button enable logic.
+    - `show_parsed_values(parsed_values, byte_order_str=None)`
+      - Assign `self._last_parsed_values = parsed_values`
+      - If unified mode and `self._last_layout` exists:
+        - Rebuild `self.layout_tree` rows by zipping `self._last_layout` with `parsed_values` (index-based). For each pair `item`, `val`:
+          - Compute `hex_value` as today (from value when not `-`).
+          - Normalize `hex_raw` with `｜` separators as today.
+          - Insert full row (layout + value columns).
+      - Else: fallback to existing `_populate_tree(self.member_tree, parsed_values)` for legacy mode.
+    - `create_layout_treeview(...)`: no change besides extra columns handled automatically by the constants.
+  - Manual struct tab:
+    - No change in V22. Continue writing parsed values into `self.manual_member_tree` and layout into `self.manual_layout_tree`.
+
+### 6.2) Non-goals and compatibility
+- Presenter (`src/presenter/struct_presenter.py`) and Model (`src/model/struct_model.py`) APIs unchanged.
+- `member_values` in Model remains for AST tree context; unified table does not rely on it.
+- CSV export behavior and entry point unchanged; still driven by `show_struct_layout(...)` success.
+
 ### 7) Feature Flag and Rollout
 - Introduce a view-level flag (e.g., `enable_unified_layout_values = True`) to switch between:
   - Unified single Treeview (default in V22).
@@ -66,6 +101,30 @@
   - Padding rows display `value` as `-` and proper hex dump.
   - Headless CI skip conditions remain intact.
 - Keep a small set of legacy-mode tests behind the flag to validate rollback path.
+
+### 10.1) Test changes by phase
+- Phase 1 (Introduce unified columns + rebuild logic):
+  - New tests (Import .H tab):
+    - `test_unified_layout_adds_value_columns_after_load` — after `show_struct_layout(...)`, assert the layout tree has the extra value columns with empty strings.
+    - `test_unified_layout_fills_values_after_parse` — simulate `show_struct_layout(...)` then `show_parsed_values(...)`; assert each row’s `value/hex_value/hex_raw` populated, with `hex_raw` grouping and `hex_value` formatting consistent with `_populate_tree` behavior.
+    - `test_unified_layout_padding_value_dash` — assert padding rows keep `value == '-'` and meaningful `hex_raw` bytes.
+    - `test_unified_layout_bitfield_and_arrays_values` — cover rows with bitfields and arrays; verify both layout columns and decoded `value` alignment.
+  - Adjustments:
+    - Any existing Import .H tests that previously asserted values in `member_tree` should be redirected to `layout_tree` when unified flag is enabled. Keep legacy assertions under legacy-mode switch if still valuable.
+  - Unchanged:
+    - Manual struct tab tests remain unchanged (still separate value/layout trees).
+
+- Phase 2 (Optional removal of legacy member-value table for Import .H):
+  - Remove or downgrade legacy-mode tests to smoke tests.
+  - Ensure A/B flag remains for one release window to ease rollbacks.
+
+### 10.2) Concrete test file updates
+- `tests/view/test_struct_view.py`:
+  - Add new tests listed above under Phase 1.
+  - Where applicable, gate old assertions with unified-flag checks to avoid brittle failures.
+- `tests/view/test_struct_view_export_csv_button.py`:
+  - Keep as-is; verify CSV export button state remains enabled after `show_struct_layout(...)` in unified mode.
+- Bitfield/nested/array coverage can reuse existing fixtures and helper stubs, focusing on row/value assertions in `layout_tree`.
 
 ### 11) Migration Notes
 - No Model/Presenter API changes in V22; View-only changes with a feature flag.
