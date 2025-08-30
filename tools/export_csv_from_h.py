@@ -48,6 +48,10 @@ def main():
     ap.add_argument("--null", dest="null_strategy", choices=["empty", "NULL", "dash"], default="empty")
     ap.add_argument("--columns", help="Comma-separated column names")
     ap.add_argument("--sort", dest="sort_by", help="Comma-separated sort spec like k1:ASC,k2:DESC")
+    ap.add_argument("--include-layout", action="store_true", help="Include layout columns (offset/size/bit_*)")
+    ap.add_argument("--include-values", action="store_true", help="Include values (value,hex_raw)")
+    ap.add_argument("--endianness", choices=["little", "big"], default="little")
+    ap.add_argument("--hex", dest="hex_input", help="Hex string for value computation")
 
     args = ap.parse_args()
 
@@ -63,6 +67,10 @@ def main():
         null_strategy=args.null_strategy,
         columns=[c.strip() for c in args.columns.split(',')] if args.columns else None,
         sort_by=parse_sort(args.sort_by) if args.sort_by else None,
+        include_layout=args.include_layout,
+        include_values=args.include_values,
+        endianness=args.endianness,
+        hex_input=(args.hex_input or None),
     )
 
     svc = DefaultCsvExportService()

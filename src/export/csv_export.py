@@ -43,6 +43,12 @@ class CsvExportOptions:
     columns: Optional[List[str]] = None
     sort_by: Optional[List[Tuple[str, str]]] = None  # [(key, 'ASC'|'DESC')]
     safe_cast: bool = True
+    # v19: combined layout + values
+    include_layout: bool = True
+    include_values: bool = True
+    endianness: str = "little"  # 'little' | 'big'
+    hex_input: Optional[str] = None
+    value_provider: Optional[Any] = None
 
 
 @dataclass
@@ -52,6 +58,7 @@ class ExportReport:
     file_path: Optional[str]
     duration_ms: int
     warnings: List[str] = field(default_factory=list)
+    values_computed: int = 0
 
 
 # --------------------------- Row Serialization -------------------------------
@@ -168,6 +175,72 @@ class DefaultCsvExportService:
         if not fields:
             raise CsvExportError("Empty parsed model", code="EMPTY_MODEL")
 
+        # v19: maybe enrich rows with layout/value
+        values_computed = 0
+        data_bytes: Optional[bytes] = None
+        if opts.include_values and opts.hex_input:
+            try:
+                hex_str = (opts.hex_input or "").strip().replace(" ", "")
+                data_bytes = bytes.fromhex(hex_str)
+            except Exception as e:
+                warnings.append(f"hex_input ignored: {e}")
+                data_bytes = None
+
+        if opts.include_values:
+            for row in fields:
+                # Prefer external provider
+                provided = None
+                if opts.value_provider is not None:
+                    try:
+                        provided = opts.value_provider(row)
+                    except Exception as e:
+                        warnings.append(f"value_provider failed: {e}")
+                        provided = None
+                if provided is not None:
+                    row["value"] = provided
+                    if row.get("hex_raw") is None:
+                        row["hex_raw"] = None
+                    continue
+                # Compute from hex_input
+                if data_bytes is None:
+                    # leave empty per null strategy at serialization
+                    row.setdefault("value", None)
+                    row.setdefault("hex_raw", None)
+                    continue
+                try:
+                    offset = int(row.get("offset", 0))
+                    size = int(row.get("size", 0))
+                except Exception:
+                    offset, size = 0, 0
+                if size <= 0 or offset < 0 or offset + size > len(data_bytes):
+                    row.setdefault("value", None)
+                    row.setdefault("hex_raw", None)
+                    continue
+                member_bytes = data_bytes[offset: offset + size]
+                byteorder = 'little' if (opts.endianness or 'little').lower() == 'little' else 'big'
+                # hex_raw normalized to big-endian string
+                try:
+                    row["hex_raw"] = int.from_bytes(member_bytes, 'big').to_bytes(size, 'big').hex()
+                except Exception:
+                    row["hex_raw"] = member_bytes.hex()
+                try:
+                    if (row.get("bit_size") or 0) and (row.get("bit_offset") is not None):
+                        storage_int = int.from_bytes(member_bytes, byteorder)
+                        bit_offset = int(row.get("bit_offset", 0))
+                        bit_size = int(row.get("bit_size", 0))
+                        mask = (1 << bit_size) - 1
+                        row["value"] = (storage_int >> bit_offset) & mask
+                    else:
+                        val = int.from_bytes(member_bytes, byteorder)
+                        if str(row.get("data_type", "")).lower() == 'bool':
+                            row["value"] = True if val != 0 else False
+                        else:
+                            row["value"] = val
+                    values_computed += 1
+                except Exception as e:
+                    warnings.append(f"value compute failed at offset {offset}: {e}")
+                    row.setdefault("value", None)
+
         # Sorting
         if opts.sort_by:
             def _sort_key(row):
@@ -191,7 +264,16 @@ class DefaultCsvExportService:
                 warnings.append(f"sort_by ignored due to error: {e}")
 
         # Columns
+        # v19: allow layout and values columns by default when include flags are set
         columns = list(opts.columns) if opts.columns else list(DEFAULT_COLUMNS)
+        if opts.include_layout:
+            for k in ["offset", "size", "bit_offset", "bit_size"]:
+                if k not in columns:
+                    columns.append(k)
+        if opts.include_values:
+            for k in ["value", "hex_raw"]:
+                if k not in columns:
+                    columns.append(k)
         # Validate columns
         for c in columns:
             if not isinstance(c, str) or not c:
@@ -253,6 +335,7 @@ class DefaultCsvExportService:
             file_path=file_path,
             duration_ms=duration_ms,
             warnings=warnings,
+            values_computed=values_computed,
         )
 
 
@@ -291,6 +374,14 @@ def build_parsed_model_from_struct(struct_model: Any) -> Dict[str, Any]:
             "source_file": source_file or None,
             "source_line": 0,
             "tags": ["bitfield"] if item.get("is_bitfield") else [],
+            # v19: include layout fields
+            "offset": item.get("offset"),
+            "size": item.get("size"),
+            "bit_offset": item.get("bit_offset") if item.get("is_bitfield") else None,
+            "bit_size": item.get("bit_size") if item.get("is_bitfield") else None,
+            # values are computed later by service when hex_input is provided
+            "value": None,
+            "hex_raw": None,
         }
         fields.append(row)
         order += 1

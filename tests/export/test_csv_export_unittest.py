@@ -52,10 +52,13 @@ class TestCsvExport(unittest.TestCase):
                     "source_file": "customer.h",
                     "source_line": 13,
                     "tags": ["core", "pii"],
+                    "offset": 4,
+                    "size": 4,
                 },
             ]
         }
-        opts = CsvExportOptions(include_header=True)
+        # include layout and values, compute from hex
+        opts = CsvExportOptions(include_header=True, include_layout=True, include_values=True, endianness='little', hex_input='D204000001000000')
         buf = io.StringIO()
         svc = DefaultCsvExportService()
         report = svc.export_to_csv(model, {"type": "stream", "stream": buf}, opts)
@@ -64,6 +67,12 @@ class TestCsvExport(unittest.TestCase):
         self.assertTrue(report.header_written)
         self.assertTrue(out.splitlines()[0].startswith("entity_name,"))
         self.assertIn('Customer ""display"" name', out)
+        # check layout columns and values exist
+        header = out.splitlines()[0].split(',')
+        self.assertIn('offset', header)
+        self.assertIn('size', header)
+        self.assertIn('value', header)
+        self.assertIn('hex_raw', header)
 
     def test_service_file_bom_and_crlf(self):
         model = {
@@ -89,10 +98,12 @@ class TestCsvExport(unittest.TestCase):
                     "comment": 'Customer "display" name',
                     "source_file": "customer.h",
                     "source_line": 13,
+                    "offset": 4,
+                    "size": 4,
                 },
             ]
         }
-        opts = CsvExportOptions(include_header=False, include_bom=True, line_ending="\r\n")
+        opts = CsvExportOptions(include_header=False, include_bom=True, line_ending="\r\n", include_layout=True, include_values=True, endianness='big', hex_input='000004D2DEADBEEF')
         svc = DefaultCsvExportService()
         out_path = os.path.join(os.path.dirname(__file__), "tmp_out.csv")
         try:
