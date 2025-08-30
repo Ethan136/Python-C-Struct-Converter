@@ -23,6 +23,10 @@ def run_pytest(args, timeout=60):
     if importlib.util.find_spec("pytest_timeout") is not None:
         if '--timeout=60' not in args:
             args = ['--timeout=60'] + args
+    # Prefer pytest-xvfb plugin if available to run GUI tests headlessly
+    env = os.environ.copy()
+    # Ensure DISPLAY is set for headless environments; pytest-xvfb will override
+    env.setdefault("DISPLAY", ":99")
     cmd = [PYTHON_EXECUTABLE, "-m", "pytest"] + args
     try:
         result = subprocess.run(
@@ -30,7 +34,8 @@ def run_pytest(args, timeout=60):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout  # 單一 pytest 子程序 timeout（可設高一點）
+            timeout=timeout,  # 單一 pytest 子程序 timeout（可設高一點）
+            env=env,
         )
         return result
     except subprocess.TimeoutExpired as e:

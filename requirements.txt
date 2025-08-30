@@ -8,6 +8,7 @@
 # Development dependencies (optional)
 pytest>=6.0.0
 pytest-cov>=2.10.0
+pytest-xvfb>=3.0.0
 black>=21.0.0
 flake8>=3.8.0
 mypy>=0.800

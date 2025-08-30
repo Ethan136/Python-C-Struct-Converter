@@ -17,6 +17,11 @@ jobs:
       with:
         python-version: '3.11'
 
+    - name: Install system GUI dependencies (Xvfb, Tk)
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y xvfb python3-tk
+
     - name: Set up virtual environment
       run: |
         python -m venv .venv
@@ -26,6 +31,8 @@ jobs:
 
     - name: Run all tests
       run: |
+        Xvfb :99 -screen 0 1024x768x24 &
+        export DISPLAY=:99
         .venv/bin/python run_all_tests.py
 
     - name: Distribute (build executables)
