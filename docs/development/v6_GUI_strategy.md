@@ -1,5 +1,10 @@
 # v6 GUI for Nested Struct and Union — Strategy（策略/規劃）
 
+> Note (V23): 本文件中關於 legacy/modern 切換與 v7 導引的內容，已由 V23 Modern-only 設計所取代；最新狀態請參考：
+> - `docs/development/v23_Modern_Replaces_Legacy_and_TreeFlat_Visual_Diff_TDD.md`
+> - `docs/development/V23_MIGRATION_GUIDE.md`
+> - `src/view/README.md`
+
 ## 1. 目標與需求
 - 支援巢狀 struct/union 樹狀顯示，提升複雜結構的可讀性與可維護性。
 - 新舊 GUI 並存，開發過程不中斷現有功能，方便平行開發與用戶回退。
