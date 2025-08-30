@@ -135,3 +135,70 @@
 - Add per-column show/hide management and saved user preferences.
 - Optional: enrich CSV export to include value columns when available.
 
+---
+
+## Appendix A: Step-by-step Implementation Checklist
+
+This appendix is a prescriptive edit list. Follow steps in order.
+
+### A.1 Add unified columns and flag
+1) File: `src/view/struct_view.py`
+   - Locate `LAYOUT_TREEVIEW_COLUMNS` and append three entries:
+     - `{ "name": "value", "title": "member_col_value", "width": 100 }`
+     - `{ "name": "hex_value", "title": "member_col_hex_value", "width": 100 }`
+     - `{ "name": "hex_raw", "title": "member_col_hex_raw", "width": 120 }`
+   - In `StructView.__init__`, set:
+     - `self.enable_unified_layout_values = True`
+     - `self._last_layout = None`
+     - `self._last_parsed_values = None`
+
+### A.2 Populate layout rows with empty value columns
+2) File: `src/view/struct_view.py`
+   - In `show_struct_layout(struct_name, layout, total_size, struct_align)`:
+     - Before inserting rows, assign `self._last_layout = layout`.
+     - If `self.enable_unified_layout_values` is True:
+       - For each `item` in `layout`, compute strings for `name/type/offset/size/bit_offset/bit_size/is_bitfield` as today.
+       - Append empty strings for the 3 new columns: `value`, `hex_value`, `hex_raw`.
+       - Insert the combined tuple into `self.layout_tree`.
+     - Keep the CSV export button enable logic exactly as-is.
+
+### A.3 Rebuild rows after parsing to include values
+3) File: `src/view/struct_view.py`
+   - In `show_parsed_values(parsed_values, byte_order_str=None)`:
+     - Assign `self._last_parsed_values = parsed_values`.
+     - If unified mode and `self._last_layout` exists:
+       - Clear all rows in `self.layout_tree`.
+       - Zip `self._last_layout` with `parsed_values` by index. For each pair:
+         - Derive `value_str` from `val.get("value", "")`.
+         - Derive `hex_value_str`:
+           - If `value_str != '-'`, attempt `hex(int(value_str))` else `'-'`.
+         - Derive `hex_raw_str`:
+           - From `val.get("hex_raw", "")` and join every two hex chars with `｜` if length > 2.
+         - Insert the full 10-column row.
+     - Else (legacy mode): fall back to `self._populate_tree(self.member_tree, parsed_values)`.
+
+### A.4 Leave manual struct tab unchanged for V22
+4) No edits to manual tab methods; ensure existing tests still pass.
+
+### A.5 Add a simple config toggle (optional)
+5) If desired, wire an environment/config reader to set `self.enable_unified_layout_values` at runtime. Otherwise keep default True for V22.
+
+### A.6 Update tests — unified mode
+6) File: `tests/view/test_struct_view.py`
+   - Add new tests:
+     - `test_unified_layout_adds_value_columns_after_load`
+       - After `show_struct_layout(...)`, fetch first row values; assert the tuple length includes 3 extra empty value columns.
+     - `test_unified_layout_fills_values_after_parse`
+       - Call `show_struct_layout(...)` then simulate `show_parsed_values(...)` with a small `parsed_values` list; assert values/hex formatting present in `layout_tree` rows.
+     - `test_unified_layout_padding_value_dash`
+       - Ensure padding row has `value == '-'` and `hex_raw` is non-empty when applicable.
+     - `test_unified_layout_bitfield_and_arrays_values`
+       - Construct a layout with bitfields/arrays; provide `parsed_values`; assert proper row-value alignment.
+   - Adjust existing Import .H tests that asserted on `member_tree` values to assert against `layout_tree` in unified mode. Keep legacy assertions under a feature-flag guard if still required.
+
+### A.7 Verify no regressions
+7) Run full test suite. Validate:
+   - CSV export button state unchanged.
+   - Headless CI safeguards remain (skip GUI tests when no display/tkinter).
+   - Presenter/Model APIs unaffected.
+
