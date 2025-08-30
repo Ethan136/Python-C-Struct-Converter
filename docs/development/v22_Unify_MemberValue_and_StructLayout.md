@@ -126,6 +126,22 @@
   - Keep as-is; verify CSV export button state remains enabled after `show_struct_layout(...)` in unified mode.
 - Bitfield/nested/array coverage can reuse existing fixtures and helper stubs, focusing on row/value assertions in `layout_tree`.
 
+### 10.3) Explicit unified-mode test tasks (to be implemented)
+- Create `tests/view/test_struct_view_unified_mode.py` containing:
+  - `test_unified_layout_adds_value_columns_after_load`
+    - Arrange: load layout and call `view.show_struct_layout(...)` with flag on.
+    - Assert: first row `values` length includes the 3 extra columns and they are empty strings.
+  - `test_unified_layout_fills_values_after_parse`
+    - Arrange: call `show_struct_layout(...)` then `show_parsed_values(...)` with mock parsed results aligned by index.
+    - Assert: `value`, `hex_value`, `hex_raw` are populated and formatted (hex_value via `hex(int(value))`; hex_raw grouped with `｜`).
+  - `test_unified_layout_padding_value_dash`
+    - Arrange: include padding entries in layout and parsed values with `value == '-'`.
+    - Assert: padding row keeps `value == '-'` and has proper `hex_raw` when bytes present.
+  - `test_unified_layout_bitfield_and_arrays_values`
+    - Arrange: layout with bitfields and arrays; parsed values paired by index.
+    - Assert: correct row count, offsets, and decoded values appear in the value columns.
+- Adjust Import .H value assertions in existing tests to check `layout_tree` under unified flag. Keep legacy-mode branches where needed.
+
 ### 11) Migration Notes
 - No Model/Presenter API changes in V22; View-only changes with a feature flag.
 - Downstream customizations relying on `member_tree` should switch to unified mode columns; legacy mode remains available temporarily.
