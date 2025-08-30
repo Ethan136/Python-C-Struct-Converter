@@ -142,6 +142,18 @@
     - Assert: correct row count, offsets, and decoded values appear in the value columns.
 - Adjust Import .H value assertions in existing tests to check `layout_tree` under unified flag. Keep legacy-mode branches where needed.
 
+### 10.4) Existing tests to adjust (Import .H values)
+- For unified mode, change assertions that previously checked `member_tree` values to check `layout_tree` columns [7..9] (value, hex_value, hex_raw):
+  - `tests/view/test_struct_view.py`
+    - Sections validating parsed values display for Import .H tab (non-manual). Identify and update those that rely on `member_tree` to read values.
+  - Keep `manual_member_tree` tests unchanged; manual tab remains separate.
+  - Tip: guard legacy assertions with `if not view.enable_unified_layout_values:` to retain backward compatibility temporarily.
+
+### 10.5) Nested struct unified test (pending)
+- Add a nested struct case to `tests/view/test_struct_view_unified_mode.py`:
+  - Layout includes a nested struct expanded into children rows (e.g., `s.a`, `s.b`).
+  - Parsed values provided in matching order; assert values appear in the correct rows in `layout_tree`.
+
 ### 11) Migration Notes
 - No Model/Presenter API changes in V22; View-only changes with a feature flag.
 - Downstream customizations relying on `member_tree` should switch to unified mode columns; legacy mode remains available temporarily.
