@@ -833,6 +833,12 @@ class StructView(tk.Tk):
                 # 清除記錄的 total_size
                 self.current_file_total_size = 0
                 self.rebuild_hex_grid(0, 1)
+                # 停用 CSV 匯出按鈕
+                try:
+                    if hasattr(self, "export_csv_button"):
+                        self.export_csv_button.config(state="disabled")
+                except Exception:
+                    pass
 
     def _on_parse_file(self):
         if self.presenter:
@@ -949,12 +955,6 @@ class StructView(tk.Tk):
         self.debug_text.config(state="disabled")
         # 全檔案移除 self.struct_info_text 相關操作，確保不再存取不存在的 Text 物件。
         pass
-        # 停用 CSV 匯出
-        try:
-            if hasattr(self, "export_csv_button"):
-                self.export_csv_button.config(state="disabled")
-        except Exception:
-            pass
 
     def _on_export_csv(self):
         # 檢查 presenter/model 是否可用

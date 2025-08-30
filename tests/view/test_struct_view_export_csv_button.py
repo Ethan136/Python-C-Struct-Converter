@@ -2,10 +2,13 @@ import os
 import tempfile
 import unittest
 import pytest
-import tkinter as tk
+try:
+    import tkinter as tk
+except Exception:
+    tk = None
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get('DISPLAY'), reason="No display found, skipping GUI tests"
+    (not os.environ.get('DISPLAY')) or (tk is None), reason="No display/tkinter, skipping GUI tests"
 )
 
 from src.model.struct_model import StructModel
