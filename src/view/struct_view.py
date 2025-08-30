@@ -246,6 +246,23 @@ class StructView(tk.Tk):
                 if hasattr(self.presenter, 'get_display_nodes') and hasattr(self.presenter, 'context'):
                     nodes = self.presenter.get_display_nodes(self.presenter.context.get('display_mode', 'tree'))
                     self.update_display(nodes, self.presenter.context)
+                # 依照新選擇的 struct/union 更新 Struct Layout 與 hex 輸入格數量
+                try:
+                    struct_name = getattr(self.presenter.model, 'struct_name', None)
+                    layout = getattr(self.presenter.model, 'layout', None)
+                    total_size = getattr(self.presenter.model, 'total_size', None)
+                    struct_align = getattr(self.presenter.model, 'struct_align', None)
+                    if struct_name is not None and layout is not None and total_size is not None and struct_align is not None:
+                        self.show_struct_layout(struct_name, layout, total_size, struct_align)
+                        # 記錄並依目前單位大小重建 hex grid
+                        self.current_file_total_size = total_size
+                        try:
+                            unit_size = self.get_selected_unit_size()
+                        except Exception:
+                            unit_size = 1
+                        self.rebuild_hex_grid(total_size or 0, unit_size)
+                except Exception:
+                    pass
             except Exception:
                 pass
         try:
