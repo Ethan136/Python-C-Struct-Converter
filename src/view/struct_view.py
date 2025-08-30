@@ -73,6 +73,9 @@ LAYOUT_TREEVIEW_COLUMNS = [
     {"name": "bit_offset", "title": "layout_col_bit_offset", "width": 80},
     {"name": "bit_size", "title": "layout_col_bit_size", "width": 80},
     {"name": "is_bitfield", "title": "layout_col_is_bitfield", "width": 80},
+    {"name": "value", "title": "member_col_value", "width": 100},
+    {"name": "hex_value", "title": "member_col_hex_value", "width": 100},
+    {"name": "hex_raw", "title": "member_col_hex_raw", "width": 120},
 ]
 
 def create_member_treeview(parent):
@@ -169,6 +172,19 @@ class StructView(tk.Tk):
         self.presenter = presenter
         self.enable_virtual = enable_virtual
         self._virtual_page_size = virtual_page_size
+        # v22: unified layout+values view flag and caches
+        self.enable_unified_layout_values = True
+        try:
+            import os as _os
+            val = str(_os.environ.get("UNIFY_LAYOUT_VALUES", "1")).lower()
+            if val in ("0", "false"):
+                self.enable_unified_layout_values = False
+            elif val in ("1", "true"):
+                self.enable_unified_layout_values = True
+        except Exception:
+            pass
+        self._last_layout = None
+        self._last_parsed_values = None
         # v21: Externalize window title
         from src.config import get_string
         self.title(get_string("window_title"))
@@ -647,6 +663,7 @@ class StructView(tk.Tk):
             bit_size = item.get("bit_size")
             bit_offset_str = str(bit_offset) if bit_offset is not None else "-"
             bit_size_str = str(bit_size) if bit_size is not None else "-"
+            # Manual tab keeps layout-only semantics; append empty strings for unified value columns.
             self.manual_layout_tree.insert("", "end", values=(
                 item.get("name", ""),
                 item.get("type", ""),
@@ -654,7 +671,10 @@ class StructView(tk.Tk):
                 item.get("size", ""),
                 bit_offset_str,
                 bit_size_str,
-                str(item.get("is_bitfield", False))
+                str(item.get("is_bitfield", False)),
+                "",
+                "",
+                "",
             ))
     
     def _on_manual_struct_change(self):
@@ -903,6 +923,56 @@ class StructView(tk.Tk):
         text_widget.config(state="disabled")
 
     def show_parsed_values(self, parsed_values, byte_order_str=None):
+        # cache parsed values
+        try:
+            self._last_parsed_values = parsed_values
+        except Exception:
+            pass
+        # unified mode: rebuild layout_tree with merged layout+values
+        if getattr(self, "enable_unified_layout_values", False) and getattr(self, "_last_layout", None):
+            try:
+                # clear current rows
+                for iid in self.layout_tree.get_children():
+                    self.layout_tree.delete(iid)
+                # merge by index
+                count = min(len(self._last_layout), len(parsed_values))
+                for i in range(count):
+                    item = self._last_layout[i]
+                    val = parsed_values[i]
+                    bit_offset = item.get("bit_offset")
+                    bit_size = item.get("bit_size")
+                    bit_offset_str = str(bit_offset) if bit_offset is not None else "-"
+                    bit_size_str = str(bit_size) if bit_size is not None else "-"
+                    name_str = str(item.get("name", ""))
+                    type_str = str(item.get("type", ""))
+                    offset_str = str(item.get("offset", ""))
+                    size_str = str(item.get("size", ""))
+                    is_bf_str = str(item.get("is_bitfield", False))
+                    value = val.get("value", "")
+                    try:
+                        hex_value = hex(int(value)) if value != "-" else "-"
+                    except Exception:
+                        hex_value = "-"
+                    hex_raw = val.get("hex_raw", "")
+                    if hex_raw and len(hex_raw) > 2:
+                        hex_raw = "｜".join(hex_raw[j:j+2] for j in range(0, len(hex_raw), 2))
+                    self.layout_tree.insert("", "end", values=(
+                        name_str,
+                        type_str,
+                        offset_str,
+                        size_str,
+                        bit_offset_str,
+                        bit_size_str,
+                        is_bf_str,
+                        str(value) if value is not None else "",
+                        str(hex_value) if hex_value is not None else "",
+                        str(hex_raw) if hex_raw is not None else "",
+                    ))
+                return
+            except Exception:
+                # fallback to legacy path if anything goes wrong
+                pass
+        # legacy mode fallback
         self._populate_tree(self.member_tree, parsed_values)
 
     def show_manual_parsed_values(self, parsed_values, byte_order_str=None):
@@ -922,6 +992,11 @@ class StructView(tk.Tk):
         self.file_path_label.config(text=f"檔案路徑: {file_path}")
 
     def show_struct_layout(self, struct_name, layout, total_size, struct_align):
+        # cache layout for unified rebuild after parse
+        try:
+            self._last_layout = layout
+        except Exception:
+            pass
         # 清空舊資料
         for i in self.layout_tree.get_children():
             self.layout_tree.delete(i)
@@ -938,15 +1013,29 @@ class StructView(tk.Tk):
             offset_str = str(item.get("offset", ""))
             size_str = str(item.get("size", ""))
             is_bf_str = str(item.get("is_bitfield", False))
-            self.layout_tree.insert("", "end", values=(
-                name_str,
-                type_str,
-                offset_str,
-                size_str,
-                bit_offset_str,
-                bit_size_str,
-                is_bf_str
-            ))
+            if getattr(self, "enable_unified_layout_values", False):
+                self.layout_tree.insert("", "end", values=(
+                    name_str,
+                    type_str,
+                    offset_str,
+                    size_str,
+                    bit_offset_str,
+                    bit_size_str,
+                    is_bf_str,
+                    "",  # value
+                    "",  # hex_value
+                    ""   # hex_raw
+                ))
+            else:
+                self.layout_tree.insert("", "end", values=(
+                    name_str,
+                    type_str,
+                    offset_str,
+                    size_str,
+                    bit_offset_str,
+                    bit_size_str,
+                    is_bf_str
+                ))
         # 啟用 CSV 匯出（當 layout 存在時）
         try:
             if hasattr(self, "export_csv_button"):
