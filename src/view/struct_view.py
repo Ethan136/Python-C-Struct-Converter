@@ -39,7 +39,7 @@ except Exception:
     filedialog = _DummyFileDialog()
 
 from .virtual_tree import VirtualTreeview
-# from src.config import get_string
+from src.config import get_string
 from src.export.csv_export import DefaultCsvExportService, CsvExportOptions, build_parsed_model_from_struct
 from src.model.struct_model import StructModel
 import time

@@ -18,6 +18,7 @@ from src.config import load_ui_strings
 
 def main():
     """Main application entry point"""
+    # Load UI strings first before creating any objects that depend on them
     strings_path = os.path.join(os.path.dirname(__file__), "config", "ui_strings.xml")
     load_ui_strings(strings_path)
 

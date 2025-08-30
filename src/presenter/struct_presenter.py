@@ -152,7 +152,6 @@ class StructPresenter:
             filetypes=(("Header files", "*.h"), ("All files", "*.*" ))
         )
         if not file_path:
-            from src.config import get_string
             return {'type': 'error', 'message': get_string('msg_no_file_selected')}
 
         try:
@@ -169,7 +168,6 @@ class StructPresenter:
                 'struct_content': struct_content
             }
         except Exception as e:
-            from src.config import get_string
             return {'type': 'error', 'message': get_string('msg_file_load_error').format(error=str(e))}
 
     async def on_load_file(self, file_path):
@@ -202,7 +200,6 @@ class StructPresenter:
 
     def parse_hex_data(self):
         if not self.model.layout:
-            from src.config import get_string
             return {'type': 'error', 'message': get_string('msg_not_loaded')}
 
         hex_parts_with_expected_len = self.view.get_hex_input_parts()
@@ -224,14 +221,12 @@ class StructPresenter:
             return {'type': 'error', 'message': f"{title}: {str(e)}"}
 
         if len(hex_data) > self.model.total_size * 2:
-            from src.config import get_string
             return {'type': 'error', 'message': get_string('msg_input_too_long').format(length=len(hex_data), expected=self.model.total_size * 2)}
 
         try:
             parsed_values = self.model.parse_hex_data(hex_data, byte_order_for_conversion)
             return {'type': 'ok', 'debug_lines': debug_lines, 'parsed_values': parsed_values}
         except Exception as e:
-            from src.config import get_string
             return {'type': 'error', 'message': get_string('msg_hex_parse_error').format(error=str(e))}
 
     def validate_manual_struct(self, struct_data):
