@@ -2560,27 +2560,7 @@ def test_virtual_tree_reorder_nodes(view):
     assert list(view.member_tree.get_children("")) == ["n1", "n2", "n0"]
 
 
-def test_structviewv7_deprecated_warning():
-    import warnings
-    from src.view import StructViewV7
-
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        v = StructViewV7(presenter=None, page_size=5)
-        v.destroy()
-    assert any(issubclass(warn.category, DeprecationWarning) for warn in w)
-
-
-def test_structviewv7_wrapper_behavior():
-    """StructViewV7 should be a thin wrapper over StructView."""
-    from src.view import StructView, StructViewV7
-
-    v = StructViewV7(presenter=None, page_size=5)
-    try:
-        assert isinstance(v, StructView)
-        assert v.enable_virtual is True
-    finally:
-        v.destroy()
+# V23: StructViewV7 removed; wrapper tests deleted
 
 if __name__ == "__main__":
     unittest.main()

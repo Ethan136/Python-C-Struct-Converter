@@ -6,17 +6,15 @@ __version__ = "1.0.0"
 __author__ = "C++ Struct Parser Team"
 
 try:
-    from .presenter import StructPresenter, V7Presenter
+    from .presenter import StructPresenter
 except Exception:
     StructPresenter = None
-    V7Presenter = None
 
 from .model import StructModel  # convenience re-export
 from .export.csv_export import DefaultCsvExportService, CsvExportOptions, CsvExportError
 
 __all__ = [
     "StructPresenter",
-    "V7Presenter",
     "StructModel",
     "DefaultCsvExportService",
     "CsvExportOptions",
