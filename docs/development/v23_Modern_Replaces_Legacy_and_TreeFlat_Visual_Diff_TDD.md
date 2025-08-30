@@ -7,7 +7,7 @@
   - 2) 讓 Tree 與 Flat 在 UI 呈現上明顯區分。
 
 ### 高層策略
-- 移除 GUI 版本選單的 `legacy`，預設即為 Modern；或保留 `legacy` 作為 Modern 的別名（行為一致）。
+- 完全移除 Legacy 與 GUI 版本切換選單，預設即為 Modern 介面（不再提供 legacy/modern 切換）。
 - Tree 模式：啟用樹欄呈現（show="tree headings"），可展開/收合巢狀節點。
 - Flat 模式：維持表格（show="headings"）、所有節點視為單層列表，不可展開；可選配顯示完整路徑欄，強化檢索。
 - 保持既有欄位設定集中化（`MEMBER_TREEVIEW_COLUMNS`）的一致性。
@@ -23,21 +23,21 @@
 
 ### 需新增/調整的測試（Test Cases）
 
-#### A. Modern 取代 Legacy
+#### A. Modern 取代 Legacy（移除 Legacy 與版本切換）
 1) View 初始化與選單
-   - 測試：Import .H 控制列不再提供 `legacy` 選項；或選 `legacy` 時行為等同 `modern`。
+   - 測試：Import .H 控制列不再提供 GUI 版本切換選單（`gui_version_var/gui_version_menu` 不存在）。
    - 檔案：`tests/view/test_struct_view.py` 新增/調整用例。
    - 斷言：
-     - 若移除 legacy：GUI 版本選單僅含 `modern`。
-     - 若保留為別名：切換到 `legacy` 會呼叫 `_switch_to_modern_gui()`，`member_tree` 指向 `modern_tree`。
+     - 啟動後即為 Modern，`modern_tree` 預設存在且可用。
+     - 不存在 `gui_version_var`、`gui_version_menu`、`_on_gui_version_change`。
 
 2) Presenter 行為
    - 檔案：`tests/presenter/test_struct_presenter.py`
-   - 斷言：`on_switch_gui_version("legacy")` 與 `("modern")` 導致相同的 context 結果，或 `legacy` 無法設定（若選單移除）。
+   - 斷言：不再提供 `on_switch_gui_version` API；`get_default_context()` 不含 `gui_version` 欄位或其值固定不檢查。
 
 3) 現有相容測試
-   - 檔案：`tests/view/test_struct_view.py`（GUI 版本切換測試需更新）。
-   - 調整：若移除 legacy，刪除或調整相關斷言；若保留別名則更新為期待 modern 行為。
+   - 檔案：`tests/view/test_struct_view.py`（GUI 版本切換測試需移除或改寫）。
+   - 調整：刪除所有針對 `legacy/v7` 切換與 `gui_version` 選單的斷言；改為驗證 Modern 預設存在與可用。
 
 #### B. Tree vs Flat 視覺差異
 1) Tree 模式顯示樹欄
@@ -70,10 +70,10 @@
 ### 需改動的檔案與調整內容（按檔案列出）
 
 #### 1) `src/view/struct_view.py`
-- A. 移除或統一 GUI 版本選單：
-  - 移除 `legacy` 選項，只保留 `modern`；或將 `legacy` 切換路徑導向 `_switch_to_modern_gui()`。
-  - 更新 `self.gui_version_var` 預設值與選項清單。
-  - 若移除 legacy：刪除 `_switch_to_legacy_gui()` 未被使用的邏輯；若保留別名，方法可留但內部直接調用 `_switch_to_modern_gui()`。
+- A. 移除 GUI 版本切換功能：
+  - 移除 GUI 版本標籤與選單（`label_gui_version` / `gui_version_var` / `gui_version_menu`）。
+  - 移除 `_on_gui_version_change`、`_switch_to_legacy_gui`、`_switch_to_v7_gui` 方法與相關呼叫。
+  - 初始化即建立 Modern 介面：`_create_modern_gui()` 或將現有 `member_tree` 統一為現代化樹視圖（可直接命名 `member_tree`）。
 
 - B. Tree/Flat 視覺差異切換：
   - 在 `update_display()` 或 `show_treeview_nodes()` 中，依 `context["display_mode"]` 調整 `member_tree` 的 `show`：
@@ -87,9 +87,9 @@
   - 測試需考慮 headless 環境。
 
 #### 2) `src/presenter/struct_presenter.py`
-- A. `on_switch_gui_version(version)`：
-  - 若移除 legacy：限制 `version` 僅允許 `modern`，或將 `legacy` 正規化為 `modern`。
-  - 更新 context 與 `validate_presenter_context` 一致。
+- A. 移除 `on_switch_gui_version(version)` 與所有對其的引用。
+- B. `get_default_context()`：移除 `gui_version` 欄位（或保留但不在任何地方使用；建議移除）。
+- C. 同步更新 `validate_presenter_context`（`src/presenter/context_schema.py`）：刪除 `gui_version` 欄位定義。
 
 - B. `on_switch_display_mode(mode)`：
   - 現有行為保留（設定 `display_mode`、重置 `expanded_nodes/selected_node`）。
@@ -104,35 +104,40 @@
   - 在展平時附加 `full_path` 欄位（透過遞迴組路徑或在 `ast_to_dict` 中持有 parent 路徑）。
 
 #### 4) 測試檔更新
-- `tests/view/test_struct_view.py`：補齊上述 A/B 測試。
-- `tests/presenter/test_struct_presenter.py`：更新 GUI 版本切換測試。
+- `tests/view/test_struct_view.py`：
+  - 刪除與 `gui_version` 相關的測試（包含 `test_gui_version_switch_ui_and_presenter_call`、`test_gui_version_switch_ui_visibility` 及任何使用 `_on_gui_version_change` 的測試）。
+  - 新增 Modern 預設存在與可用的測試（取代 `test_modern_gui_creation` → 驗證初始化後現代 Treeview 已存在）。
+  - 新增/調整 Tree/Flat 視覺差異測試（見上節）。
+- `tests/presenter/test_struct_presenter.py`：
+  - 移除 `on_switch_gui_version` 相關測試。
+  - 更新 `get_default_context` 期望（不含 `gui_version`）。
 - `tests/model/test_struct_model_display_nodes.py`（新增）：驗證 flat nodes 無 children 與（選配）full_path。
 
 ---
 
 ### 逐步 TDD 流程（細項）
 
-1) 新增/調整測試：Modern 取代 Legacy
+1) 新增/調整測試：Modern 取代 Legacy（移除 Legacy 與版本切換）
    - 編寫 View 測試：
-     - 若移除 legacy：斷言選單僅含 `modern`。
-     - 若保留別名：斷言切到 `legacy` 後 `member_tree is modern_tree`。
+     - 斷言初始化後即為 Modern，`modern_tree/member_tree` 存在；且不存在 `gui_version_var/gui_version_menu`。
    - 編寫 Presenter 測試：
-     - `on_switch_gui_version("legacy")` 行為等同 `"modern"`（或拋錯，取決於策略）。
+     - `get_default_context()` 不含 `gui_version`；不存在 `on_switch_gui_version`。
 
 2) 新增測試：Tree vs Flat 視覺差異
    - Tree：`show` 包含 `tree`；巢狀可展開。
    - Flat：`show == "headings"`；所有節點無子項。
 
 3) 實作最小變更：
-   - View：依 mode 設定 `member_tree.configure(show=...)`；flat 模式渲染前移除 children。
+   - View：
+     - 移除 GUI 版本切換 UI 與方法；初始化即建立 Modern Treeview。
+     - 依 display_mode 設定 `member_tree.configure(show=...)`；flat 模式渲染前移除 children。
    - Model：`get_display_nodes("flat")` 改為輸出 children=[]；（選配）提供 `full_path`。
-   - Presenter：正規化 `legacy -> modern` 或限定版本集合。
+   - Presenter：移除 `gui_version` 相關邏輯與欄位；同步更新 context schema。
 
 4) 通過測試後的重構：
-   - 若選擇移除 legacy：
-     - 刪除 `_switch_to_legacy_gui()` 未使用分支。
-     - 移除 GUI 選單中的 `legacy` 值。
-     - 更新文件（v6/v8 文件中 legacy/modern 的描述，標註 v23 起 modern 為唯一介面）。
+   - 刪除 `_switch_to_legacy_gui()`、`_switch_to_v7_gui()`、`_on_gui_version_change()` 與相關 UI 元件。
+   - 完全移除 GUI 版本選單；將相關字串鍵（若有）標註為 deprecated 或移除。
+   - 更新文件（v6/v8 文件中 legacy/modern 的描述，標註 v23 起 Modern 為唯一介面）。
 
 5) 文件與使用說明：
    - 更新 `docs/development/v6_GUI_view.md`/`v8_GUI_integration.md` 的 GUI 版本切換章節。
@@ -141,47 +146,29 @@
 ---
 
 ### 風險與回退策略
-- 風險：既有 UI 測試對 `legacy` 的期望需更新；headless CI 下 Treeview `show` 驗證需穩健。
-- 回退：保留 `legacy` 作為 modern 別名，先不移除選項，只調整行為；待驗證穩定再移除選項。
+- 風險：既有 UI 測試與文件廣泛引用 `legacy` 與版本切換，需全面更新；headless CI 下 Treeview `show` 驗證需穩健。
+- 回退：以 feature flag 臨時恢復 GUI 版本選單（非預設顯示），僅供內部測試；正式版本不建議回退至 Legacy。
 
 ---
 
 ### 現有測試需同步調整清單（精準）
 
-以下列出受影響的既有測試與建議調整方式，請依「是否移除 legacy 選項」決策執行（若保留為別名，將 legacy 正規化成 modern 並保留選單；若移除，刪除或改寫相應斷言）。
+以下列出受影響的既有測試與建議調整方式（已確定移除 Legacy 與版本切換選單）：
 
 - tests/view/test_struct_view.py
-  - test_gui_version_switch_ui_and_presenter_call
-    - 若移除 legacy/v7：
-      - 刪除對 `self.view.gui_version_var.get() == "legacy"` 的預設值斷言，改為 `"modern"` 或移除此預設值檢查。
-      - 刪除切換 `"v7"` 與返回 `"legacy"` 的斷言；改為僅驗證 `"modern"` 流程。
-    - 若保留 legacy 為別名：
-      - 保留 `self.view._on_gui_version_change("legacy")` 測試，但改為斷言 `member_tree is modern_tree` 且 `presenter.context["gui_version"] in ("legacy","modern")`，兩者行為一致。
-
-  - test_gui_version_switch_ui_visibility
-    - 若移除 legacy：移除「切回舊版」段落；保留驗證 modern 元件存在即可。
-    - 若保留別名：將「切回舊版」改為呼叫 `legacy`，並驗證 `member_tree is modern_tree`（等同 modern）。
-
-  - 內部使用的初始 context（多處）：
-    - 搜尋 `"gui_version": "legacy"`，改為 `"modern"` 或移除此欄位預設值檢查（讓測試對 gui_version 去敏化）。
-
-  - 涉及 `gui_version_var` 存在性與選單內容的測試：
-    - 若移除 legacy：改為斷言選單只含 `modern`，或改為不檢查選單（若整體移除 GUI 版本切換）。
-    - 若保留別名：斷言選單包含 `modern`, `legacy`，且 `legacy` 行為與 `modern` 等價。
-
-  - 新增/調整與 Tree/Flat 視覺差異的測試：
-    - 在切換到 `tree` 後，新增斷言 `member_tree.cget("show")` 含 `"tree"`（如 `"tree headings"`），且若測試資料具巢狀，`get_children` 顯示層級 > 1。
-    - 在切換到 `flat` 後，新增斷言 `member_tree.cget("show") == "headings"`，並驗證根層子項皆無下層節點（`get_children(item)` 皆為空）。
-    - 平衡 headless 限制：如需，僅驗證 `show` 與 children 結構，不強制檢查開合狀態。
+  - 刪除：`test_gui_version_switch_ui_and_presenter_call`、`test_gui_version_switch_ui_visibility`、任何使用 `_on_gui_version_change` 的測試段落。
+  - 搜尋並移除：任何對 `self.view.gui_version_var`、`self.view.gui_version_menu` 的引用。
+  - 搜尋並移除：任何對 `"gui_version": "legacy"` 初始 context 的強制斷言（整體去除 gui_version）。
+  - 新增：初始化即為 Modern 的測試（驗證 `modern_tree`/`member_tree` 存在、可插入節點）。
+  - 新增/調整：Tree/Flat 視覺差異測試（`show` 設定與 children 結構）。
 
 - tests/presenter/test_struct_presenter.py
-  - 新增（或改寫）關於 `on_switch_gui_version` 的用例：
-    - 若保留別名：`on_switch_gui_version("legacy")` 與 `("modern")` 更新的 context 等價；或至少不丟例外。
-    - 若移除 legacy：`on_switch_gui_version("legacy")` 應丟 `ValueError` 或被正規化為 `modern`（依實作策略選其一並測試）。
-  - 保持 `on_switch_display_mode` 測試，但可補充對 `expanded_nodes`/`selected_node` 重置的斷言。
+  - 刪除：`on_switch_gui_version` 相關測試與任何直接引用該 API 的測試資料。
+  - 更新：`get_default_context` 期望（不含 `gui_version`）。
+  - 保持：`on_switch_display_mode` 測試；可補強對 `expanded_nodes`/`selected_node` 重置的斷言。
 
 - tests/presenter/test_v2p_contract.py
-  - 無需調整 gui_version；可選擇性補強對 tree/flat 切換後 nodes 結構差異的合約測試（flat 無 children）。
+  - 不需檢查 `gui_version`；可選擇性補強對 tree/flat 切換後 nodes 結構差異的合約測試（flat 無 children）。
 
 - tests/presenter/test_v7_presenter.py
   - 無直接依賴 gui_version；保持不變。
@@ -194,15 +181,17 @@
   - 若實作在 flat 模式新增 `full_path` 欄，需同步更新 View 層對 `MEMBER_TREEVIEW_COLUMNS` 的測試（欄位一致性檢查）。
   - 若改動 GUI 版本選單（移除/改名），需同步更新任何查找該 widget 的測試（避免硬依賴）。
 
-建議流程：先以「legacy 作為 modern 別名」通過所有測試，再選擇性移除 legacy 選單並批次更新相依測試，降低一次性破壞性變更的風險。
+建議流程：一次性移除 Legacy 與 GUI 版本切換並同步更新測試；如需降低風險，可在短期開發分支中先保留 feature flag 但預設關閉，不在主分支暴露。
 
 ---
 
 ### 完成定義（DoD）
 - 所有新增/調整測試通過（含 headless/CI）。
-- Modern 成為預設 UI；Legacy 行為與現況一致或被移除。
+- 已完全移除 Legacy 與 GUI 版本切換：
+  - 不存在 `gui_version_var/gui_version_menu`、`_on_gui_version_change`、`_switch_to_legacy_gui/_switch_to_v7_gui`。
+  - Presenter context 與 schema 不含 `gui_version`。
 - Tree 與 Flat 在 UI 呈現明顯不同：
   - Tree：`show="tree headings"`、可展開巢狀。
   - Flat：`show="headings"`、無子項。
-- 文件已更新，並記錄相容性注意事項。
+- 文件已更新，並記錄相容性注意事項與移除項目列表。
 
