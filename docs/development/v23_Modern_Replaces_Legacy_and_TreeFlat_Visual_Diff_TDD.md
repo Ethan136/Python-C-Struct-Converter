@@ -146,6 +146,58 @@
 
 ---
 
+### 現有測試需同步調整清單（精準）
+
+以下列出受影響的既有測試與建議調整方式，請依「是否移除 legacy 選項」決策執行（若保留為別名，將 legacy 正規化成 modern 並保留選單；若移除，刪除或改寫相應斷言）。
+
+- tests/view/test_struct_view.py
+  - test_gui_version_switch_ui_and_presenter_call
+    - 若移除 legacy/v7：
+      - 刪除對 `self.view.gui_version_var.get() == "legacy"` 的預設值斷言，改為 `"modern"` 或移除此預設值檢查。
+      - 刪除切換 `"v7"` 與返回 `"legacy"` 的斷言；改為僅驗證 `"modern"` 流程。
+    - 若保留 legacy 為別名：
+      - 保留 `self.view._on_gui_version_change("legacy")` 測試，但改為斷言 `member_tree is modern_tree` 且 `presenter.context["gui_version"] in ("legacy","modern")`，兩者行為一致。
+
+  - test_gui_version_switch_ui_visibility
+    - 若移除 legacy：移除「切回舊版」段落；保留驗證 modern 元件存在即可。
+    - 若保留別名：將「切回舊版」改為呼叫 `legacy`，並驗證 `member_tree is modern_tree`（等同 modern）。
+
+  - 內部使用的初始 context（多處）：
+    - 搜尋 `"gui_version": "legacy"`，改為 `"modern"` 或移除此欄位預設值檢查（讓測試對 gui_version 去敏化）。
+
+  - 涉及 `gui_version_var` 存在性與選單內容的測試：
+    - 若移除 legacy：改為斷言選單只含 `modern`，或改為不檢查選單（若整體移除 GUI 版本切換）。
+    - 若保留別名：斷言選單包含 `modern`, `legacy`，且 `legacy` 行為與 `modern` 等價。
+
+  - 新增/調整與 Tree/Flat 視覺差異的測試：
+    - 在切換到 `tree` 後，新增斷言 `member_tree.cget("show")` 含 `"tree"`（如 `"tree headings"`），且若測試資料具巢狀，`get_children` 顯示層級 > 1。
+    - 在切換到 `flat` 後，新增斷言 `member_tree.cget("show") == "headings"`，並驗證根層子項皆無下層節點（`get_children(item)` 皆為空）。
+    - 平衡 headless 限制：如需，僅驗證 `show` 與 children 結構，不強制檢查開合狀態。
+
+- tests/presenter/test_struct_presenter.py
+  - 新增（或改寫）關於 `on_switch_gui_version` 的用例：
+    - 若保留別名：`on_switch_gui_version("legacy")` 與 `("modern")` 更新的 context 等價；或至少不丟例外。
+    - 若移除 legacy：`on_switch_gui_version("legacy")` 應丟 `ValueError` 或被正規化為 `modern`（依實作策略選其一並測試）。
+  - 保持 `on_switch_display_mode` 測試，但可補充對 `expanded_nodes`/`selected_node` 重置的斷言。
+
+- tests/presenter/test_v2p_contract.py
+  - 無需調整 gui_version；可選擇性補強對 tree/flat 切換後 nodes 結構差異的合約測試（flat 無 children）。
+
+- tests/presenter/test_v7_presenter.py
+  - 無直接依賴 gui_version；保持不變。
+
+- 新增：tests/model/test_struct_model_display_nodes.py（可新建）
+  - 驗證 `StructModel.get_display_nodes("flat")` 回傳的每個節點 `children == []`。
+  - 若啟用 `full_path` 欄位，驗證 flat 模式節點含此欄並值正確（路徑組合）。
+
+- 其他：
+  - 若實作在 flat 模式新增 `full_path` 欄，需同步更新 View 層對 `MEMBER_TREEVIEW_COLUMNS` 的測試（欄位一致性檢查）。
+  - 若改動 GUI 版本選單（移除/改名），需同步更新任何查找該 widget 的測試（避免硬依賴）。
+
+建議流程：先以「legacy 作為 modern 別名」通過所有測試，再選擇性移除 legacy 選單並批次更新相依測試，降低一次性破壞性變更的風險。
+
+---
+
 ### 完成定義（DoD）
 - 所有新增/調整測試通過（含 headless/CI）。
 - Modern 成為預設 UI；Legacy 行為與現況一致或被移除。
