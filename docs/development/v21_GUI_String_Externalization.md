@@ -97,3 +97,216 @@
   - 統一使用 `str.format` 或 `%(name)s` 風格；
   - 測試覆蓋參數化訊息。
 
+---
+
+### TDD 重構計畫（改動順序＋各階段預期測試結果）
+
+以下採用「小步快跑、測試先行」原則，將外部化工作拆成多個可快速驗證的階段。每一階段都應：
+- 先新增或調整測試（紅燈）
+- 最小實作讓測試轉綠（綠燈）
+- 重構/清理（保持綠燈）
+
+所有命令均在專案根目錄執行。
+
+#### 階段 0：基線校驗（不改動）
+- 動作：
+  - 執行全部測試。
+- 指令：
+```bash
+pytest -q
+```
+- 預期：
+  - 既有測試全部通過（綠燈）。
+  - 若出現與 DISPLAY 有關的 GUI 測試被跳過屬正常現象（headless）。
+
+#### 階段 1：config 層 API 行為測試（防退化）
+- 測試新增：`tests/config/test_ui_strings.py`
+  - `test_load_ui_strings_success`: 載入 `src/config/ui_strings.xml` 後，至少含有 `app_title`, `dialog_select_file` 等鍵。
+  - `test_get_string_fallback_to_key`: 取得不存在鍵時，回傳鍵名本身。
+  - `test_load_nonexistent_file_raises`: 當路徑不存在時丟出 `FileNotFoundError`。
+- 指令：
+```bash
+pytest -q tests/config/test_ui_strings.py
+```
+- 預期：
+  - 以上測試綠燈（`src/config/ui_strings.py` 現狀已符合）。
+
+#### 階段 2：Presenter 錯誤標題與對話框字串外部化（邏輯層不觸 UI）
+- 目標：將 `StructPresenter` 內錯誤標題映射與檔案對話框標題改為使用 `get_string`。
+- 涉及檔案：`src/presenter/struct_presenter.py`
+- 現況摘錄（僅示意）：
+```12:55:src/presenter/struct_presenter.py
+from src.config import get_string
+...
+file_path = filedialog.askopenfilename(
+    title=get_string("dialog_select_file"),
+    filetypes=(("Header files", "*.h"), ("All files", "*.*" ))
+)
+...
+title_map = {
+    "invalid_input": "無效輸入",
+    "value_too_large": "數值過大",
+    "overflow_error": "溢位錯誤",
+    "conversion_error": "轉換錯誤",
+}
+```
+- 測試新增：`tests/presenter/test_presenter_i18n.py`
+  - `test_browse_file_dialog_title_uses_xml_key`: 以 monkeypatch `src.config.ui_strings.get_string` 回傳 sentinel，呼叫 `browse_file` 時檢查 `askopenfilename(title=sentinel)` 被呼叫。
+  - `test_parse_hex_error_title_uses_xml_key`: 觸發 `invalid_input` 等錯誤碼，期待回傳的錯誤訊息以 `get_string('dialog_invalid_input')` 之值為標題開頭。
+- 期望紅燈原因：
+  - 錯誤標題目前為硬字串中文映射。
+- 實作改動：
+  - 將 `title_map` 值改為 `get_string('dialog_invalid_input')` 等對應鍵。
+  - 確認所有錯誤訊息標題皆源自 `get_string`。必要的鍵（`dialog_invalid_input`, `dialog_value_too_large`, `dialog_overflow_error`, `dialog_conversion_error`）已存在於 XML，若缺則補。
+- 綠燈依據：上述測試通過。
+
+#### 階段 3：View 視窗標題與分頁標籤外部化（基礎可見文字）
+- 目標：將 `StructView` 的 `title` 與 Tab 文字改為 `get_string`。
+- 涉及檔案：`src/view/struct_view.py`
+- 新增鍵（XML）：
+  - `window_title`（如：`C Struct GUI`）
+  - `tab_load_h`（載入.H檔）
+  - `tab_manual_struct`（手動設定資料結構）
+- 測試新增：`tests/view/test_view_i18n_title_tabs.py`（顯示環境存在時執行）
+  - `test_window_title_uses_xml`: 建立 `StructView` 後，斷言 `view.title()` 等於 `get_string('window_title')`。
+  - `test_tabs_use_xml`: 斷言兩個分頁標籤文字來源為對應鍵。
+- 期望紅燈原因：
+  - 現況為硬字串。
+- 實作改動：
+  - 在 `__init__` 或 `_create_tab_control` 將硬字串改為 `get_string(...)`。
+  - 於 `ui_strings.xml` 補上新鍵。
+- 綠燈依據：測試全部通過。
+
+#### 階段 4：控制列標籤與下拉選單標籤外部化
+- 目標：外部化「單位大小：」「Endianness：」「顯示模式：」「Target Struct：」「GUI 版本：」「搜尋：」「Filter：」等標籤。
+- 新增鍵（XML 建議）：
+  - `label_unit_size`, `label_endianness`, `label_display_mode`, `label_target_struct`, `label_gui_version`, `label_search`, `label_filter`
+- 測試新增：`tests/view/test_view_i18n_controls.py`
+  - 對各 `Label` 取 `cget('text')`，斷言其值等於 `get_string` 對應鍵。
+- 期望紅燈 → 實作改動：
+  - 以 `get_string` 替換 `tk.Label(..., text=...)` 的硬字串。
+  - XML 補鍵。
+- 綠燈依據：測試通過。
+
+#### 階段 5：按鈕文字外部化（展開/收合/批次）
+- 目標：外部化 `展開全部`、`收合全部`、`展開選取`、`收合選取`。
+- 新增鍵：`btn_expand_all`, `btn_collapse_all`, `btn_expand_selected`, `btn_collapse_selected`
+- 測試新增：`tests/view/test_view_i18n_buttons.py`
+  - 檢查 `Button` 的 `cget('text')` 對應 `get_string`。
+- 期望紅燈 → 實作改動：
+  - 改寫 `tk.Button(..., text=...)` 為 `get_string`。
+  - XML 補鍵。
+- 綠燈依據：測試通過。
+
+#### 階段 6：Treeview 欄位標題外部化
+- 目標：外部化 `MEMBER_TREEVIEW_COLUMNS`, `LAYOUT_TREEVIEW_COLUMNS` 內的 `title`。
+- 新增鍵：
+  - Members：`member_col_name`, `member_col_value`, `member_col_hex_value`, `member_col_hex_raw`
+  - Layout：`layout_col_name`, `layout_col_type`, `layout_col_offset`, `layout_col_size`, `layout_col_bit_offset`, `layout_col_bit_size`, `layout_col_is_bitfield`
+- 測試新增：`tests/view/test_view_i18n_treeview_headers.py`
+  - 斷言 `tree.heading(col, 'text')` 與 `get_string(對應鍵)` 一致。
+- 期望紅燈 → 實作改動：
+  - 建立 columns 時以 `get_string` 設定 `heading` 文本。
+  - XML 補鍵。
+- 綠燈依據：測試通過。
+
+#### 階段 7：View 內 messagebox 與錯誤提示外部化
+- 現況摘錄（示意）：
+```864:864:src/view/struct_view.py
+messagebox.showerror(title, message)
+```
+```963:966:src/view/struct_view.py
+messagebox.showerror("錯誤", "尚未載入 struct，無法匯出 CSV")
+```
+```1016:1025:src/view/struct_view.py
+messagebox.showwarning(...)
+messagebox.showerror("匯出失敗", str(e))
+```
+```1623:1633:src/view/struct_view.py
+messagebox.showwarning("Context Warning", warning_msg)
+messagebox.showerror("錯誤", str(context["error"]))
+```
+- 新增鍵：
+  - `dialog_error_title`, `dialog_warning_title`, `dialog_export_failed_title`, `dialog_not_loaded_title`, `dialog_not_loaded_body`, `dialog_context_warning_title`
+- 測試新增：`tests/view/test_view_i18n_messagebox.py`
+  - 以 monkeypatch 攔截 `messagebox.showerror/showwarning`，驗證 title/message 來自 `get_string`。
+- 期望紅燈 → 實作改動：
+  - 全面以 `get_string` 取代硬字串 title/body，動態訊息以格式化或直接附加異常文字。
+  - XML 補鍵。
+- 綠燈依據：測試通過。
+
+#### 階段 8：XML 鍵完整性測試（集合校驗）
+- 目標：確保 XML 至少包含「鍵名清單（初版）」列出的鍵。
+- 測試新增：`tests/config/test_ui_keys_presence.py`
+  - 解析 `ui_strings.xml`，斷言必備鍵集合皆存在。
+- 期望紅燈 → 實作改動：
+  - 在 XML 補足缺失鍵。
+- 綠燈依據：測試通過。
+
+#### 階段 9：靜態檢查（避免回歸硬字串）
+- 測試新增：`tests/view/test_no_hardcoded_ui_strings.py`
+  - 使用簡單正則在 `src/view/struct_view.py` 搜尋 `text="..."` 與 `heading(..., text=...)` 的硬字串；
+  - 白名單：數字、空字串、非 UI 文字（例如變數、DEBUG 字樣，必要時維護清單）。
+- 期望紅燈 → 實作改動：
+- 將殘留硬字串改為 `get_string` 或加入白名單依據評估。
+- 綠燈依據：測試通過。
+
+#### 階段 10：全域回歸
+- 指令：
+```bash
+pytest -q
+```
+- 預期：
+  - 全部測試綠燈；
+  - Headless 環境下 GUI 測試允許被 skip。
+
+---
+
+### 鍵名清單（初版，實作中可調整命名）
+- 基礎與對話框：
+  - `app_title`, `window_title`, `dialog_select_file`, `dialog_error_title`, `dialog_warning_title`, `dialog_export_failed_title`, `dialog_not_loaded_title`, `dialog_not_loaded_body`, `dialog_context_warning_title`
+  - `dialog_invalid_input`, `dialog_value_too_large`, `dialog_overflow_error`, `dialog_conversion_error`, `dialog_parsing_error`, `dialog_invalid_length`, `dialog_no_struct`
+- 分頁與區塊：
+  - `tab_load_h`, `tab_manual_struct`, `layout_frame_title`, `hex_input_title`, `parsed_values_title`
+- 控制列標籤：
+  - `label_unit_size`, `label_endianness`, `label_display_mode`, `label_target_struct`, `label_gui_version`, `label_search`, `label_filter`
+- 按鈕：
+  - `btn_expand_all`, `btn_collapse_all`, `btn_expand_selected`, `btn_collapse_selected`, `parse_button`, `browse_button`
+- Treeview 欄位：
+  - Members：`member_col_name`, `member_col_value`, `member_col_hex_value`, `member_col_hex_raw`
+  - Layout：`layout_col_name`, `layout_col_type`, `layout_col_offset`, `layout_col_size`, `layout_col_bit_offset`, `layout_col_bit_size`, `layout_col_is_bitfield`
+
+---
+
+### 測試實作與檔案規劃
+- 新增測試檔路徑建議：
+  - `tests/config/test_ui_strings.py`
+  - `tests/presenter/test_presenter_i18n.py`
+  - `tests/view/test_view_i18n_title_tabs.py`
+  - `tests/view/test_view_i18n_controls.py`
+  - `tests/view/test_view_i18n_buttons.py`
+  - `tests/view/test_view_i18n_treeview_headers.py`
+  - `tests/view/test_view_i18n_messagebox.py`
+  - `tests/view/test_no_hardcoded_ui_strings.py`
+
+---
+
+### PR 切分與改動順序（實作層級）
+- PR1：加測試（階段 1）與微調 `ui_strings.xml`（不破壞現有功能）。
+- PR2：Presenter 錯誤標題外部化（階段 2）。
+- PR3：View 標題與分頁外部化（階段 3）。
+- PR4：控制列標籤外部化（階段 4）。
+- PR5：按鈕外部化（階段 5）。
+- PR6：Treeview 欄位外部化（階段 6）。
+- PR7：messagebox 外部化（階段 7）。
+- PR8：XML 鍵完整性測試（階段 8）與靜態檢查（階段 9）。
+- PR9：全域回歸與文件更新（階段 10）。
+
+---
+
+### 驗收標準（Definition of Done）
+- GUI 內可視文字均來源於 `ui_strings.xml`，缺鍵時 UI 顯示鍵名自身，不崩潰。
+- 列出的測試檔全部通過，且新增的靜態檢查無紅燈（或白名單合理）。
+- `docs/` 已更新鍵名清單與命名規範，對應實際程式碼。
+- CI：`pytest -q` 綠燈；在具 DISPLAY 的 runner 上，View 測試可執行且通過。
+
