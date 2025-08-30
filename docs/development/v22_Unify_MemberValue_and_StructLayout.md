@@ -38,7 +38,10 @@
 - Update `show_parsed_values(...)` to:
   - Either: iterate current `layout_tree` rows and update the appended value columns by index.
   - Or: reconstruct the unified rows by zipping `layout` and `parsed_values` and reinsert (simpler and deterministic).
-- Keep manual struct tab behavior unchanged in V22; consider unification there in a later version.
+- Manual tab in V22:
+  - Manual tab adopts the same `LAYOUT_TREEVIEW_COLUMNS` (which now includes `value/hex_value/hex_raw`).
+  - These 3 value columns are populated with empty strings by default in the manual layout tree.
+  - If preserving the old appearance is desired, consider adding per-column visibility control in a follow-up release, or defining a manual-tab-specific column set.
 
 ### 6.1) Concrete edit points
 - File: `src/view/struct_view.py`
@@ -89,6 +92,7 @@
 - Behavior:
   - When disabled, `show_struct_layout(...)` and `show_parsed_values(...)` revert to legacy behavior (no appended value columns; values shown in `member_tree`).
   - Tests may branch on this flag to preserve legacy assertions temporarily.
+  - Example (Linux/macOS): `UNIFY_LAYOUT_VALUES=0 python -m pytest -q`
 
 ### 8) Risks and Mitigations
 - GUI test breakage expecting `member_tree`: guard with the feature flag and update tests to check unified mode paths. Retain minimal compatibility tests for legacy mode during the transition.
@@ -157,11 +161,12 @@
     - Sections validating parsed values display for Import .H tab (non-manual). Identify and update those that rely on `member_tree` to read values.
   - Keep `manual_member_tree` tests unchanged; manual tab remains separate.
   - Tip: guard legacy assertions with `if not view.enable_unified_layout_values:` to retain backward compatibility temporarily.
+  - Note: If no Import .H tests actually assert values via `member_tree`, no changes are required.
 
-### 10.5) Nested struct unified test (pending)
-- Add a nested struct case to `tests/view/test_struct_view_unified_mode.py`:
+### 10.5) Nested struct unified test (completed)
+- Implemented in `tests/view/test_struct_view_unified_mode.py::test_unified_layout_nested_struct_values`.
   - Layout includes a nested struct expanded into children rows (e.g., `s.a`, `s.b`).
-  - Parsed values provided in matching order; assert values appear in the correct rows in `layout_tree`.
+  - Parsed values provided in matching order; asserts values appear in the correct rows in `layout_tree`.
   - Example shape:
     - Layout rows: `{"name":"s.a","type":"int","offset":0,...}`, `{"name":"s.b","type":"short","offset":4,...}`
     - Parsed rows: `{"name":"s.a","value":"123","hex_raw":"7b000000"}`, `{"name":"s.b","value":"258","hex_raw":"0201"}`
