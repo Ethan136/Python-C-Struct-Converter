@@ -75,6 +75,9 @@
     <string name="dialog_no_struct">No Struct</string>
     <string name="msg_no_file_selected">未選擇檔案</string>
     <string name="msg_not_loaded">尚未載入 struct 定義檔案</string>
+    <string name="msg_file_load_error">載入檔案時發生錯誤: {error}</string>
+    <string name="msg_input_too_long">輸入資料長度 ({length}) 超過預期總大小 ({expected})</string>
+    <string name="msg_hex_parse_error">解析 hex 資料時發生錯誤: {error}</string>
     <string name="dialog_export_h_title">匯出 .h 檔內容</string>
     <string name="dialog_not_loaded_title">錯誤</string>
     <string name="dialog_not_loaded_body">尚未載入 struct，無法匯出 CSV</string>

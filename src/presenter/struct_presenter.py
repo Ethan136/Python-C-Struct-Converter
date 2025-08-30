@@ -169,7 +169,8 @@ class StructPresenter:
                 'struct_content': struct_content
             }
         except Exception as e:
-            return {'type': 'error', 'message': f"載入檔案時發生錯誤: {e}"}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_file_load_error').format(error=str(e))}
 
     async def on_load_file(self, file_path):
         self.context["loading"] = True
@@ -223,13 +224,15 @@ class StructPresenter:
             return {'type': 'error', 'message': f"{title}: {str(e)}"}
 
         if len(hex_data) > self.model.total_size * 2:
-            return {'type': 'error', 'message': f"輸入資料長度 ({len(hex_data)}) 超過預期總大小 ({self.model.total_size * 2})"}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_input_too_long').format(length=len(hex_data), expected=self.model.total_size * 2)}
 
         try:
             parsed_values = self.model.parse_hex_data(hex_data, byte_order_for_conversion)
             return {'type': 'ok', 'debug_lines': debug_lines, 'parsed_values': parsed_values}
         except Exception as e:
-            return {'type': 'error', 'message': f"解析 hex 資料時發生錯誤: {e}"}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_hex_parse_error').format(error=str(e))}
 
     def validate_manual_struct(self, struct_data):
         return self.model.validate_manual_struct(struct_data["members"], struct_data["total_size"])
@@ -264,7 +267,8 @@ class StructPresenter:
             title = get_string(title_key_map.get(e.kind, "dialog_error_title"))
             return {'type': 'error', 'message': f"{title}: {str(e)}"}
         except Exception as e:
-            return {'type': 'error', 'message': f"解析 hex 資料時發生錯誤: {e}"}
+            from src.config import get_string
+            return {'type': 'error', 'message': get_string('msg_hex_parse_error').format(error=str(e))}
 
     def compute_member_layout(self, members, total_size):
         """計算 struct member 的 layout，回傳 layout list，含 LRU cache 機制。"""

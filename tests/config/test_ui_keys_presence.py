@@ -30,7 +30,7 @@ def test_ui_strings_contains_required_keys():
         "dialog_export_failed_title", "dialog_export_done_title", "dialog_export_done_body",
         "dialog_context_warning_title", "dialog_not_loaded_body", "dialog_export_h_title",
         # presenter messages
-        "msg_no_file_selected", "msg_not_loaded",
+        "msg_no_file_selected", "msg_not_loaded", "msg_file_load_error", "msg_input_too_long", "msg_hex_parse_error",
     }
 
     missing = sorted(required - keys)
