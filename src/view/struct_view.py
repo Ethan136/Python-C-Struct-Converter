@@ -174,6 +174,15 @@ class StructView(tk.Tk):
         self._virtual_page_size = virtual_page_size
         # v22: unified layout+values view flag and caches
         self.enable_unified_layout_values = True
+        try:
+            import os as _os
+            val = str(_os.environ.get("UNIFY_LAYOUT_VALUES", "1")).lower()
+            if val in ("0", "false"):
+                self.enable_unified_layout_values = False
+            elif val in ("1", "true"):
+                self.enable_unified_layout_values = True
+        except Exception:
+            pass
         self._last_layout = None
         self._last_parsed_values = None
         # v21: Externalize window title

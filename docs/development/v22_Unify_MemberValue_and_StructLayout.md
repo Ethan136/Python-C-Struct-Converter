@@ -81,6 +81,15 @@
   - Legacy two-Treeview mode (fallback during rollout/testing).
 - Flag can be set via config or environment variable for CI A/B execution.
 
+### 7.1) Environment flag (implementation detail)
+- Name: `UNIFY_LAYOUT_VALUES`
+- Accepted values: `"1"`/`"true"` (enable), `"0"`/`"false"` (disable)
+- Default: enabled when unset
+- Read point: `StructView.__init__`
+- Behavior:
+  - When disabled, `show_struct_layout(...)` and `show_parsed_values(...)` revert to legacy behavior (no appended value columns; values shown in `member_tree`).
+  - Tests may branch on this flag to preserve legacy assertions temporarily.
+
 ### 8) Risks and Mitigations
 - GUI test breakage expecting `member_tree`: guard with the feature flag and update tests to check unified mode paths. Retain minimal compatibility tests for legacy mode during the transition.
 - Anonymous/duplicate names: index-based merge avoids key collisions.
@@ -153,6 +162,9 @@
 - Add a nested struct case to `tests/view/test_struct_view_unified_mode.py`:
   - Layout includes a nested struct expanded into children rows (e.g., `s.a`, `s.b`).
   - Parsed values provided in matching order; assert values appear in the correct rows in `layout_tree`.
+  - Example shape:
+    - Layout rows: `{"name":"s.a","type":"int","offset":0,...}`, `{"name":"s.b","type":"short","offset":4,...}`
+    - Parsed rows: `{"name":"s.a","value":"123","hex_raw":"7b000000"}`, `{"name":"s.b","value":"258","hex_raw":"0201"}`
 
 ### 11) Migration Notes
 - No Model/Presenter API changes in V22; View-only changes with a feature flag.

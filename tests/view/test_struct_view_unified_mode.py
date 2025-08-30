@@ -95,3 +95,25 @@ def test_unified_layout_bitfield_and_arrays_values():
     assert vals1[7] == str(int("41", 16)) and vals1[9] == "41"
     assert vals2[7] == str(int("42", 16)) and vals2[9] == "42"
 
+
+@skip_if_no_display
+def test_unified_layout_nested_struct_values():
+    view = _make_view()
+    # Simulate flattened nested names as produced by layout calculator (e.g., s.a, s.b)
+    layout = [
+        {"name": "s.a", "type": "int", "offset": 0, "size": 4, "bit_offset": None, "bit_size": None, "is_bitfield": False},
+        {"name": "s.b", "type": "short", "offset": 4, "size": 2, "bit_offset": None, "bit_size": None, "is_bitfield": False},
+    ]
+    parsed = [
+        {"name": "s.a", "value": "123", "hex_raw": "7b000000"},
+        {"name": "s.b", "value": "258", "hex_raw": "0201"},
+    ]
+    view.show_struct_layout("S", layout, total_size=6, struct_align=4)
+    view.show_parsed_values(parsed)
+    items = view.layout_tree.get_children("")
+    assert len(items) == 2
+    vals0 = view.layout_tree.item(items[0], "values")
+    vals1 = view.layout_tree.item(items[1], "values")
+    assert vals0[0] == "s.a" and vals0[7] == "123" and vals0[9] == "7b｜00｜00｜00"
+    assert vals1[0] == "s.b" and vals1[7] == "258" and vals1[9] == "02｜01"
+
