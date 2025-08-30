@@ -156,11 +156,11 @@
   - `set_import_target_struct(name)` 寫入 context 並推送。
   - 對外顯示的節點 `value`/`offset`/`size` 以字串提供（經由 Model `get_display_nodes`）。
 
-- View：尚未完成
-  - 尚未提供「Target Struct」下拉/輸入控制項。
-  - 未串接 `presenter.set_import_target_struct(name)` 事件。
-  - 應確保 `Treeview.insert(..., values=...)` 僅傳入字串 tuple/list。
-  - 缺少對應測試（見下）。
+- View：已完成
+  - 已提供「Target Struct」下拉/輸入控制項（見 `src/view/struct_view.py`）。
+  - 已串接 `presenter.set_import_target_struct(name)` 事件，並在 context 更新時同步顯示。
+  - `Treeview.insert(..., values=...)` 已以字串 tuple/list 提供。
+  - 已有對應測試：`tests/view/test_struct_view_target_struct_dropdown_population.py`。
 
 - API 相容性與移轉：尚未完成
   - `parse_member_line`（legacy）尚未標記 deprecated；文件與呼叫點尚未統一導向 v2。
