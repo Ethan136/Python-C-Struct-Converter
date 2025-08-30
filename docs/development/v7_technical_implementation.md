@@ -1,4 +1,9 @@
-# v7 技術實作細節
+# v7 技術實作細節（Deprecated）
+
+> Note (V23): 本文件為歷史規劃/實作記錄。自 V23 起，系統已移除 v7/legacy 版本切換，Modern 為唯一介面。請參考：
+> - V23 規劃與 TDD：`docs/development/v23_Modern_Replaces_Legacy_and_TreeFlat_Visual_Diff_TDD.md`
+> - 遷移指南：`docs/development/V23_MIGRATION_GUIDE.md`
+> - 目前 GUI 說明：`src/view/README.md`
 
 ## 1. AST 節點結構實作
 
