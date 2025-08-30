@@ -94,3 +94,11 @@
 ### 後續（v20+）
 - 將「上下文切換後 UI 同步」抽為共用 helper 以便重用。
 - 於 GUI 提供 CSV 選項面板（自訂 delimiter、columns、BOM、排序等）。
+
+---
+
+### 最近修正補充（v20）
+- 匯出按鈕狀態修正：成功載入 .h 後，流程中會呼叫 `clear_results()`；原邏輯曾在 `clear_results()` 內關閉匯出按鈕，導致按鈕被誤停用。現已移除此關閉行為，改於「載入失敗分支」明確關閉按鈕，成功載入時由 `show_struct_layout(...)` 啟用。
+- 測試在 headless/無 tkinter 環境下的相容：
+  - GUI 測試已加 `skipif(not os.environ.get('DISPLAY') or not tkinter)`，避免在 CI 環境誤判失敗。
+  - 測試中 monkeypatch `filedialog` 與 `messagebox`，避免彈窗阻塞。
