@@ -58,21 +58,21 @@ class _DummyVirtual:
 
 # --- Treeview 巢狀遞迴插入與互動 helper ---
 MEMBER_TREEVIEW_COLUMNS = [
-    {"name": "name", "title": "欄位名稱", "width": 120},
-    {"name": "value", "title": "值", "width": 100},
-    {"name": "hex_value", "title": "Hex Value", "width": 100},
-    {"name": "hex_raw", "title": "Hex Raw", "width": 150},
+    {"name": "name", "title": "member_col_name", "width": 120},
+    {"name": "value", "title": "member_col_value", "width": 100},
+    {"name": "hex_value", "title": "member_col_hex_value", "width": 100},
+    {"name": "hex_raw", "title": "member_col_hex_raw", "width": 100},
 ]
 
 # Columns for struct layout treeviews
 LAYOUT_TREEVIEW_COLUMNS = [
-    {"name": "name", "title": "欄位名稱", "width": 120},
-    {"name": "type", "title": "型別", "width": 100},
-    {"name": "offset", "title": "Offset", "width": 80},
-    {"name": "size", "title": "Size", "width": 80},
-    {"name": "bit_offset", "title": "bit_offset", "width": 80},
-    {"name": "bit_size", "title": "bit_size", "width": 80},
-    {"name": "is_bitfield", "title": "is_bitfield", "width": 80},
+    {"name": "name", "title": "layout_col_name", "width": 120},
+    {"name": "type", "title": "layout_col_type", "width": 100},
+    {"name": "offset", "title": "layout_col_offset", "width": 80},
+    {"name": "size", "title": "layout_col_size", "width": 80},
+    {"name": "bit_offset", "title": "layout_col_bit_offset", "width": 80},
+    {"name": "bit_size", "title": "layout_col_bit_size", "width": 80},
+    {"name": "is_bitfield", "title": "layout_col_is_bitfield", "width": 80},
 ]
 
 def create_member_treeview(parent):
@@ -169,7 +169,9 @@ class StructView(tk.Tk):
         self.presenter = presenter
         self.enable_virtual = enable_virtual
         self._virtual_page_size = virtual_page_size
-        self.title("C Struct GUI")
+        # v21: Externalize window title
+        from src.config import get_string
+        self.title(get_string("window_title"))
         self.geometry("1200x800")
         self._debug_auto_refresh_id = None
         self._debug_auto_refresh_enabled = None
@@ -194,8 +196,10 @@ class StructView(tk.Tk):
         self.tab_control = ttk.Notebook(self)
         self.tab_file = ttk.Frame(self.tab_control)
         self.tab_manual = ttk.Frame(self.tab_control)
-        self.tab_control.add(self.tab_file, text="載入.H檔")
-        self.tab_control.add(self.tab_manual, text="手動設定資料結構")
+        # v21: Externalize tab labels
+        from src.config import get_string
+        self.tab_control.add(self.tab_file, text=get_string("tab_load_h"))
+        self.tab_control.add(self.tab_manual, text=get_string("tab_manual_struct"))
         self.tab_control.pack(expand=1, fill="both")
 
         # 在載入.H檔Tab建立UI
@@ -211,24 +215,25 @@ class StructView(tk.Tk):
         control_frame = tk.Frame(main_frame)
         control_frame.pack(fill="x", pady=(5, 2))
         self.file_control_frame = control_frame  # 供測試直接存取
-        tk.Label(control_frame, text="單位大小：").pack(side=tk.LEFT)
+        from src.config import get_string
+        tk.Label(control_frame, text=get_string("label_unit_size")).pack(side=tk.LEFT)
         self.unit_size_var = tk.StringVar(value="1 Byte")
         unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
         self.unit_menu = tk.OptionMenu(control_frame, self.unit_size_var, *unit_options, command=lambda _: self._on_unit_size_change())
         self.unit_menu.pack(side=tk.LEFT)
-        tk.Label(control_frame, text="  Endianness：").pack(side=tk.LEFT)
+        tk.Label(control_frame, text=get_string("label_endianness")).pack(side=tk.LEFT)
         self.endian_var = tk.StringVar(value="Little Endian")
         endian_options = ["Little Endian", "Big Endian"]
         self.endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=lambda _: self._on_endianness_change())
         self.endian_menu.pack(side=tk.LEFT)
         # 顯示模式切換
-        tk.Label(control_frame, text="  顯示模式：").pack(side=tk.LEFT)
+        tk.Label(control_frame, text=get_string("label_display_mode")).pack(side=tk.LEFT)
         self.display_mode_var = tk.StringVar(value="tree")
         display_mode_options = ["tree", "flat"]
         self.display_mode_menu = tk.OptionMenu(control_frame, self.display_mode_var, *display_mode_options, command=self._on_display_mode_change)
         self.display_mode_menu.pack(side=tk.LEFT)
         # Target Struct 選擇器（v17）
-        tk.Label(control_frame, text="  Target Struct：").pack(side=tk.LEFT)
+        tk.Label(control_frame, text=get_string("label_target_struct")).pack(side=tk.LEFT)
         self.target_struct_var = tk.StringVar(value="")
         try:
             self.target_struct_combo = ttk.Combobox(control_frame, textvariable=self.target_struct_var, width=18, state="readonly")
@@ -272,43 +277,44 @@ class StructView(tk.Tk):
             # fallback for Entry：Enter 觸發
             self.target_struct_combo.bind('<Return>', lambda e: _on_target_struct_change())
         # GUI 版本切換
-        tk.Label(control_frame, text="  GUI 版本：").pack(side=tk.LEFT)
+        tk.Label(control_frame, text=get_string("label_gui_version")).pack(side=tk.LEFT)
         self.gui_version_var = tk.StringVar(value="legacy")
         gui_version_options = ["legacy", "modern"]
         self.gui_version_menu = tk.OptionMenu(control_frame, self.gui_version_var, *gui_version_options, command=self._on_gui_version_change)
         self.gui_version_menu.pack(side=tk.LEFT)
         # 搜尋輸入框
-        tk.Label(control_frame, text="  搜尋：").pack(side=tk.LEFT)
+        tk.Label(control_frame, text=get_string("label_search")).pack(side=tk.LEFT)
         self.search_var = tk.StringVar()
         self.search_entry = tk.Entry(control_frame, textvariable=self.search_var, width=16)
         self.search_entry.pack(side=tk.LEFT)
         self.search_entry.bind('<KeyRelease>', self._on_search_entry_change)
         # Filter 輸入框
-        tk.Label(control_frame, text="  Filter：").pack(side=tk.LEFT)
+        tk.Label(control_frame, text=get_string("label_filter")).pack(side=tk.LEFT)
         self.filter_var = tk.StringVar()
         self.filter_entry = tk.Entry(control_frame, textvariable=self.filter_var, width=16)
         self.filter_entry.pack(side=tk.LEFT)
         self.filter_entry.bind('<KeyRelease>', self._on_filter_entry_change)
         # 展開全部/收合全部按鈕
-        self.expand_all_btn = tk.Button(control_frame, text="展開全部", command=self._on_expand_all)
+        from src.config import get_string
+        self.expand_all_btn = tk.Button(control_frame, text=get_string("btn_expand_all"), command=self._on_expand_all)
         self.expand_all_btn.pack(side=tk.LEFT, padx=2)
-        self.collapse_all_btn = tk.Button(control_frame, text="收合全部", command=self._on_collapse_all)
+        self.collapse_all_btn = tk.Button(control_frame, text=get_string("btn_collapse_all"), command=self._on_collapse_all)
         self.collapse_all_btn.pack(side=tk.LEFT, padx=2)
         # 批次操作按鈕
-        self.batch_expand_btn = tk.Button(control_frame, text="展開選取", command=self._on_batch_expand)
+        self.batch_expand_btn = tk.Button(control_frame, text=get_string("btn_expand_selected"), command=self._on_batch_expand)
         self.batch_expand_btn.pack(side=tk.LEFT, padx=2)
-        self.batch_collapse_btn = tk.Button(control_frame, text="收合選取", command=self._on_batch_collapse)
+        self.batch_collapse_btn = tk.Button(control_frame, text=get_string("btn_collapse_selected"), command=self._on_batch_collapse)
         self.batch_collapse_btn.pack(side=tk.LEFT, padx=2)
         # 批次刪除按鈕
-        self.batch_delete_btn = tk.Button(control_frame, text="批次刪除", command=self._on_batch_delete)
+        self.batch_delete_btn = tk.Button(control_frame, text=get_string("btn_batch_delete"), command=self._on_batch_delete)
         self.batch_delete_btn.pack(side=tk.LEFT, padx=2)
         # 32-bit 模式切換
         self.file_pointer32_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(control_frame, text="32-bit 模式", variable=self.file_pointer32_var, command=lambda: self._on_pointer_mode_toggle(self.file_pointer32_var.get())).pack(side=tk.LEFT, padx=6)
+        tk.Checkbutton(control_frame, text=get_string("chk_32bit_mode"), variable=self.file_pointer32_var, command=lambda: self._on_pointer_mode_toggle(self.file_pointer32_var.get())).pack(side=tk.LEFT, padx=6)
         # 檔案選擇按鈕
-        tk.Button(main_frame, text="選擇 .h 檔", command=self._on_browse_file).pack(anchor="w", pady=2)
+        tk.Button(main_frame, text=get_string("browse_button"), command=self._on_browse_file).pack(anchor="w", pady=2)
         # 檔案路徑顯示
-        self.file_path_label = tk.Label(main_frame, text="尚未選擇檔案")
+        self.file_path_label = tk.Label(main_frame, text=get_string("no_file_selected"))
         self.file_path_label.pack(anchor="w", pady=2)
 
         # hex grid 輸入區
@@ -317,11 +323,11 @@ class StructView(tk.Tk):
         self.hex_grid_frame.pack(fill="x", pady=2)
 
         # 解析按鈕
-        self.parse_button = tk.Button(main_frame, text="解析", command=self._on_parse_file, state="disabled")
+        self.parse_button = tk.Button(main_frame, text=get_string("parse_button"), command=self._on_parse_file, state="disabled")
         self.parse_button.pack(anchor="w", pady=5)
 
         # 匯出 CSV 按鈕（v19 GUI 整合）
-        self.export_csv_button = tk.Button(main_frame, text="匯出 CSV", command=self._on_export_csv, state="disabled")
+        self.export_csv_button = tk.Button(main_frame, text=get_string("export_csv_button"), command=self._on_export_csv, state="disabled")
         self.export_csv_button.pack(anchor="w", pady=2)
 
         # struct member value 顯示區
@@ -352,14 +358,14 @@ class StructView(tk.Tk):
         # struct 名稱
         name_frame = tk.Frame(scrollable_frame)
         name_frame.pack(anchor="w", pady=5)
-        tk.Label(name_frame, text="struct 名稱:").pack(side=tk.LEFT)
+        tk.Label(name_frame, text=get_string("label_struct_name")).pack(side=tk.LEFT)
         self.struct_name_var = tk.StringVar(value="MyStruct")
         tk.Entry(name_frame, textvariable=self.struct_name_var, width=20).pack(side=tk.LEFT)
 
         # 結構體大小（byte）
         size_frame = tk.Frame(scrollable_frame)
         size_frame.pack(anchor="w", pady=5)
-        tk.Label(size_frame, text="結構體總大小 (bytes):").pack(side=tk.LEFT)
+        tk.Label(size_frame, text=get_string("label_total_size_bytes")).pack(side=tk.LEFT)
         self.size_var = tk.IntVar(value=0)
         tk.Entry(size_frame, textvariable=self.size_var, width=10).pack(side=tk.LEFT)
 
@@ -369,7 +375,7 @@ class StructView(tk.Tk):
         self.member_frame.pack(fill="x", pady=5)
 
         # 新增Member按鈕
-        tk.Button(scrollable_frame, text="新增Member", command=self._add_member).pack(anchor="w", pady=2)
+        tk.Button(scrollable_frame, text=get_string("btn_add_member"), command=self._add_member).pack(anchor="w", pady=2)
 
         # 驗證提示
         self.validation_label = tk.Label(scrollable_frame, text="", fg="red")
@@ -378,18 +384,18 @@ class StructView(tk.Tk):
         # 匯出/儲存/重設按鈕
         btn_frame = tk.Frame(scrollable_frame)
         btn_frame.pack(anchor="w", pady=5)
-        tk.Button(btn_frame, text="匯出為.H檔", command=self.on_export_manual_struct).pack(side=tk.LEFT, padx=2)
-        tk.Button(btn_frame, text="重設", command=self._reset_manual_struct).pack(side=tk.LEFT, padx=2)
+        tk.Button(btn_frame, text=get_string("btn_export_h"), command=self.on_export_manual_struct).pack(side=tk.LEFT, padx=2)
+        tk.Button(btn_frame, text=get_string("btn_reset"), command=self._reset_manual_struct).pack(side=tk.LEFT, padx=2)
 
         # 單位選擇與 endianness（與 file tab 一致）
         manual_control_frame = tk.Frame(scrollable_frame)
         manual_control_frame.pack(fill="x", pady=(5, 2))
-        tk.Label(manual_control_frame, text="單位大小：").pack(side=tk.LEFT)
+        tk.Label(manual_control_frame, text=get_string("label_unit_size")).pack(side=tk.LEFT)
         self.manual_unit_size_var = tk.StringVar(value="1 Byte")
         unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
         self.manual_unit_menu = tk.OptionMenu(manual_control_frame, self.manual_unit_size_var, *unit_options, command=lambda _: self._on_manual_unit_size_change())
         self.manual_unit_menu.pack(side=tk.LEFT)
-        tk.Label(manual_control_frame, text="  Endianness：").pack(side=tk.LEFT)
+        tk.Label(manual_control_frame, text=get_string("label_endianness")).pack(side=tk.LEFT)
         self.manual_endian_var = tk.StringVar(value="Little Endian")
         endian_options = ["Little Endian", "Big Endian"]
         self.manual_endian_menu = tk.OptionMenu(manual_control_frame, self.manual_endian_var, *endian_options, command=lambda _: self._on_manual_endianness_change())
@@ -404,7 +410,7 @@ class StructView(tk.Tk):
         self.manual_hex_grid_frame.pack(fill="x", pady=2)
 
         # 解析按鈕
-        self.manual_parse_button = tk.Button(scrollable_frame, text="解析", command=self._on_parse_manual_hex, state="normal")
+        self.manual_parse_button = tk.Button(scrollable_frame, text=get_string("parse_button"), command=self._on_parse_manual_hex, state="normal")
         self.manual_parse_button.pack(anchor="w", pady=5)
 
         # struct member value 顯示區
@@ -472,11 +478,11 @@ class StructView(tk.Tk):
 
     def _build_member_header(self, is_v3_format):
         tk.Label(self.member_frame, text="#", font=("Arial", 9, "bold")).grid(row=0, column=0, padx=2, pady=2)
-        tk.Label(self.member_frame, text="成員名稱", font=("Arial", 9, "bold")).grid(row=0, column=1, padx=2, pady=2)
-        tk.Label(self.member_frame, text="型別", font=("Arial", 9, "bold")).grid(row=0, column=2, padx=2, pady=2)
-        tk.Label(self.member_frame, text="bit size", font=("Arial", 9, "bold")).grid(row=0, column=3, padx=2, pady=2)
-        tk.Label(self.member_frame, text="size", font=("Arial", 9, "bold")).grid(row=0, column=4, padx=2, pady=2)
-        tk.Label(self.member_frame, text="操作", font=("Arial", 9, "bold")).grid(row=0, column=5, padx=2, pady=2)
+        tk.Label(self.member_frame, text=get_string("member_col_name"), font=("Arial", 9, "bold")).grid(row=0, column=1, padx=2, pady=2)
+        tk.Label(self.member_frame, text=get_string("layout_col_type"), font=("Arial", 9, "bold")).grid(row=0, column=2, padx=2, pady=2)
+        tk.Label(self.member_frame, text=get_string("layout_col_bit_size"), font=("Arial", 9, "bold")).grid(row=0, column=3, padx=2, pady=2)
+        tk.Label(self.member_frame, text=get_string("layout_col_size"), font=("Arial", 9, "bold")).grid(row=0, column=4, padx=2, pady=2)
+        tk.Label(self.member_frame, text=get_string("layout_col_actions"), font=("Arial", 9, "bold")).grid(row=0, column=5, padx=2, pady=2)
 
     def _render_member_row(self, idx, member, is_v3_format, name2size):
         row = idx + 1
@@ -493,10 +499,10 @@ class StructView(tk.Tk):
         size_label = tk.Label(self.member_frame, text=size_val)
         size_label.is_size_label = True
         op_frame = tk.Frame(self.member_frame)
-        tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i), width=4).pack(side=tk.LEFT, padx=1)
-        tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i), width=4).pack(side=tk.LEFT, padx=1)
-        tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i), width=4).pack(side=tk.LEFT, padx=1)
-        tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4).pack(side=tk.LEFT, padx=1)
+        tk.Button(op_frame, text=get_string("btn_delete"), command=lambda i=idx: self._delete_member(i), width=4).pack(side=tk.LEFT, padx=1)
+        tk.Button(op_frame, text=get_string("btn_move_up"), command=lambda i=idx: self._move_member_up(i), width=4).pack(side=tk.LEFT, padx=1)
+        tk.Button(op_frame, text=get_string("btn_move_down"), command=lambda i=idx: self._move_member_down(i), width=4).pack(side=tk.LEFT, padx=1)
+        tk.Button(op_frame, text=get_string("btn_copy"), command=lambda i=idx: self._copy_member(i), width=4).pack(side=tk.LEFT, padx=1)
         name_var.trace_add("write", lambda *_, i=idx, v=name_var: self._update_member_name(i, v))
         type_var.trace_add("write", lambda *_, i=idx, v=type_var: self._update_member_type(i, v))
         bit_var.trace_add("write", lambda *_, i=idx, v=bit_var: self._update_member_bit(i, v))
@@ -533,11 +539,11 @@ class StructView(tk.Tk):
                 widget.destroy()
             self._member_header_widgets = [
                 tk.Label(self.member_frame, text="#", font=("Arial", 9, "bold")),
-                tk.Label(self.member_frame, text="成員名稱", font=("Arial", 9, "bold")),
-                tk.Label(self.member_frame, text="型別", font=("Arial", 9, "bold")),
-                tk.Label(self.member_frame, text="bit size", font=("Arial", 9, "bold")),
-                tk.Label(self.member_frame, text="size", font=("Arial", 9, "bold")),
-                tk.Label(self.member_frame, text="操作", font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text=get_string("member_col_name"), font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text=get_string("layout_col_type"), font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text=get_string("layout_col_bit_size"), font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text=get_string("layout_col_size"), font=("Arial", 9, "bold")),
+                tk.Label(self.member_frame, text=get_string("layout_col_actions"), font=("Arial", 9, "bold")),
             ]
             for col, w in enumerate(self._member_header_widgets):
                 w.grid(row=0, column=col, padx=2, pady=2)
@@ -587,10 +593,10 @@ class StructView(tk.Tk):
                 size_label.is_size_label = True
                 op_frame = tk.Frame(self.member_frame)
                 # 操作按鈕 takefocus=1
-                del_btn = tk.Button(op_frame, text="刪除", command=lambda i=idx: self._delete_member(i), width=4, takefocus=1)
-                up_btn = tk.Button(op_frame, text="上移", command=lambda i=idx: self._move_member_up(i), width=4, takefocus=1)
-                down_btn = tk.Button(op_frame, text="下移", command=lambda i=idx: self._move_member_down(i), width=4, takefocus=1)
-                copy_btn = tk.Button(op_frame, text="複製", command=lambda i=idx: self._copy_member(i), width=4, takefocus=1)
+                del_btn = tk.Button(op_frame, text=get_string("btn_delete"), command=lambda i=idx: self._delete_member(i), width=4, takefocus=1)
+                up_btn = tk.Button(op_frame, text=get_string("btn_move_up"), command=lambda i=idx: self._move_member_up(i), width=4, takefocus=1)
+                down_btn = tk.Button(op_frame, text=get_string("btn_move_down"), command=lambda i=idx: self._move_member_down(i), width=4, takefocus=1)
+                copy_btn = tk.Button(op_frame, text=get_string("btn_copy"), command=lambda i=idx: self._copy_member(i), width=4, takefocus=1)
                 del_btn.pack(side=tk.LEFT, padx=1)
                 up_btn.pack(side=tk.LEFT, padx=1)
                 down_btn.pack(side=tk.LEFT, padx=1)
@@ -827,7 +833,8 @@ class StructView(tk.Tk):
                 self.current_file_total_size = result['total_size']
                 self.rebuild_hex_grid(result['total_size'], 1)
             else:
-                self.show_error('載入檔案錯誤', result['message'])
+                from src.config import get_string
+                self.show_error(get_string('dialog_file_error'), result['message'])
                 self.disable_parse_button()
                 self.clear_results()
                 # 清除記錄的 total_size
@@ -847,7 +854,8 @@ class StructView(tk.Tk):
                 self.show_parsed_values(result['parsed_values'])
                 self.show_debug_bytes(result['debug_lines'])
             else:
-                self.show_error('解析錯誤', result['message'])
+                from src.config import get_string
+                self.show_error(get_string('dialog_parsing_error'), result['message'])
 
     def enable_parse_button(self):
         self.parse_button.config(state="normal")
@@ -960,7 +968,8 @@ class StructView(tk.Tk):
         # 檢查 presenter/model 是否可用
         if not self.presenter or not hasattr(self.presenter, "model") or not self.presenter.model:
             try:
-                messagebox.showerror("錯誤", "尚未載入 struct，無法匯出 CSV")
+                from src.config import get_string
+                messagebox.showerror(get_string('dialog_error_title'), get_string('dialog_not_loaded_body'))
             except Exception:
                 pass
             return
@@ -1013,15 +1022,17 @@ class StructView(tk.Tk):
             svc = DefaultCsvExportService()
             report = svc.export_to_csv(parsed_model, {"type": "file", "path": file_path}, opts)
             try:
+                from src.config import get_string
                 messagebox.showwarning(
-                    "匯出完成",
-                    f"已輸出 {report.records_written} 筆欄位到\n{report.file_path}\n耗時 {report.duration_ms} ms"
+                    get_string('dialog_export_done_title'),
+                    get_string('dialog_export_done_body').format(records=report.records_written, path=report.file_path, ms=report.duration_ms)
                 )
             except Exception:
                 pass
         except Exception as e:
             try:
-                messagebox.showerror("匯出失敗", str(e))
+                from src.config import get_string
+                messagebox.showerror(get_string('dialog_export_failed_title'), str(e))
             except Exception:
                 pass
 
@@ -1172,17 +1183,17 @@ class StructView(tk.Tk):
         control_frame.pack(fill="x", padx=10, pady=5)
 
         # Undo/Redo 按鈕
-        self.undo_btn = tk.Button(control_frame, text="Undo", command=self._on_undo)
+        self.undo_btn = tk.Button(control_frame, text=get_string("btn_undo"), command=self._on_undo)
         self.undo_btn.grid(row=0, column=0, padx=5)
-        self.redo_btn = tk.Button(control_frame, text="Redo", command=self._on_redo)
+        self.redo_btn = tk.Button(control_frame, text=get_string("btn_redo"), command=self._on_redo)
         self.redo_btn.grid(row=0, column=1, padx=5)
 
         # 手動清空 cache 按鈕
-        clear_btn = tk.Button(control_frame, text="手動清空 Cache", command=self._on_invalidate_cache)
+        clear_btn = tk.Button(control_frame, text=get_string("btn_clear_cache"), command=self._on_invalidate_cache)
         clear_btn.grid(row=0, column=2, padx=5)
 
         # LRU cache 容量 Spinbox
-        tk.Label(control_frame, text="LRU 容量:").grid(row=0, column=3, padx=2)
+        tk.Label(control_frame, text=get_string("label_lru_capacity")).grid(row=0, column=3, padx=2)
         default_lru = 32
         if self.presenter and hasattr(self.presenter, "get_lru_cache_size"):
             try:
@@ -1203,7 +1214,7 @@ class StructView(tk.Tk):
         auto_clear_cb.grid(row=0, column=5, padx=5)
 
         # 自動清空 interval Entry
-        tk.Label(control_frame, text="Interval (秒):").grid(row=0, column=6, padx=2)
+        tk.Label(control_frame, text=get_string("label_interval_seconds")).grid(row=0, column=6, padx=2)
         self.auto_clear_interval_var = tk.DoubleVar(value=1.0)
         interval_entry = tk.Entry(control_frame, width=6, textvariable=self.auto_clear_interval_var)
         interval_entry.grid(row=0, column=7, padx=2)
@@ -1212,15 +1223,15 @@ class StructView(tk.Tk):
         self._debug_auto_refresh_enabled = tk.BooleanVar(value=True)
         self._debug_auto_refresh_id = None
         self._debug_auto_refresh_interval = tk.DoubleVar(value=1.0)
-        auto_refresh_cb = tk.Checkbutton(control_frame, text="自動 Refresh", variable=self._debug_auto_refresh_enabled, command=self._on_toggle_debug_auto_refresh)
+        auto_refresh_cb = tk.Checkbutton(control_frame, text=get_string("label_auto_refresh"), variable=self._debug_auto_refresh_enabled, command=self._on_toggle_debug_auto_refresh)
         auto_refresh_cb.grid(row=0, column=9, padx=5)
-        tk.Label(control_frame, text="Refresh Interval (秒):").grid(row=0, column=10, padx=2)
+        tk.Label(control_frame, text=get_string("label_refresh_interval_seconds")).grid(row=0, column=10, padx=2)
         auto_refresh_interval_entry = tk.Entry(control_frame, width=6, textvariable=self._debug_auto_refresh_interval)
         auto_refresh_interval_entry.grid(row=0, column=11, padx=2)
         self._debug_auto_refresh_interval.trace_add("write", lambda *_: self._on_debug_auto_refresh_interval_change())
 
         # 手動 refresh 按鈕
-        refresh_btn = tk.Button(control_frame, text="Refresh", command=self.refresh_debug_info)
+        refresh_btn = tk.Button(control_frame, text=get_string("btn_refresh"), command=self.refresh_debug_info)
         refresh_btn.grid(row=0, column=8, padx=5)
 
         self.refresh_debug_info()
@@ -1619,8 +1630,8 @@ class StructView(tk.Tk):
             warning_msg = "context version 不明，請檢查"
         if warning_msg:
             try:
-                from tkinter import messagebox
-                messagebox.showwarning("Context Warning", warning_msg)
+                from src.config import get_string
+                messagebox.showwarning(get_string('dialog_context_warning_title'), warning_msg)
             except Exception:
                 pass
             context.setdefault("debug_info", {})["context_warning"] = warning_msg
@@ -1628,8 +1639,8 @@ class StructView(tk.Tk):
         self.show_treeview_nodes(nodes, context, icon_map)
         # 顯示錯誤訊息
         if context.get("error"):
-            from tkinter import messagebox
-            messagebox.showerror("錯誤", str(context["error"]))
+            from src.config import get_string
+            messagebox.showerror(get_string('dialog_error_title'), str(context["error"]))
         # pending_action 狀態顯示進度與禁用互動
         pending = context.get("pending_action")
         if pending:
@@ -1637,7 +1648,7 @@ class StructView(tk.Tk):
             if not hasattr(self, "pending_label"):
                 self.pending_label = tk.Label(self, text="", fg="blue", font=("Arial", 14, "bold"))
                 self.pending_label.pack(side="top", fill="x", pady=4)
-            self.pending_label.config(text=f"進行中：{pending}... 請稍候")
+            self.pending_label.config(text=f"{get_string('label_pending_prefix')}{pending}... {get_string('label_please_wait')}")
             # 禁用主要互動元件
             if hasattr(self, "parse_button"): self.parse_button.config(state="disabled")
             if hasattr(self, "expand_all_btn"): self.expand_all_btn.config(state="disabled")

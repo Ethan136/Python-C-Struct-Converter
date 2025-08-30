@@ -210,13 +210,15 @@ class StructPresenter:
         try:
             hex_data, debug_lines = self._process_hex_parts(hex_parts_with_expected_len, byte_order_for_conversion)
         except HexProcessingError as e:
-            title_map = {
-                "invalid_input": "無效輸入",
-                "value_too_large": "數值過大",
-                "overflow_error": "溢位錯誤",
-                "conversion_error": "轉換錯誤",
+            # v21: externalize error titles
+            title_key_map = {
+                "invalid_input": "dialog_invalid_input",
+                "value_too_large": "dialog_value_too_large",
+                "overflow_error": "dialog_overflow_error",
+                "conversion_error": "dialog_conversion_error",
             }
-            return {'type': 'error', 'message': f"{title_map.get(e.kind, '錯誤')}: {str(e)}"}
+            title = get_string(title_key_map.get(e.kind, "dialog_error_title"))
+            return {'type': 'error', 'message': f"{title}: {str(e)}"}
 
         if len(hex_data) > self.model.total_size * 2:
             return {'type': 'error', 'message': f"輸入資料長度 ({len(hex_data)}) 超過預期總大小 ({self.model.total_size * 2})"}
@@ -250,13 +252,15 @@ class StructPresenter:
             parsed_values = self.model.parse_hex_data(hex_data, byte_order, layout=layout, total_size=struct_def['total_size'])
             return {'type': 'ok', 'debug_lines': debug_lines, 'parsed_values': parsed_values}
         except HexProcessingError as e:
-            title_map = {
-                "invalid_input": "無效輸入",
-                "value_too_large": "數值過大",
-                "overflow_error": "溢位錯誤",
-                "conversion_error": "轉換錯誤",
+            # v21: externalize error titles
+            title_key_map = {
+                "invalid_input": "dialog_invalid_input",
+                "value_too_large": "dialog_value_too_large",
+                "overflow_error": "dialog_overflow_error",
+                "conversion_error": "dialog_conversion_error",
             }
-            return {'type': 'error', 'message': f"{title_map.get(e.kind, '錯誤')}: {str(e)}"}
+            title = get_string(title_key_map.get(e.kind, "dialog_error_title"))
+            return {'type': 'error', 'message': f"{title}: {str(e)}"}
         except Exception as e:
             return {'type': 'error', 'message': f"解析 hex 資料時發生錯誤: {e}"}
 
