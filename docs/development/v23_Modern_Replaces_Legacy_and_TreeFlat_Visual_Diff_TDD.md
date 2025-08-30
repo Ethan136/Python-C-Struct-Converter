@@ -113,6 +113,20 @@
   - 更新 `get_default_context` 期望（不含 `gui_version`）。
 - `tests/model/test_struct_model_display_nodes.py`（新增）：驗證 flat nodes 無 children 與（選配）full_path。
 
+#### 5) v7 清理與文件一致性（本 Task 已完成）
+- 移除 v7 實作與測試：
+  - 刪除 `src/view/struct_view_v7.py`、`src/presenter/v7_presenter.py`、`tests/presenter/test_v7_presenter.py`
+  - 停止對外匯出：更新 `src/view/__init__.py`、`src/presenter/__init__.py`、`src/__init__.py`
+- 文件一致性更新：
+  - v7 系列文件加註 Deprecated 與導引連結（V23 文件、遷移指南、View README）
+  - v6 系列文件加入「已被 V23 取代的部分」提示與連結
+- UI 字串與測試同步：
+  - 移除 `label_gui_version` 與相依測試鍵
+  - 新增 Tree/Flat 視覺差異測試 `tests/view/test_struct_view_tree_flat_visual.py`
+- 新增文件：
+  - `CHANGELOG.md`（列出 V23 變更與 API 範例）
+  - `docs/development/V23_MIGRATION_GUIDE.md`（遷移步驟、前後對照、驗證清單）
+
 ---
 
 ### 逐步 TDD 流程（細項）
