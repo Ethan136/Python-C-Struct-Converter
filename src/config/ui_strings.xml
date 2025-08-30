@@ -48,7 +48,6 @@
     <string name="label_endianness">  Endianness：</string>
     <string name="label_display_mode">  顯示模式：</string>
     <string name="label_target_struct">  Target Struct：</string>
-    <string name="label_gui_version">  GUI 版本：</string>
     <string name="label_search">  搜尋：</string>
     <string name="label_filter">  Filter：</string>
     <string name="label_struct_name">struct 名稱:</string>

@@ -15,7 +15,7 @@ def test_ui_strings_contains_required_keys():
         "window_title", "tab_load_h", "tab_manual_struct", "tab_debug",
         # control labels
         "label_unit_size", "label_endianness", "label_display_mode", "label_target_struct",
-        "label_gui_version", "label_search", "label_filter", "label_struct_name", "label_total_size_bytes",
+        "label_search", "label_filter", "label_struct_name", "label_total_size_bytes",
         # buttons used
         "browse_button", "parse_button", "export_csv_button",
         "btn_expand_all", "btn_collapse_all", "btn_expand_selected", "btn_collapse_selected",

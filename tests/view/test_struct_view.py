@@ -2111,10 +2111,9 @@ class TestStructView(unittest.TestCase):
         presenter.get_display_nodes = lambda mode: nodes
         presenter.context["display_mode"] = "tree"
         presenter.context["expanded_nodes"] = ["root", "u1"]
-        # 切換到 modern GUI
-        view._on_gui_version_change("modern")
+        # V23: 初始化即為 modern，直接更新顯示
         view.update_display(nodes, presenter.context)
-        modern_tree = view.modern_tree
+        modern_tree = getattr(view, 'modern_tree', None) or view.member_tree
         # 驗證 struct 節點
         struct_item = modern_tree.item("root")
         self.assertIn("[struct]", struct_item["text"])
