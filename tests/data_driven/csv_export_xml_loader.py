@@ -28,6 +28,9 @@ class CSVExportXMLCase:
             'includeLayout': opt.get('includeLayout', 'true').lower() == 'true',
             'includeValues': opt.get('includeValues', 'true').lower() == 'true',
             'endianness': opt.get('endianness', 'little').lower(),
+            # v24 additions (optional)
+            'columnsSource': opt.get('columnsSource', None),
+            'includeMetadata': opt.get('includeMetadata', 'false').lower() == 'true',
         }
 
 
