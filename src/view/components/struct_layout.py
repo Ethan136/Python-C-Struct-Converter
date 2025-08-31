@@ -32,6 +32,11 @@ except Exception:
     ttk = _DummyTtkModule()
 
 from src.config.columns import UNIFIED_LAYOUT_VALUE_COLUMNS
+try:
+    from src.config import get_string as _get_string
+except Exception:
+    def _get_string(key: str) -> str:
+        return key
 
 
 class StructLayout:
@@ -61,17 +66,38 @@ class StructLayout:
             "hex_value": 100,
             "hex_raw": 120,
         }
+        # i18n title mapping
+        title_keys = {
+            "name": "layout_col_name",
+            "type": "layout_col_type",
+            "offset": "layout_col_offset",
+            "size": "layout_col_size",
+            "bit_offset": "layout_col_bit_offset",
+            "bit_size": "layout_col_bit_size",
+            "is_bitfield": "layout_col_is_bitfield",
+            "value": "member_col_value",
+            "hex_value": "member_col_hex_value",
+            "hex_raw": "member_col_hex_raw",
+        }
         for c in UNIFIED_LAYOUT_VALUE_COLUMNS:
-            tree.heading(c, text=c)
+            title = _get_string(title_keys.get(c, c))
+            tree.heading(c, text=title)
             tree.column(c, width=default_widths.get(c, 100), stretch=False)
         tree["displaycolumns"] = col_names
         tree.pack(side="left", fill="both", expand=True)
         return tree
 
     def set_display_mode(self, mode: str):
-        # Reserved for future: currently only records the mode
+        # Basic visual toggle: tree shows tree column, flat shows only headings
         if mode in ("tree", "flat"):
             self.display_mode = mode
+            try:
+                if mode == "tree":
+                    self.tree.configure(show="tree headings")
+                else:
+                    self.tree.configure(show="headings")
+            except Exception:
+                pass
 
     def set_rows(self, rows: List[Dict]):
         # Full rebuild

@@ -1914,6 +1914,12 @@ class StructView(tk.Tk):
     def _on_display_mode_change(self, mode):
         if self.presenter and hasattr(self.presenter, "on_switch_display_mode"):
             self.presenter.on_switch_display_mode(mode)
+        # 同步 StructLayout 視覺模式
+        try:
+            if hasattr(self, "struct_layout_component") and self.struct_layout_component:
+                self.struct_layout_component.set_display_mode(str(mode))
+        except Exception:
+            pass
 
     def _on_search_entry_change(self, event):
         search_str = self.search_var.get()
