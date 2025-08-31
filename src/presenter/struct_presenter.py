@@ -225,6 +225,12 @@ class StructPresenter:
 
         try:
             parsed_values = self.model.parse_hex_data(hex_data, byte_order_for_conversion)
+            # V25: notify view to refresh unified layout rows if available
+            try:
+                if self.view and hasattr(self.view, "on_values_refreshed"):
+                    self.view.on_values_refreshed()
+            except Exception:
+                pass
             return {'type': 'ok', 'debug_lines': debug_lines, 'parsed_values': parsed_values}
         except Exception as e:
             return {'type': 'error', 'message': get_string('msg_hex_parse_error').format(error=str(e))}
