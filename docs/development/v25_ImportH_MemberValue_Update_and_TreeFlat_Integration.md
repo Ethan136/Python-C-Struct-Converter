@@ -147,6 +147,59 @@
 
 ---
 
+#### TDD 計畫（V25 主要改動目標）
+- 範圍：聚焦（1）重新 parse 後 value 需正確刷新與（3）Struct Layout 內聚（C，內建 tree/flat 雙模式）。（2）Tree/Flat 顯示問題列入「後續執行項目」，待（1）落地後執行。
+
+- 測試層級與檔案規劃：
+  - Model 單元測試：`tests/model/test_struct_model_values.py`
+  - Presenter 單元/整合：`tests/presenter/test_struct_presenter_parse_refresh.py`
+  - Struct Layout 元件/視圖測試：`tests/view/test_struct_layout_component.py`
+  - 端到端（E2E，headless）：`tests/e2e/test_import_h_value_refresh_and_modes.py`
+
+- 共同前置（fixtures/resources）：
+  - 測試資源：`tests/resources/v25/simple_struct.h`、`tests/resources/v25/nested_bitfield_struct.h`、對應 `*.bin`/hex 輸入。
+  - 統一 columns：引用 `src/config/columns.py` 中的 `UNIFIED_LAYOUT_VALUE_COLUMNS`。
+
+- 用例 A：值更新後重新 parse，Struct Layout 應刷新 value（對應（1））
+  - A1：`test_presenter_emits_new_rows_on_parse_complete`
+    - 步驟：初次 parse 取得 rows → 修改輸入值 → 重新 parse。
+    - 斷言：presenter 發出 parse 完成事件且 rows 身分（id/list 參照）改變；rows 中目標欄位之 `value` 與 `hex_value` 更新。
+  - A2：`test_view_updates_cells_after_parse_complete`
+    - 步驟：掛載 Struct Layout 視圖 → 注入初次 rows → 修改輸入並重新 parse（模擬事件）。
+    - 斷言：目標 cell 顯示新 `value`/`hex_value`，不存在舊值殘留；無需重啟視圖即可更新。
+  - A3：`test_unified_keys_are_used_in_rows`
+    - 斷言：渲染使用的 rows 僅包含統一鍵名（`name`, `type`, `offset`, `size`, `bit_offset`, `bit_size`, `is_bitfield`, `value`, `hex_value`, `hex_raw`）；不含 legacy 鍵名（如 `field_name`）。
+  - A4：`test_bitfield_array_nested_values_refresh`
+    - 覆蓋 bitfield/陣列/巢狀：更新來源值後，對應節點之 `value` 與 `hex_value` 皆刷新正確。
+
+- 用例 B：Struct Layout 完全整合（C），內建 tree/flat 雙模式（對應（3））
+  - B1：`test_struct_layout_api_contract`
+    - 呼叫：`set_rows(rows)`、`display_mode = "tree"|"flat"`、`refresh_values(updated_rows)`。
+    - 斷言：
+      - 設定 rows 後，欄位順序等於 `UNIFIED_LAYOUT_VALUE_COLUMNS`。
+      - `refresh_values` 僅更新值，不改變列數與欄位定義；值與十六進位同步更新。
+  - B2：`test_display_mode_switch_preserves_values`
+    - 步驟：`display_mode=tree` 顯示正確 → 切換 `flat` → 值維持一致，再切回 `tree`。
+    - 斷言：任一模式下的可見列，其 `value/hex_value/hex_raw` 與 rows 一致；切換不需再次 parse。
+  - B3：`test_tree_flat_share_same_rows_source`
+    - 斷言：tree 與 flat 兩模式渲染共用同一套資料來源（以等值/標識驗證），避免兩份平行狀態。
+  - B4（選配）：`test_state_persistence_expand_and_selection`
+    - 若保留展開/選取狀態：模式切換後，重新套用合理的對映狀態（或明確重置規則）。
+  - B5（效能煙霧）：`test_virtualization_smoke_values_visible_rows`
+    - 大量節點下（>1000）在 headless 模式驗證可見範圍內的列值正確；不要求滾動模擬，只檢查初次渲染子集。
+
+- 用例 C：E2E（端到端）流程
+  - C1：`test_import_h_update_value_then_parse_and_switch_modes`
+    - 步驟：匯入 `.h` 與輸入值 → 檢查值呈現 → 更新輸入值 → 重新 parse → 切換 `tree/flat`。
+    - 斷言：值於兩模式下皆已更新；CSV/導出（若適用）與 GUI 顯示一致。
+
+- 驗收對應（連結文件 AC）
+  - 對應（1）AC1–AC3：A1–A4 覆蓋。
+  - 對應（3）整合目標：B1–B3 為必要，B4–B5 視情況啟用。
+
+- 不在本輪範圍：
+  - （2）Tree/Flat 原缺陷的個別渲染差異，列為「後續執行項目」的 T2-1/2/3。
+
 #### 附錄：時程建議與風險
 - 里程碑（僅規劃、可依實際調整）：
   - M1：完成問題（1）與（2）排查與測試覆蓋（1–2 天）。
