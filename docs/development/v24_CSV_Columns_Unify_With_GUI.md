@@ -132,18 +132,14 @@
   - Ensure `LAYOUT_TREEVIEW_COLUMNS` order/names align with `UNIFIED_LAYOUT_VALUE_COLUMNS`.
   - Ensure `hex_value` column is still present in GUI and remains unaffected by exporter changes.
 
-#### 10) Risks & Mitigations
+#### 11) Risks & Mitigations
 - Cross-module dependency: avoid importing view from export; use `src/config/columns.py` as a neutral module.
 - Backward compatibility: default change may break consumer pipelines; provide `legacy` mode and clear documentation.
 - Performance: computing `hex_value` is trivial compared to existing value/hex_raw computation; negligible impact.
 
-#### 11) Rollout
+#### 12) Rollout
 - Behind a soft flag: environment variable `CSV_COLUMNS_SOURCE` read by CLI defaults (overridable by CLI arg), defaulting to `gui_unified` in V24.
 - Staged release: ship with both modes and deprecate `legacy` in a future version.
-
-#### 12) Follow-ups (Post-V24)
-- Per-column show/hide for CSV mirroring GUI user preferences (if/when GUI adds preference persistence for columns).
-- Optional localized CSV headers by mapping ids to i18n strings (currently headers use column ids).
 
 #### 13) Documentation/Artifacts to Update After V24
 - User/README docs:
@@ -169,4 +165,13 @@
 
 - Changelog/Release notes:
   - Add V24 entry describing the default column change, migration path (`legacy` mode), and implications for downstream consumers.
+
+#### 14) Status
+- Implemented files:
+  - `src/config/columns.py`
+  - `src/export/csv_export.py`
+  - `src/view/struct_view.py`
+  - `tools/export_csv_from_h.py`
+- Test status:
+  - Project test runner reports all tests passing.
 
