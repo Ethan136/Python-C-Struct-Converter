@@ -49,9 +49,12 @@ def main():
     ap.add_argument("--columns", help="Comma-separated column names")
     ap.add_argument("--sort", dest="sort_by", help="Comma-separated sort spec like k1:ASC,k2:DESC")
     ap.add_argument("--include-layout", action="store_true", help="Include layout columns (offset/size/bit_*)")
-    ap.add_argument("--include-values", action="store_true", help="Include values (value,hex_raw)")
+    ap.add_argument("--include-values", action="store_true", help="Include values (value,hex_raw,hex_value)")
     ap.add_argument("--endianness", choices=["little", "big"], default="little")
     ap.add_argument("--hex", dest="hex_input", help="Hex string for value computation")
+    # v24 options
+    ap.add_argument("--columns-source", choices=["gui_unified", "legacy", "explicit"], default=os.environ.get("CSV_COLUMNS_SOURCE", "gui_unified"))
+    ap.add_argument("--include-metadata", action="store_true", help="Append metadata columns after unified set")
 
     args = ap.parse_args()
 
@@ -71,6 +74,8 @@ def main():
         include_values=args.include_values,
         endianness=args.endianness,
         hex_input=(args.hex_input or None),
+        columns_source=args.columns_source,
+        include_metadata=args.include_metadata,
     )
 
     svc = DefaultCsvExportService()

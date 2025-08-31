@@ -44,6 +44,9 @@ from src.export.csv_export import DefaultCsvExportService, CsvExportOptions, bui
 from src.model.struct_model import StructModel
 import time
 
+# v24: ensure GUI columns align with shared unified columns
+from src.config.columns import UNIFIED_LAYOUT_VALUE_COLUMNS  # noqa: F401
+
 class _DummyVirtual:
     def __init__(self, tree):
         self.tree = tree
@@ -64,7 +67,7 @@ MEMBER_TREEVIEW_COLUMNS = [
     {"name": "hex_raw", "title": "member_col_hex_raw", "width": 100},
 ]
 
-# Columns for struct layout treeviews
+# Columns for struct layout treeviews (must match UNIFIED_LAYOUT_VALUE_COLUMNS order)
 LAYOUT_TREEVIEW_COLUMNS = [
     {"name": "name", "title": "layout_col_name", "width": 120},
     {"name": "type", "title": "layout_col_type", "width": 100},

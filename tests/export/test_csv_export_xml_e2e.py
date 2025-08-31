@@ -48,6 +48,9 @@ class TestCSVExportXML(unittest.TestCase):
                     include_values=c.options['includeValues'],
                     endianness=c.options['endianness'],
                     hex_input=c.hex_value,
+                    # v24 passthroughs
+                    columns_source=(c.options.get('columnsSource') or 'gui_unified'),
+                    include_metadata=c.options.get('includeMetadata', False),
                 )
                 svc = DefaultCsvExportService()
                 buf = io.StringIO()

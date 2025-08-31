@@ -19,6 +19,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, TextIO, Tuple
 
+from src.config.columns import UNIFIED_LAYOUT_VALUE_COLUMNS  # added import
+
 
 # --------------------------- Exceptions & Types ------------------------------
 
@@ -49,6 +51,9 @@ class CsvExportOptions:
     endianness: str = "little"  # 'little' | 'big'
     hex_input: Optional[str] = None
     value_provider: Optional[Any] = None
+    # v24 additions
+    columns_source: str = "gui_unified"  # gui_unified | legacy | explicit
+    include_metadata: bool = False
 
 
 @dataclass
@@ -200,12 +205,21 @@ class DefaultCsvExportService:
                     row["value"] = provided
                     if row.get("hex_raw") is None:
                         row["hex_raw"] = None
+                    # compute hex_value when possible
+                    try:
+                        if isinstance(row.get("value"), bool):
+                            row["hex_value"] = hex(1 if row["value"] else 0)
+                        elif isinstance(row.get("value"), int):
+                            row["hex_value"] = hex(int(row["value"]))
+                    except Exception:
+                        row.setdefault("hex_value", None)
                     continue
                 # Compute from hex_input
                 if data_bytes is None:
                     # leave empty per null strategy at serialization
                     row.setdefault("value", None)
                     row.setdefault("hex_raw", None)
+                    row.setdefault("hex_value", None)
                     continue
                 try:
                     offset = int(row.get("offset", 0))
@@ -215,6 +229,7 @@ class DefaultCsvExportService:
                 if size <= 0 or offset < 0 or offset + size > len(data_bytes):
                     row.setdefault("value", None)
                     row.setdefault("hex_raw", None)
+                    row.setdefault("hex_value", None)
                     continue
                 member_bytes = data_bytes[offset: offset + size]
                 byteorder = 'little' if (opts.endianness or 'little').lower() == 'little' else 'big'
@@ -237,6 +252,14 @@ class DefaultCsvExportService:
                         row["hex_raw"] = int(computed_val).to_bytes(size, 'big').hex()
                     except Exception:
                         row["hex_raw"] = member_bytes.hex()
+                    # hex_value from computed value
+                    try:
+                        if isinstance(row.get("value"), bool):
+                            row["hex_value"] = hex(1 if row["value"] else 0)
+                        else:
+                            row["hex_value"] = hex(int(computed_val))
+                    except Exception:
+                        row.setdefault("hex_value", None)
                     values_computed += 1
                 except Exception as e:
                     warnings.append(f"value compute failed at offset {offset}: {e}")
@@ -265,16 +288,25 @@ class DefaultCsvExportService:
                 warnings.append(f"sort_by ignored due to error: {e}")
 
         # Columns
-        # v19: if user explicitly sets columns, respect exact selection; otherwise augment defaults
         explicit_cols = opts.columns is not None
-        columns = list(opts.columns) if explicit_cols else list(DEFAULT_COLUMNS)
-        if not explicit_cols:
-            if opts.include_layout:
-                for k in ["offset", "size", "bit_offset", "bit_size"]:
-                    if k not in columns:
-                        columns.append(k)
-            if opts.include_values:
-                for k in ["value", "hex_raw"]:
+        columns: List[str]
+        if opts.columns_source == "explicit" and explicit_cols:
+            columns = list(opts.columns)
+        elif opts.columns_source == "legacy":
+            columns = list(opts.columns) if explicit_cols else list(DEFAULT_COLUMNS)
+            if not explicit_cols:
+                if opts.include_layout:
+                    for k in ["offset", "size", "bit_offset", "bit_size"]:
+                        if k not in columns:
+                            columns.append(k)
+                if opts.include_values:
+                    for k in ["value", "hex_raw"]:
+                        if k not in columns:
+                            columns.append(k)
+        else:  # gui_unified default
+            columns = list(UNIFIED_LAYOUT_VALUE_COLUMNS)
+            if opts.include_metadata:
+                for k in ["entity_name", "field_order", "source_file", "source_line", "tags"]:
                     if k not in columns:
                         columns.append(k)
         # Validate columns
@@ -382,9 +414,14 @@ def build_parsed_model_from_struct(struct_model: Any) -> Dict[str, Any]:
             "size": item.get("size"),
             "bit_offset": item.get("bit_offset") if item.get("is_bitfield") else None,
             "bit_size": item.get("bit_size") if item.get("is_bitfield") else None,
+            # v24 unify with GUI naming
+            "name": name,
+            "type": item.get("type"),
+            "is_bitfield": bool(item.get("is_bitfield")),
             # values are computed later by service when hex_input is provided
             "value": None,
             "hex_raw": None,
+            "hex_value": None,
         }
         fields.append(row)
         order += 1
