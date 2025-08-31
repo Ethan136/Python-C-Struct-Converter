@@ -121,7 +121,9 @@ class StructModel:
         self.input_processor = InputFieldProcessor()
         self.manual_struct = None  # 新增屬性
         self._observers = set()
-        self.member_values = {}  # 新增：存放解析後的 value
+        self.member_values = {}  # 新增：存放解析後的 value（字串/顯示用）
+        self.member_numeric_values = {}  # 新增：存放解析後的數值（int，用於 hex_value 計算）
+        self.member_hex_raws = {}  # 新增：存放解析後的 hex_raw 字串
 
     # 移除 _merge_byte_and_bit_size
     # 完全移除 _convert_legacy_member 及舊格式相容邏輯
@@ -221,7 +223,9 @@ class StructModel:
             padded_hex = hex_data.zfill(self.total_size * 2)
             data_bytes = bytes.fromhex(padded_hex)
             parsed_values = []
-            member_value_map = {}  # 新增
+            member_value_map = {}
+            member_numeric_map = {}
+            member_hex_raw_map = {}
             for item in self.layout:
                 if item['type'] == "padding":
                     padding_bytes = data_bytes[item['offset'] : item['offset'] + item['size']]
@@ -239,25 +243,76 @@ class StructModel:
                     bit_offset = item["bit_offset"]
                     bit_size = item["bit_size"]
                     mask = (1 << bit_size) - 1
-                    value = (storage_int >> bit_offset) & mask
-                    display_value = str(value)
+                    computed_val = (storage_int >> bit_offset) & mask
+                    display_value = str(computed_val)
                 else:
-                    value = int.from_bytes(member_bytes, byte_order)
-                    display_value = str(bool(value)) if item['type'] == 'bool' else str(value)
+                    computed_val = int.from_bytes(member_bytes, byte_order)
+                    display_value = str(bool(computed_val)) if item['type'] == 'bool' else str(computed_val)
                 hex_value = int.from_bytes(member_bytes, 'big').to_bytes(size, 'big').hex()
                 parsed_values.append({
                     "name": name,
                     "value": display_value,
                     "hex_raw": hex_value
                 })
-                member_value_map[name] = display_value  # 新增：存到 model
-            self.member_values = member_value_map  # 新增：存到 model
+                member_value_map[name] = display_value
+                try:
+                    member_numeric_map[name] = int(computed_val)
+                except Exception:
+                    # 布林或非數值時，轉為 0/1 或略過
+                    try:
+                        if isinstance(computed_val, bool):
+                            member_numeric_map[name] = 1 if computed_val else 0
+                    except Exception:
+                        pass
+                member_hex_raw_map[name] = hex_value
+            # 更新快取映射供後續 unified rows 使用
+            self.member_values = member_value_map
+            self.member_numeric_values = member_numeric_map
+            self.member_hex_raws = member_hex_raw_map
             return parsed_values
         except Exception as e:
             raise
         finally:
             self.layout = orig_layout
             self.total_size = orig_total_size
+
+    # V25: 提供統一 rows 生成，鍵名遵循 V22/V24
+    def build_unified_rows(self):
+        rows = []
+        layout_list = self.layout or []
+        value_map = getattr(self, "member_values", {}) or {}
+        numeric_map = getattr(self, "member_numeric_values", {}) or {}
+        hex_raw_map = getattr(self, "member_hex_raws", {}) or {}
+        for item in layout_list:
+            try:
+                if item.get("type") == "padding":
+                    continue
+                name = item.get("name")
+                if not name:
+                    continue
+                row = {
+                    "name": name,
+                    "type": item.get("type"),
+                    "offset": item.get("offset"),
+                    "size": item.get("size"),
+                    "bit_offset": item.get("bit_offset") if item.get("is_bitfield") else None,
+                    "bit_size": item.get("bit_size") if item.get("is_bitfield") else None,
+                    "is_bitfield": bool(item.get("is_bitfield")),
+                    "value": value_map.get(name),
+                    "hex_raw": hex_raw_map.get(name),
+                    "hex_value": None,
+                }
+                # 計算 hex_value（若有數值）
+                if name in numeric_map:
+                    try:
+                        row["hex_value"] = hex(int(numeric_map[name]))
+                    except Exception:
+                        row["hex_value"] = None
+                rows.append(row)
+            except Exception:
+                # 忽略單列錯誤，持續處理其餘列
+                continue
+        return rows
 
     def _convert_to_cpp_members(self, members):
         """將 type/bit 欄位轉換為 C++ 標準型別（V3/V4 版本），支援 tuple 格式。"""

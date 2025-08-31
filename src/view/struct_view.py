@@ -46,6 +46,7 @@ import time
 
 # v24: ensure GUI columns align with shared unified columns
 from src.config.columns import UNIFIED_LAYOUT_VALUE_COLUMNS  # noqa: F401
+from src.view.components.struct_layout import StructLayout
 
 class _DummyVirtual:
     def __init__(self, tree):
@@ -365,11 +366,17 @@ class StructView(tk.Tk):
         # struct layout 顯示區
         layout_frame = tk.LabelFrame(main_frame, text="Struct Layout")
         layout_frame.pack(fill="both", expand=True, padx=2, pady=2)
-        # 新增 scroll bar
-        layout_scrollbar = ttk.Scrollbar(layout_frame, orient="vertical")
-        self.layout_tree = create_layout_treeview(layout_frame, yscrollcommand=layout_scrollbar.set)
-        layout_scrollbar.config(command=self.layout_tree.yview)
-        layout_scrollbar.pack(side="right", fill="y")
+        # 新版：使用 StructLayout 元件（內含 Treeview）
+        self.struct_layout_component = StructLayout(layout_frame)
+        self.layout_tree = self.struct_layout_component.tree
+        # 仍加入 scroll bar（若 Treeview 支援 yscrollcommand）
+        try:
+            layout_scrollbar = ttk.Scrollbar(layout_frame, orient="vertical")
+            self.layout_tree.configure(yscrollcommand=layout_scrollbar.set)
+            layout_scrollbar.config(command=self.layout_tree.yview)
+            layout_scrollbar.pack(side="right", fill="y")
+        except Exception:
+            pass
 
     def _create_manual_struct_frame(self, parent):
         _, scrollable_frame = create_scrollable_tab_frame(parent)
@@ -931,46 +938,48 @@ class StructView(tk.Tk):
             self._last_parsed_values = parsed_values
         except Exception:
             pass
-        # unified mode: rebuild layout_tree with merged layout+values
+        # unified mode: use model unified rows to rebuild layout tree with latest values
         if getattr(self, "enable_unified_layout_values", False) and getattr(self, "_last_layout", None):
             try:
-                # clear current rows
-                for iid in self.layout_tree.get_children():
-                    self.layout_tree.delete(iid)
-                # merge by index
-                count = min(len(self._last_layout), len(parsed_values))
-                for i in range(count):
-                    item = self._last_layout[i]
-                    val = parsed_values[i]
-                    bit_offset = item.get("bit_offset")
-                    bit_size = item.get("bit_size")
-                    bit_offset_str = str(bit_offset) if bit_offset is not None else "-"
-                    bit_size_str = str(bit_size) if bit_size is not None else "-"
-                    name_str = str(item.get("name", ""))
-                    type_str = str(item.get("type", ""))
-                    offset_str = str(item.get("offset", ""))
-                    size_str = str(item.get("size", ""))
-                    is_bf_str = str(item.get("is_bitfield", False))
-                    value = val.get("value", "")
-                    try:
-                        hex_value = hex(int(value)) if value != "-" else "-"
-                    except Exception:
-                        hex_value = "-"
-                    hex_raw = val.get("hex_raw", "")
-                    if hex_raw and len(hex_raw) > 2:
-                        hex_raw = "｜".join(hex_raw[j:j+2] for j in range(0, len(hex_raw), 2))
-                    self.layout_tree.insert("", "end", values=(
-                        name_str,
-                        type_str,
-                        offset_str,
-                        size_str,
-                        bit_offset_str,
-                        bit_size_str,
-                        is_bf_str,
-                        str(value) if value is not None else "",
-                        str(hex_value) if hex_value is not None else "",
-                        str(hex_raw) if hex_raw is not None else "",
-                    ))
+                rows = []
+                if self.presenter and hasattr(self.presenter, "model") and hasattr(self.presenter.model, "build_unified_rows"):
+                    rows = self.presenter.model.build_unified_rows()
+                if hasattr(self, "struct_layout_component") and self.struct_layout_component:
+                    self.struct_layout_component.refresh_values(rows)
+                else:
+                    # 後備：直接清空再插入
+                    for iid in self.layout_tree.get_children():
+                        self.layout_tree.delete(iid)
+                    for row in rows:
+                        bit_offset = row.get("bit_offset")
+                        bit_size = row.get("bit_size")
+                        bit_offset_str = str(bit_offset) if bit_offset is not None else "-"
+                        bit_size_str = str(bit_size) if bit_size is not None else "-"
+                        name_str = str(row.get("name", ""))
+                        type_str = str(row.get("type", ""))
+                        offset_str = str(row.get("offset", ""))
+                        size_str = str(row.get("size", ""))
+                        is_bf_str = str(row.get("is_bitfield", False))
+                        value = row.get("value", "")
+                        hex_value = row.get("hex_value", "")
+                        hex_raw = row.get("hex_raw", "")
+                        if hex_raw and len(hex_raw) > 2:
+                            try:
+                                hex_raw = "｜".join(hex_raw[j:j+2] for j in range(0, len(hex_raw), 2))
+                            except Exception:
+                                pass
+                        self.layout_tree.insert("", "end", values=(
+                            name_str,
+                            type_str,
+                            offset_str,
+                            size_str,
+                            bit_offset_str,
+                            bit_size_str,
+                            is_bf_str,
+                            str(value) if value is not None else "",
+                            str(hex_value) if hex_value is not None else "",
+                            str(hex_raw) if hex_raw is not None else "",
+                        ))
                 return
             except Exception:
                 # fallback to legacy path if anything goes wrong
@@ -1000,49 +1009,82 @@ class StructView(tk.Tk):
             self._last_layout = layout
         except Exception:
             pass
-        # 清空舊資料
-        for i in self.layout_tree.get_children():
-            self.layout_tree.delete(i)
-        # 插入新資料
+        # 清空舊資料並插入新資料（值留空）
+        rows = []
         for item in layout:
             bit_offset = item.get("bit_offset")
             bit_size = item.get("bit_size")
-            # 無論是否 bitfield，都顯示 bit_offset/bit_size，若無則顯示 '-'
-            bit_offset_str = str(bit_offset) if bit_offset is not None else "-"
-            bit_size_str = str(bit_size) if bit_size is not None else "-"
-            # 確保皆為字串
-            name_str = str(item.get("name", ""))
-            type_str = str(item.get("type", ""))
-            offset_str = str(item.get("offset", ""))
-            size_str = str(item.get("size", ""))
-            is_bf_str = str(item.get("is_bitfield", False))
-            if getattr(self, "enable_unified_layout_values", False):
+            rows.append({
+                "name": item.get("name", ""),
+                "type": item.get("type", ""),
+                "offset": item.get("offset", ""),
+                "size": item.get("size", ""),
+                "bit_offset": bit_offset if bit_offset is not None else None,
+                "bit_size": bit_size if bit_size is not None else None,
+                "is_bitfield": bool(item.get("is_bitfield", False)),
+                "value": "",
+                "hex_value": "",
+                "hex_raw": "",
+            })
+        if getattr(self, "enable_unified_layout_values", False) and hasattr(self, "struct_layout_component") and self.struct_layout_component:
+            self.struct_layout_component.set_rows(rows)
+        else:
+            # 後備：直接清空再插入
+            for i in self.layout_tree.get_children():
+                self.layout_tree.delete(i)
+            for r in rows:
+                bit_offset = r.get("bit_offset")
+                bit_size = r.get("bit_size")
+                bit_offset_str = str(bit_offset) if bit_offset is not None else "-"
+                bit_size_str = str(bit_size) if bit_size is not None else "-"
                 self.layout_tree.insert("", "end", values=(
-                    name_str,
-                    type_str,
-                    offset_str,
-                    size_str,
+                    str(r.get("name", "")),
+                    str(r.get("type", "")),
+                    str(r.get("offset", "")),
+                    str(r.get("size", "")),
                     bit_offset_str,
                     bit_size_str,
-                    is_bf_str,
-                    "",  # value
-                    "",  # hex_value
-                    ""   # hex_raw
+                    str(r.get("is_bitfield", False)),
+                    "",
+                    "",
+                    "",
                 ))
-            else:
-                self.layout_tree.insert("", "end", values=(
-                    name_str,
-                    type_str,
-                    offset_str,
-                    size_str,
-                    bit_offset_str,
-                    bit_size_str,
-                    is_bf_str
-                ))
+        # 啟用 CSV 匯出（當 layout 存在時）
         # 啟用 CSV 匯出（當 layout 存在時）
         try:
             if hasattr(self, "export_csv_button"):
                 self.export_csv_button.config(state="normal" if layout else "disabled")
+        except Exception:
+            pass
+
+    # V25: presenter callback to refresh values into struct layout component
+    def on_values_refreshed(self):
+        try:
+            if self.presenter and hasattr(self.presenter, "model") and hasattr(self.presenter.model, "build_unified_rows"):
+                rows = self.presenter.model.build_unified_rows()
+                if hasattr(self, "struct_layout_component") and self.struct_layout_component:
+                    self.struct_layout_component.refresh_values(rows)
+                else:
+                    # 後備：重建顯示
+                    for iid in self.layout_tree.get_children():
+                        self.layout_tree.delete(iid)
+                    for r in rows:
+                        bit_offset = r.get("bit_offset")
+                        bit_size = r.get("bit_size")
+                        bit_offset_str = str(bit_offset) if bit_offset is not None else "-"
+                        bit_size_str = str(bit_size) if bit_size is not None else "-"
+                        self.layout_tree.insert("", "end", values=(
+                            str(r.get("name", "")),
+                            str(r.get("type", "")),
+                            str(r.get("offset", "")),
+                            str(r.get("size", "")),
+                            bit_offset_str,
+                            bit_size_str,
+                            str(r.get("is_bitfield", False)),
+                            str(r.get("value", "")),
+                            str(r.get("hex_value", "")),
+                            str(r.get("hex_raw", "")),
+                        ))
         except Exception:
             pass
 
@@ -1872,6 +1914,12 @@ class StructView(tk.Tk):
     def _on_display_mode_change(self, mode):
         if self.presenter and hasattr(self.presenter, "on_switch_display_mode"):
             self.presenter.on_switch_display_mode(mode)
+        # 同步 StructLayout 視覺模式
+        try:
+            if hasattr(self, "struct_layout_component") and self.struct_layout_component:
+                self.struct_layout_component.set_display_mode(str(mode))
+        except Exception:
+            pass
 
     def _on_search_entry_change(self, event):
         search_str = self.search_var.get()
