@@ -200,6 +200,87 @@
 - 不在本輪範圍：
   - （2）Tree/Flat 原缺陷的個別渲染差異，列為「後續執行項目」的 T2-1/2/3。
 
+---
+
+#### 需改動的檔案與調整內容（按檔案列出）
+- 1）`src/config/columns.py`
+  - 確認並統一欄位常數：`UNIFIED_LAYOUT_VALUE_COLUMNS = ["name", "type", "offset", "size", "bit_offset", "bit_size", "is_bitfield", "value", "hex_value", "hex_raw"]`。
+  - 若尚無：提供 `get_unified_layout_value_columns()` 取得拷貝，避免外部修改原常數。
+  - 若需要：補充欄位標題 key 與 i18n 對應（例如 `layout_col_*`、`member_col_*`），集中管理映射。
+
+- 2）`src/model/struct_model.py`
+  - 建立/調整統一 rows 生成：`build_unified_rows(ast, value_source) -> list[dict]`。
+    - 產出鍵名必須符合 `UNIFIED_LAYOUT_VALUE_COLUMNS`，包含 `is_bitfield`、`value`、`hex_value`、`hex_raw`。
+    - 禁止輸出 legacy 鍵名（如 `field_name`）；若內部仍需，請在 model 內部轉換，不外露。
+  - 提供展平/樹化輔助：
+    - `to_tree_nodes(unified_rows) -> list[TreeNode]`（可保留 children）。
+    - `to_flat_nodes(unified_rows) -> list[TreeNode]`（children 為空）。
+    - 節點需有穩定 `node_id`（由完整路徑/offset/type 組合），供 View 維持選取/展開狀態。
+  - 值計算：集中處理數值到十六進位的轉換（`hex_value`），bitfield/陣列/巢狀皆須覆蓋。
+  - 介面契約：對 presenter 提供單一入口（例如 `get_unified_rows(context)`）。
+
+- 3）`src/presenter/struct_presenter.py`
+  - 在 parse 完成時：
+    - 重新呼叫 model 的 `build_unified_rows(...)` 取得新 rows。
+    - 廣播明確事件（例如 `on_parse_complete(rows)` 或呼叫 View 的 `set_rows(rows)`）。
+  - 值更新流程：
+    - 重建 value provider/context，避免沿用舊快取。
+    - 新增/保留 `refresh_values(updated_rows)` 或等效事件，用於不變更 columns 結構時僅更新值。
+  - 事件順序：確保 parse 完成後才觸發 View 更新（避免競態）。
+
+- 4）`src/view/components/struct_layout.py`（新檔，若尚未存在）
+  - 單一元件內建 tree/flat 雙模式（決策 C）：
+    - API：`set_rows(rows)`、`refresh_values(rows)`、`display_mode = "tree"|"flat"`。
+    - Columns 來源：引用 `UNIFIED_LAYOUT_VALUE_COLUMNS`，維持順序與對應。
+    - Tree/Flat 渲染：共用同一份 rows 資料，只在視圖層決定是否顯示樹欄與 children。
+    - 狀態同步：切換模式時處理展開/選取/滾動位置（最簡策略：重置或最小對映）。
+    - 虛擬化（如有）：確保可見列的 `value/hex_value/hex_raw` 正確。
+
+- 5）`src/view/struct_view.py`
+  - 以 `StructLayout` 元件取代既有 Tree/Flat 平行渲染管線。
+  - 移除重複 columns 定義，統一引用 `UNIFIED_LAYOUT_VALUE_COLUMNS`。
+  - 與 presenter 事件對接：parse 完成 → `set_rows`；值變更 → `refresh_values`；模式切換 → 設定 `display_mode`。
+
+- 6）`src/presenter/context_schema.py`（如存在）
+  - 移除/更新與 legacy 鍵名或 columns 相關的 schema 欄位，改為以 unified rows 為準。
+
+- 7）i18n/字串資源（實際檔名依專案）：
+  - 確保 unified columns 的標題/說明文字存在並一致（`name`、`type`、`offset`...、`hex_raw`）。
+
+- 8）測試檔（依 TDD 計畫新增）
+  - `tests/model/test_struct_model_values.py`
+  - `tests/presenter/test_struct_presenter_parse_refresh.py`
+  - `tests/view/test_struct_layout_component.py`
+  - `tests/e2e/test_import_h_value_refresh_and_modes.py`
+
+- 9）工具/匯出（非必要變更，檢查相容）
+  - `src/export/csv_export.py` 與 `tools/export_csv_from_h.py` 應已對齊 V24；僅需驗證與 V25 unified rows 不衝突。
+
+---
+
+#### 實作步驟清單（按順序）
+1) 模型統一：在 `src/model/struct_model.py` 實作/修正 `build_unified_rows(...)`，並完成 `hex_value`/`hex_raw`、`is_bitfield` 的產生與鍵名統一。
+2) Presenter 串接：在 `src/presenter/struct_presenter.py` 於 parse 完成時呼叫 model 並發送 `set_rows`/`on_parse_complete`；在值更新流程改為呼叫 `refresh_values`。
+3) 建立 `src/view/components/struct_layout.py` 元件（若無），落地 API 與 tree/flat 內聚；替換 `src/view/struct_view.py` 內的舊管線。
+4) Columns 與 i18n：統一由 `src/config/columns.py` 輸出，清理舊 columns 定義；補齊字串資源。
+5) 移除 legacy 鍵名外露：檢查所有渲染與匯出路徑，確保不再依賴 `field_name` 等舊鍵。
+6) 測試實作：依 TDD 計畫補齊單元/整合/E2E 測試；先紅後綠。
+7) 效能與虛擬化驗證：在大量節點下進行煙霧測試，確保可見列值正確與流暢度可接受。
+8) 文件更新：同步更新使用說明/遷移筆記（如需）。
+
+---
+
+#### 事件與資料契約（供跨層對齊）
+- 事件：
+  - `on_parse_complete(rows)`：攜帶全量 unified rows，供 View 首次/重建渲染。
+  - `refresh_values(rows)`：僅更新值的版本（columns 結構與列順序不變）。
+  - `on_display_mode_change(mode)`：`mode in {"tree", "flat"}`。
+- rows 規範（每列至少包含）：
+  - `name`, `type`, `offset`, `size`, `bit_offset`, `bit_size`, `is_bitfield`, `value`, `hex_value`, `hex_raw`。
+  - 推薦附加：`node_id`（穩定識別）、`full_path`（除錯/顯示用，flat 可選）。
+  - 鍵名禁止：`field_name` 等 legacy 名稱不得外露至 View/Presenter 邊界之外。
+
+---
 #### 附錄：時程建議與風險
 - 里程碑（僅規劃、可依實際調整）：
   - M1：完成問題（1）與（2）排查與測試覆蓋（1–2 天）。
