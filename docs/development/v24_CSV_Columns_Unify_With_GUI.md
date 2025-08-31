@@ -46,7 +46,7 @@
   - CLI flag `--columns-source legacy|gui_unified|explicit` with default `gui_unified`.
   - Release notes and migration guide: advise consumers to either pin `legacy` or update their parsers to the new unified header.
 
-#### 7) Implementation Steps
+#### 7) Implementation Steps (code edits checklist)
 1) Create `src/config/columns.py` with `UNIFIED_LAYOUT_VALUE_COLUMNS`.
 2) Update `src/view/struct_view.py` to import and use `UNIFIED_LAYOUT_VALUE_COLUMNS` in building `LAYOUT_TREEVIEW_COLUMNS` (append value columns as already planned in V22, but now sourced centrally).
 3) Update `src/export/csv_export.py`:
@@ -66,18 +66,71 @@
 - Enabling `include_metadata` appends the 5 metadata columns at the end, preserving the unified header order at the front.
 - Setting `columns_source=legacy` reproduces V23 outputs bit-by-bit on existing tests.
 
-#### 9) Test Plan
+#### 9) Implementation Details (per file)
+- `src/config/columns.py` (new):
+  - Add constant:
+    - `UNIFIED_LAYOUT_VALUE_COLUMNS = ["name", "type", "offset", "size", "bit_offset", "bit_size", "is_bitfield", "value", "hex_value", "hex_raw"]`
+  - Optional helper:
+    - `def get_unified_layout_value_columns(): return list(UNIFIED_LAYOUT_VALUE_COLUMNS)`
+
+- `src/view/struct_view.py`:
+  - Import: `from src.config.columns import UNIFIED_LAYOUT_VALUE_COLUMNS`
+  - Ensure `LAYOUT_TREEVIEW_COLUMNS` includes entries for each of the unified names with their titles and widths, and in the same order:
+    - `name`, `type`, `offset`, `size`, `bit_offset`, `bit_size`, `is_bitfield`, `value`, `hex_value`, `hex_raw`.
+  - If any of the three value columns are currently appended inline, replace with a construction that derives from `UNIFIED_LAYOUT_VALUE_COLUMNS` to guarantee order alignment.
+  - Keep existing i18n `title` keys: `layout_col_*` for layout columns and `member_col_*` for value columns.
+
+- `src/export/csv_export.py`:
+  - In `CsvExportOptions`:
+    - Add fields: `columns_source = "gui_unified"`, `include_metadata = False`.
+  - In `DefaultCsvExportService.export_to_csv(...)` column selection block:
+    - If `opts.columns_source == "explicit"` and `opts.columns` is set: use `opts.columns`.
+    - Elif `opts.columns_source == "legacy"`: keep existing behavior (DEFAULT_COLUMNS + layout/value appends).
+    - Else (`gui_unified` default): `columns = list(UNIFIED_LAYOUT_VALUE_COLUMNS)`.
+      - If `opts.include_metadata`: append `["entity_name", "field_order", "source_file", "source_line", "tags"]`.
+  - In values computation section:
+    - After deriving `row["value"]`, set `row["hex_value"] = hex(int(row["value"]))` when value is int/bool; else leave empty/None.
+  - In `build_parsed_model_from_struct(...)`:
+    - Add `"is_bitfield": bool(item.get("is_bitfield"))` to `row`.
+    - Ensure `"name"` and `"type"` keys align with GUI naming.
+
+- `tools/export_csv_from_h.py`:
+  - argparse:
+    - Add `--columns-source` with choices: `gui_unified`, `legacy`, `explicit` (default `gui_unified`).
+    - Add `--include-metadata` flag (store_true).
+    - If `--columns-source explicit` and `--columns` provided, pass through as-is.
+    - Default value can read `os.environ.get("CSV_COLUMNS_SOURCE", "gui_unified")`.
+  - Pass new options into `CsvExportOptions`.
+
+- Documentation:
+  - Update release notes (v24) and migration guide with header changes and how to switch to `legacy`.
+
+#### 10) Test Plan (what to add/change)
 - Unit tests (export):
-  - `test_default_columns_are_gui_unified_order`
-  - `test_hex_value_is_present_and_correct`
-  - `test_bitfield_value_and_hex_value`
-  - `test_include_metadata_appends_columns`
-  - `test_columns_source_legacy_matches_v23`
-  - `test_columns_source_explicit_respects_order`
+  - `test_default_columns_are_gui_unified_order`: no options passed → header matches unified order.
+  - `test_hex_value_is_present_and_correct`: with numeric and boolean values, verify `hex_value` correctness.
+  - `test_bitfield_value_and_hex_value`: verify bitfield extraction and corresponding hex_value.
+  - `test_include_metadata_appends_columns`: confirm appended metadata after unified set.
+  - `test_columns_source_legacy_matches_v23`: verify byte-for-byte compatibility with previous behavior.
+  - `test_columns_source_explicit_respects_order`: provide custom `columns` and verify output.
+  - `test_invalid_columns_source_raises_or_ignores`: ensure invalid is handled.
+
 - E2E XML-driven export tests:
-  - Update/add v24 suite with expected headers for unified mode and coverage for little/big endian, arrays, nested structs, bitfields.
+  - Add `tests/resources/v24/cases.xml` with unified header expectations covering:
+    - little/big endian
+    - arrays, nested structs
+    - bitfields (incl. anonymous)
+  - Update loader to allow selecting `columnsSource` and `includeMetadata` per case.
+
+- CLI tests (new `tests/tools/test_export_csv_from_h_cli.py`):
+  - Verify `--columns-source gui_unified` default outputs unified header.
+  - Verify `--columns-source legacy` reproduces V23 expectations.
+  - Verify `--include-metadata` appends columns.
+  - Verify `CSV_COLUMNS_SOURCE` environment variable defaulting.
+
 - GUI tests (smoke):
-  - Verify `LAYOUT_TREEVIEW_COLUMNS` still matches unified schema imported from `src/config/columns.py`.
+  - Ensure `LAYOUT_TREEVIEW_COLUMNS` order/names align with `UNIFIED_LAYOUT_VALUE_COLUMNS`.
+  - Ensure `hex_value` column is still present in GUI and remains unaffected by exporter changes.
 
 #### 10) Risks & Mitigations
 - Cross-module dependency: avoid importing view from export; use `src/config/columns.py` as a neutral module.
