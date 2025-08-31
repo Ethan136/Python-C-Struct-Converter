@@ -145,3 +145,28 @@
 - Per-column show/hide for CSV mirroring GUI user preferences (if/when GUI adds preference persistence for columns).
 - Optional localized CSV headers by mapping ids to i18n strings (currently headers use column ids).
 
+#### 13) Documentation/Artifacts to Update After V24
+- User/README docs:
+  - `docs/development/v20_TargetStruct_UI_Sync_and_CSV_Export_GUI.md`: update CSV export description to reflect unified default header and new options.
+  - `doc/development/v19-csv-export-tdd.md` (legacy): add a top note pointing to V24 unified columns and how to enable `legacy` mode.
+  - Any user-facing README or How-To mentioning CSV columns and examples (add a new example with unified header).
+
+- i18n resources:
+  - `src/config/ui_strings.xml`: ensure keys for `layout_col_*` and `member_col_*` remain consistent; add any new labels if GUI changes wording.
+
+- Developer docs and architecture notes:
+  - `docs/development/v22_Unify_MemberValue_and_StructLayout.md`: reference that CSV now defaults to unified columns and includes `hex_value`.
+  - `docs/development/v6_GUI_view.md`: if it enumerates column orders or names, align examples with `UNIFIED_LAYOUT_VALUE_COLUMNS`.
+  - `docs/analysis/INPUT_CONVERSION_COMPLETE.md`: update any CSV column mapping tables.
+
+- Tests and fixtures:
+  - `tests/export/` unit tests: update expectations for default header/content to include `hex_value` in unified mode.
+  - `tests/export/test_csv_export_xml_e2e.py` and loader `tests/data_driven/csv_export_xml_loader.py`: add support for `columnsSource` and `includeMetadata`; update/add v24 cases and expected CSV files under `tests/resources/v24/`.
+  - `tests/view/test_struct_view.py`: smoke-check that `LAYOUT_TREEVIEW_COLUMNS` aligns with the unified list defined in `src/config/columns.py`.
+
+- CLI help and examples:
+  - `tools/export_csv_from_h.py`: update `--help` text, README usage examples, and document `--columns-source` and `--include-metadata` with samples.
+
+- Changelog/Release notes:
+  - Add V24 entry describing the default column change, migration path (`legacy` mode), and implications for downstream consumers.
+
