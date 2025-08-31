@@ -931,34 +931,34 @@ class StructView(tk.Tk):
             self._last_parsed_values = parsed_values
         except Exception:
             pass
-        # unified mode: rebuild layout_tree with merged layout+values
+        # unified mode: use model unified rows to rebuild layout tree with latest values
         if getattr(self, "enable_unified_layout_values", False) and getattr(self, "_last_layout", None):
             try:
                 # clear current rows
                 for iid in self.layout_tree.get_children():
                     self.layout_tree.delete(iid)
-                # merge by index
-                count = min(len(self._last_layout), len(parsed_values))
-                for i in range(count):
-                    item = self._last_layout[i]
-                    val = parsed_values[i]
-                    bit_offset = item.get("bit_offset")
-                    bit_size = item.get("bit_size")
+                rows = []
+                if self.presenter and hasattr(self.presenter, "model") and hasattr(self.presenter.model, "build_unified_rows"):
+                    rows = self.presenter.model.build_unified_rows()
+                # insert new rows according to UNIFIED_LAYOUT_VALUE_COLUMNS order
+                for row in rows:
+                    bit_offset = row.get("bit_offset")
+                    bit_size = row.get("bit_size")
                     bit_offset_str = str(bit_offset) if bit_offset is not None else "-"
                     bit_size_str = str(bit_size) if bit_size is not None else "-"
-                    name_str = str(item.get("name", ""))
-                    type_str = str(item.get("type", ""))
-                    offset_str = str(item.get("offset", ""))
-                    size_str = str(item.get("size", ""))
-                    is_bf_str = str(item.get("is_bitfield", False))
-                    value = val.get("value", "")
-                    try:
-                        hex_value = hex(int(value)) if value != "-" else "-"
-                    except Exception:
-                        hex_value = "-"
-                    hex_raw = val.get("hex_raw", "")
+                    name_str = str(row.get("name", ""))
+                    type_str = str(row.get("type", ""))
+                    offset_str = str(row.get("offset", ""))
+                    size_str = str(row.get("size", ""))
+                    is_bf_str = str(row.get("is_bitfield", False))
+                    value = row.get("value", "")
+                    hex_value = row.get("hex_value", "")
+                    hex_raw = row.get("hex_raw", "")
                     if hex_raw and len(hex_raw) > 2:
-                        hex_raw = "｜".join(hex_raw[j:j+2] for j in range(0, len(hex_raw), 2))
+                        try:
+                            hex_raw = "｜".join(hex_raw[j:j+2] for j in range(0, len(hex_raw), 2))
+                        except Exception:
+                            pass
                     self.layout_tree.insert("", "end", values=(
                         name_str,
                         type_str,
