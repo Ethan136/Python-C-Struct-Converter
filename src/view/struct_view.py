@@ -384,14 +384,43 @@ class StructView(tk.Tk):
         self.file_path_label = tk.Label(main_frame, text=get_string("no_file_selected"))
         self.file_path_label.pack(anchor="w", pady=2)
 
-        # hex grid 輸入區
-        self.hex_entries = []
-        self.hex_grid_frame = tk.Frame(main_frame)
-        self.hex_grid_frame.pack(fill="x", pady=2)
+        # ---- 固定底部 Footer 區（v28）：統一 Input Bytes 位置 ----
+        try:
+            self.input_footer_frame = tk.Frame(main_frame)
+            self.input_footer_frame.pack(fill="x", side="bottom")
+        except Exception:
+            # 在無 tk 環境下，提供 dummy 以供測試
+            class _DummyFrame:
+                def __init__(self, parent=None):
+                    self._parent = parent
+                def pack(self, *a, **k):
+                    pass
+                def pack_forget(self):
+                    pass
+            self.input_footer_frame = _DummyFrame(main_frame)
 
-        # v26: flex string 輸入區（預設隱藏）
+        # hex grid 輸入區（移入 footer）
+        self.hex_entries = []
+        try:
+            self.hex_grid_frame = tk.Frame(self.input_footer_frame)
+            # 預設由輸入模式控制是否顯示，此處不主動 pack
+        except Exception:
+            class _Dummy:
+                def __init__(self, parent=None): self._parent = parent
+                def pack(self, *a, **k): pass
+                def pack_forget(self): pass
+            self.hex_grid_frame = _Dummy(self.input_footer_frame)
+
+        # v26: flex string 輸入區（移入 footer，預設顯示）
         self.flex_input_var = tk.StringVar(value="")
-        self.flex_frame = tk.Frame(main_frame)
+        try:
+            self.flex_frame = tk.Frame(self.input_footer_frame)
+        except Exception:
+            class _Dummy:
+                def __init__(self, parent=None): self._parent = parent
+                def pack(self, *a, **k): pass
+                def pack_forget(self): pass
+            self.flex_frame = _Dummy(self.input_footer_frame)
         try:
             tk.Label(self.flex_frame, text=get_string("label_flex_input")).pack(anchor="w")
         except Exception:
@@ -412,9 +441,12 @@ class StructView(tk.Tk):
             self.flex_preview_label.pack(fill="x")
         except Exception:
             self.flex_preview_label = None
-        # 預設以 flex 模式顯示（因 input_mode 預設為 flex_string）
+        # 預設以 flex 模式顯示（因 input_mode 預設為 flex_string），僅在 footer 內切換
         try:
             self.hex_grid_frame.pack_forget()
+        except Exception:
+            pass
+        try:
             self.flex_frame.pack(fill="x", pady=2)
         except Exception:
             pass
@@ -1351,50 +1383,11 @@ class StructView(tk.Tk):
                 self.presenter.set_input_mode(str(mode))
         except Exception:
             pass
-        # 切換顯示區塊
         try:
             if str(mode) == 'flex_string':
-                # 隱藏 grid，顯示 flex
-                try:
-                    self.hex_grid_frame.pack_forget()
-                except Exception:
-                    pass
-                try:
-                    self.flex_frame.pack(fill="x", pady=2)
-                except Exception:
-                    pass
-                # 隱藏單位控制
-                try:
-                    if hasattr(self, "_unit_label") and self._unit_label:
-                        self._unit_label.pack_forget()
-                except Exception:
-                    pass
-                try:
-                    if hasattr(self, "unit_menu") and self.unit_menu:
-                        self.unit_menu.pack_forget()
-                except Exception:
-                    pass
+                self._show_footer_flex()
             else:
-                # 顯示 grid，隱藏 flex
-                try:
-                    self.flex_frame.pack_forget()
-                except Exception:
-                    pass
-                try:
-                    self.hex_grid_frame.pack(fill="x", pady=2)
-                except Exception:
-                    pass
-                # 顯示單位控制
-                try:
-                    if hasattr(self, "_unit_label") and self._unit_label:
-                        self._unit_label.pack(side=tk.LEFT)
-                except Exception:
-                    pass
-                try:
-                    if hasattr(self, "unit_menu") and self.unit_menu:
-                        self.unit_menu.pack(side=tk.LEFT)
-                except Exception:
-                    pass
+                self._show_footer_grid()
         except Exception:
             pass
 
@@ -1489,6 +1482,70 @@ class StructView(tk.Tk):
             return ""
         except Exception:
             return ""
+
+    # v28 helpers: footer creation and toggle
+    def _create_input_footer(self, parent):
+        try:
+            if hasattr(self, 'input_footer_frame') and self.input_footer_frame:
+                return self.input_footer_frame
+        except Exception:
+            pass
+        try:
+            self.input_footer_frame = tk.Frame(parent)
+            self.input_footer_frame.pack(fill="x", side="bottom")
+        except Exception:
+            class _DummyFrame:
+                def __init__(self, p=None): self._parent = p
+                def pack(self, *a, **k): pass
+                def pack_forget(self): pass
+            self.input_footer_frame = _DummyFrame(parent)
+        return self.input_footer_frame
+
+    def _show_footer_flex(self):
+        # Hide grid, show flex; hide unit controls
+        try:
+            if hasattr(self, 'hex_grid_frame') and self.hex_grid_frame:
+                self.hex_grid_frame.pack_forget()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'flex_frame') and self.flex_frame:
+                self.flex_frame.pack(fill="x", pady=2)
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "_unit_label") and self._unit_label:
+                self._unit_label.pack_forget()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "unit_menu") and self.unit_menu:
+                self.unit_menu.pack_forget()
+        except Exception:
+            pass
+
+    def _show_footer_grid(self):
+        # Hide flex, show grid; show unit controls
+        try:
+            if hasattr(self, 'flex_frame') and self.flex_frame:
+                self.flex_frame.pack_forget()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'hex_grid_frame') and self.hex_grid_frame:
+                self.hex_grid_frame.pack(fill="x", pady=2)
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "_unit_label") and self._unit_label:
+                self._unit_label.pack(side=tk.LEFT)
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "unit_menu") and self.unit_menu:
+                self.unit_menu.pack(side=tk.LEFT)
+        except Exception:
+            pass
 
     def show_flexible_preview(self, hex_bytes: str, total_len: int, warnings, trunc_info) -> None:
         # Store for tests; a real UI would update widgets
