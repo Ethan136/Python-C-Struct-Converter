@@ -248,17 +248,7 @@ class StructView(tk.Tk):
         control_frame.pack(fill="x", pady=(5, 2))
         self.file_control_frame = control_frame  # 供測試直接存取
         from src.config import get_string
-        tk.Label(control_frame, text=get_string("label_unit_size")).pack(side=tk.LEFT)
-        self.unit_size_var = tk.StringVar(value="1 Byte")
-        unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
-        self.unit_menu = tk.OptionMenu(control_frame, self.unit_size_var, *unit_options, command=lambda _: self._on_unit_size_change())
-        self.unit_menu.pack(side=tk.LEFT)
-        tk.Label(control_frame, text=get_string("label_endianness")).pack(side=tk.LEFT)
-        self.endian_var = tk.StringVar(value="Little Endian")
-        endian_options = ["Little Endian", "Big Endian"]
-        self.endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=lambda _: self._on_endianness_change())
-        self.endian_menu.pack(side=tk.LEFT)
-        # v26: 輸入模式切換（grid / flex_string）
+        # v26: 將 Input Mode 放在最左側（位於單位大小之前）
         try:
             tk.Label(control_frame, text="Input Mode").pack(side=tk.LEFT)
         except Exception:
@@ -270,6 +260,16 @@ class StructView(tk.Tk):
             self.input_mode_menu.pack(side=tk.LEFT)
         except Exception:
             pass
+        tk.Label(control_frame, text=get_string("label_unit_size")).pack(side=tk.LEFT)
+        self.unit_size_var = tk.StringVar(value="1 Byte")
+        unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
+        self.unit_menu = tk.OptionMenu(control_frame, self.unit_size_var, *unit_options, command=lambda _: self._on_unit_size_change())
+        self.unit_menu.pack(side=tk.LEFT)
+        tk.Label(control_frame, text=get_string("label_endianness")).pack(side=tk.LEFT)
+        self.endian_var = tk.StringVar(value="Little Endian")
+        endian_options = ["Little Endian", "Big Endian"]
+        self.endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=lambda _: self._on_endianness_change())
+        self.endian_menu.pack(side=tk.LEFT)
         # 顯示模式切換
         tk.Label(control_frame, text=get_string("label_display_mode")).pack(side=tk.LEFT)
         self.display_mode_var = tk.StringVar(value="tree")
