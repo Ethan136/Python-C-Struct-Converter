@@ -186,3 +186,40 @@
 - 負向案例（整合）：
 	- 提供非法 token（如 `0x`、`0xGG`、缺前綴 `01`）時，`parse_flexible_hex_input()` 回傳 `type=='error'`，訊息映射到 `dialog_invalid_input`。
 	- 分隔符混用與連續分隔：`",,,  0x01 , 0x02  ,,,"` 解析成功（空 token 忽略）。
+
+# 尚未完成項目與補充規格
+- View UI 串接
+	- 新增「輸入模式」切換：在載入 .h 的頁籤控制列（`control_frame`）新增 OptionMenu，值為 `grid`／`字串 Bytes`（對應 presenter `set_input_mode('grid'|'flex_string')`）。
+	- 新增元件與狀態：
+		- `self.flex_input_var = tk.StringVar(value="")`
+		- `self.flex_input_entry = tk.Entry(..., textvariable=self.flex_input_var, width=60)`（僅在 `flex_string` 模式顯示）
+		- `self.flex_preview_label` 或簡易容器，用於顯示 bytes 預覽與告警摘要（使用 `show_flexible_preview` 更新）。
+	- 模式切換行為：
+		- 當切換為 `flex_string`：隱藏/淡化 grid 輸入區（hex grid），顯示字串輸入框與預覽區；呼叫 `presenter.set_input_mode('flex_string')`。
+		- 當切換為 `grid`：反向處理並呼叫 `presenter.set_input_mode('grid')`。
+	- 解析按鈕分流（`_on_parse_file`）：
+		- 若 `get_input_mode() == 'flex_string'`：
+			- 呼叫 `presenter.parse_flexible_hex_input()`；
+			- 成功時：`show_parsed_values(parsed_values)`，並以 `ParseResult.data.hex()`、`warnings`、`trunc_info` 呼叫 `show_flexible_preview(...)`；
+			- 失敗時：沿用既有 `show_error(...)`。
+		- 若為 `grid`：維持現行 `presenter.parse_hex_data()` 流程。
+	- 已有方法（最小契約）：`get_input_mode()`、`get_flexible_input_string()`、`show_flexible_preview(...)`，需將 UI 實際元件與之線路化（目前 `flex_input_var` 僅供測試，尚未在 UI 建立/綁定）。
+
+- CSV 匯出行為
+	- `_on_export_csv()` 取得 `hex_input` 的策略更新：
+		- 若 `get_input_mode() == 'flex_string'` 且 `context['extra']['last_flex_hex']` 存在，則使用它；
+		- 否則，沿用現行 grid 輸入：`"".join(raw for raw, _ in get_hex_input_parts()).replace(" ", "")`。
+	- 將所選 `hex_input` 傳入 `CsvExportOptions.hex_input`，其餘維持現有流程。
+	- 建議在 UI 顯示匯出前的使用中資訊（以 i18n 字串）標示來源（flex/grid）。
+
+- 額外測試缺口（建議補）
+	- View 互動：
+		- 模式切換顯示/隱藏；
+		- 在 `flex_string` 模式輸入合法/非法字串後按下解析，驗證：
+			- 解析成功呼叫 `show_parsed_values` 與 `show_flexible_preview`；
+			- 解析失敗呼叫 `show_error`；
+			- `show_flexible_preview` 內容包含 `hex_bytes/total_len/warnings/trunc_info`。
+	- CSV 匯出（flex 模式）：
+		- 在 `flex_string` 模式解析成功後，呼叫 `_on_export_csv()`，驗證 `CsvExportOptions.hex_input == context.extra.last_flex_hex`（可以 in-memory stream 取代實際寫檔）。
+	- 上限保護（可選）：
+		- 若啟用單一 token 或總長度上限，於 parser 與 View 顯示加上對應錯誤/警告測試。
