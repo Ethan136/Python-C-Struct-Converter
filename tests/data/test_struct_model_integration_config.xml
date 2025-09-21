@@ -53,9 +53,9 @@
         ]]></struct_definition>
         <input_data><hex>12345678</hex></input_data>
         <expected_results>
-            <member name="a" value="0" hex_raw="00"/>
-            <member name="(padding)" value="-" hex_raw="000000"/>
-            <member name="b" value="305419896" hex_raw="12345678"/>
+            <member name="a" value="18" hex_raw="12"/>
+            <member name="(padding)" value="-" hex_raw="345678"/>
+            <member name="b" value="0" hex_raw="00000000"/>
         </expected_results>
     </test_case>
     <test_case name="parse_hex_bitfields" description="Parse bitfield struct" endianness="little">
@@ -116,9 +116,9 @@
         ]]></struct_definition>
         <input_data><hex>12345678</hex></input_data>
         <expected_results>
-            <member name="a" value="0" hex_raw="00"/>
-            <member name="(padding)" value="-" hex_raw="000000"/>
-            <member name="b" value="2018915346" hex_raw="12345678"/>
+            <member name="a" value="18" hex_raw="12"/>
+            <member name="(padding)" value="-" hex_raw="345678"/>
+            <member name="b" value="0" hex_raw="00000000"/>
         </expected_results>
     </test_case>
     <test_case name="parse_hex_short_input" description="Parse short hex input padded" endianness="little">
