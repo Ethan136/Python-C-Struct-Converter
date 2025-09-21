@@ -235,6 +235,54 @@ class StructPresenter:
         except Exception as e:
             return {'type': 'error', 'message': get_string('msg_hex_parse_error').format(error=str(e))}
 
+    # v26: input mode and flexible input parsing
+    def set_input_mode(self, mode: str):
+        if mode not in ("grid", "flex_string"):
+            raise ValueError("Invalid input mode")
+        self.context.setdefault("extra", {})["input_mode"] = mode
+        self.context["debug_info"]["last_event"] = "set_input_mode"
+        self.context["debug_info"]["last_event_args"] = {"mode": mode}
+        self.push_context()
+        return {"mode": mode}
+
+    def parse_flexible_hex_input(self):
+        # Ensure struct loaded
+        if not self.model.layout:
+            return {'type': 'error', 'message': get_string('msg_not_loaded')}
+        # Read inputs from view
+        input_str = self.view.get_flexible_input_string() if self.view else ""
+        byte_order_str = self.view.get_selected_endianness() if self.view else "Little Endian"
+        byte_order_for_conversion = 'little' if byte_order_str == "Little Endian" else 'big'
+        target_len = getattr(self.model, 'total_size', None) or None
+        try:
+            res = self.input_processor.process_flexible_input(input_str, target_len)
+        except ValueError as e:
+            # Map to generic invalid input dialog
+            title = get_string("dialog_invalid_input")
+            return {'type': 'error', 'message': f"{title}: {str(e)}"}
+        # Convert to hex string for model and store for CSV export
+        hex_data = res.data.hex()
+        try:
+            self.context.setdefault('extra', {})['last_flex_hex'] = hex_data
+        except Exception:
+            pass
+        try:
+            parsed_values = self.model.parse_hex_data(hex_data, byte_order_for_conversion)
+            # V25: notify view to refresh unified layout rows if available
+            try:
+                if self.view and hasattr(self.view, "on_values_refreshed"):
+                    self.view.on_values_refreshed()
+            except Exception:
+                pass
+            payload = {'type': 'ok', 'parsed_values': parsed_values}
+            if res.warnings:
+                payload['warnings'] = list(res.warnings)
+            if res.trunc_info:
+                payload['trunc_info'] = list(res.trunc_info)
+            return payload
+        except Exception as e:
+            return {'type': 'error', 'message': get_string('msg_hex_parse_error').format(error=str(e))}
+
     def validate_manual_struct(self, struct_data):
         return self.model.validate_manual_struct(struct_data["members"], struct_data["total_size"])
 
@@ -394,7 +442,7 @@ class StructPresenter:
             "filter": None,
             "search": None,
             "version": "2.0",  # 修正：升級到 2.0 版本
-            "extra": {},
+            "extra": {"input_mode": "grid"},
             "loading": False,
             "history": [],
             "user_settings": {},

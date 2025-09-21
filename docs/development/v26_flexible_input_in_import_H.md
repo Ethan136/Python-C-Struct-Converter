@@ -153,3 +153,36 @@
 	- 匯入 .h → 顯示 layout → `flex_string` 輸入 → 解析並顯示欄位值；
 	- 與 `1/4/8-byte` grid 模式對齊：相同數值輸入應輸出一致 bytes；
 	- CSV 匯出流程不因新模式破壞（必要時以 `ParseResult.data.hex()` 提供 `hex_input`）。
+
+## 整合測試（實作細節）
+- 測試目標：驗證 import .h → model → presenter → view 的完整資料流在 `flex_string` 模式下與 `grid` 模式一致，並確保 CSV 匯出可帶出 `hex_input`。
+
+- 測試樣本（最小）：
+	- 以 3 bytes 的結構驗證（如：`struct S { char a; short b; };`），LE 小端。
+	- 預期 bytes：`01 02 03`（`hex_raw == '010203'`）。
+
+- 驗證路徑：
+	1) `StructModel.load_struct_from_file(...)` 取得 `layout/total_size`。
+	2) `StructPresenter.set_input_mode('flex_string')` 使 context.extra.input_mode 為 `flex_string`。
+	3) View 回傳 `get_flexible_input_string()` 的字串（例如 `0x01,0x0302`）。
+	4) `StructPresenter.parse_flexible_hex_input()` → 呼叫 `process_flexible_input` → `model.parse_hex_data(...)`。
+	5) 檢查 `parsed_values[0].hex_raw == '010203'`，且在補零/裁切時有 `warnings/trunc_info`。
+
+- 與 grid 模式的一致性：
+	- grid 模式（1-byte）依序輸入 `01`、`02`、`03`，與 flex 輸入 `0x030201`/`0x01,0x02,0x03`/`0x01, 0x0302`/`0x0201 0x03` 結果一致。
+	- 以兩種模式結果的 `hex_raw` 比較相等作為斷言。
+
+- CSV 匯出 `hex_input`（行為建議與驗證）：
+	- 建議 Presenter 在 `parse_flexible_hex_input()` 成功後，於 `context['extra']['last_flex_hex']` 儲存 `ParseResult.data.hex()`。
+	- View 匯出 `_on_export_csv()` 取得 `hex_input` 時：
+		- 若為 `flex_string` 模式且存在 `context['extra']['last_flex_hex']`，則用它；
+		- 否則沿用現有 grid 模式將 `get_hex_input_parts()` 合併的內容。
+	- 測試可以 stub 取代實際寫檔，檢查組裝 `CsvExportOptions.hex_input` 或匯出內容包含 `010203`。
+
+- 非 GUI 測試策略：
+	- Presenter 測試：以 Mock View 實作 `get_flexible_input_string()`、`get_selected_endianness()`、`update_display()`、`on_values_refreshed()`，避免 GUI 依賴。
+	- View 測試：以 `object.__new__(StructView)` 建立最小實例並注入 `presenter`、`flex_input_var` 等必需欄位，驗證 `get_input_mode()`、`get_flexible_input_string()`、`show_flexible_preview()` 的最小契約。
+
+- 負向案例（整合）：
+	- 提供非法 token（如 `0x`、`0xGG`、缺前綴 `01`）時，`parse_flexible_hex_input()` 回傳 `type=='error'`，訊息映射到 `dialog_invalid_input`。
+	- 分隔符混用與連續分隔：`",,,  0x01 , 0x02  ,,,"` 解析成功（空 token 忽略）。

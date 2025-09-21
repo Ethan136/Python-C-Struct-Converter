@@ -110,3 +110,16 @@ class InputFieldProcessor:
             False
         """
         return byte_size in self.supported_byte_sizes 
+
+    # New flexible input wrapper (v26)
+    def process_flexible_input(self, input_str, target_len):
+        """
+        Delegate flexible hex string parsing to flexible_bytes_parser.
+        Args:
+            input_str (str): Raw user input string (e.g., "0x01, 0x0203")
+            target_len (int|None): Fixed length in bytes or None for variable.
+        Returns:
+            ParseResult: see flexible_bytes_parser.ParseResult
+        """
+        from . import flexible_bytes_parser as fbp
+        return fbp.parse_flexible_input(input_str, target_len)

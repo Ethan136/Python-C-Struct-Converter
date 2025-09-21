@@ -204,6 +204,18 @@ class StructView(tk.Tk):
             self._bind_member_tree_events()
         # 新增 presenter/view 綁定與初始顯示
         self._init_presenter_view_binding()
+        # v26: flexible input state (minimal implementation)
+        try:
+            self.flex_input_var = tk.StringVar(value="")
+        except Exception:
+            # Fallback dummy when tk not available
+            class _DummyVar:
+                def get(self):
+                    return ""
+                def set(self, v):
+                    pass
+            self.flex_input_var = _DummyVar()
+        self._flex_preview = {"hex_bytes": "", "total_len": 0, "warnings": [], "trunc_info": []}
 
     def get_member_table_refresh_count(self):
         return self._member_table_refresh_count
@@ -246,6 +258,18 @@ class StructView(tk.Tk):
         endian_options = ["Little Endian", "Big Endian"]
         self.endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=lambda _: self._on_endianness_change())
         self.endian_menu.pack(side=tk.LEFT)
+        # v26: 輸入模式切換（grid / flex_string）
+        try:
+            tk.Label(control_frame, text="Input Mode").pack(side=tk.LEFT)
+        except Exception:
+            pass
+        self.input_mode_var = tk.StringVar(value="grid")
+        try:
+            mode_options = ["grid", "flex_string"]
+            self.input_mode_menu = tk.OptionMenu(control_frame, self.input_mode_var, *mode_options, command=lambda v: self._on_input_mode_change(v))
+            self.input_mode_menu.pack(side=tk.LEFT)
+        except Exception:
+            pass
         # 顯示模式切換
         tk.Label(control_frame, text=get_string("label_display_mode")).pack(side=tk.LEFT)
         self.display_mode_var = tk.StringVar(value="tree")
@@ -336,6 +360,30 @@ class StructView(tk.Tk):
         self.hex_entries = []
         self.hex_grid_frame = tk.Frame(main_frame)
         self.hex_grid_frame.pack(fill="x", pady=2)
+
+        # v26: flex string 輸入區（預設隱藏）
+        self.flex_input_var = tk.StringVar(value="")
+        self.flex_frame = tk.Frame(main_frame)
+        try:
+            tk.Label(self.flex_frame, text="Flexible Hex Input").pack(anchor="w")
+        except Exception:
+            pass
+        try:
+            self.flex_input_entry = tk.Entry(self.flex_frame, textvariable=self.flex_input_var, width=80)
+            self.flex_input_entry.pack(fill="x", pady=2)
+        except Exception:
+            self.flex_input_entry = None
+        # 簡易預覽/告警顯示（以 Label 表示，測試可讀取 _flex_preview 狀態）
+        try:
+            self.flex_preview_label = tk.Label(self.flex_frame, text="", fg="blue", justify="left", anchor="w")
+            self.flex_preview_label.pack(fill="x")
+        except Exception:
+            self.flex_preview_label = None
+        # 預設以 grid 模式顯示
+        try:
+            self.flex_frame.pack_forget()
+        except Exception:
+            pass
 
         # 解析按鈕
         self.parse_button = tk.Button(main_frame, text=get_string("parse_button"), command=self._on_parse_file, state="disabled")
@@ -879,7 +927,31 @@ class StructView(tk.Tk):
                     pass
 
     def _on_parse_file(self):
-        if self.presenter:
+        if not self.presenter:
+            return
+        # v26: 依輸入模式分流解析
+        mode = "grid"
+        try:
+            mode = self.get_input_mode()
+        except Exception:
+            mode = "grid"
+        if str(mode) == "flex_string":
+            result = self.presenter.parse_flexible_hex_input()
+            if result.get('type') == 'ok':
+                self.show_parsed_values(result.get('parsed_values'))
+                # 取得 last_flex_hex 作為預覽 bytes
+                try:
+                    hex_bytes = ((self.presenter.context or {}).get('extra', {}) or {}).get('last_flex_hex') or ""
+                except Exception:
+                    hex_bytes = ""
+                total_len = len(hex_bytes) // 2 if hex_bytes else 0
+                warnings = result.get('warnings', [])
+                trunc_info = result.get('trunc_info', [])
+                self.show_flexible_preview(hex_bytes, total_len, warnings, trunc_info)
+            else:
+                from src.config import get_string
+                self.show_error(get_string('dialog_parsing_error'), result.get('message'))
+        else:
             result = self.presenter.parse_hex_data()
             if result['type'] == 'ok':
                 self.show_parsed_values(result['parsed_values'])
@@ -1130,13 +1202,34 @@ class StructView(tk.Tk):
             parsed_model = build_parsed_model_from_struct(self.presenter.model)
 
             # 蒐集 hex 輸入（若有），供 value 計算
-            hex_parts = []
+            hex_input = ""
             try:
-                hex_parts = self.get_hex_input_parts()
+                mode = self.get_input_mode()
             except Exception:
+                mode = "grid"
+            if mode == 'flex_string':
+                try:
+                    ctx = self.presenter.context if self.presenter and hasattr(self.presenter, 'context') else {}
+                    hex_input = (ctx.get('extra', {}) or {}).get('last_flex_hex', '') or ''
+                except Exception:
+                    hex_input = ''
+            if not hex_input:
+                # 回退到 grid 合併
                 hex_parts = []
+                try:
+                    hex_parts = self.get_hex_input_parts()
+                except Exception:
+                    hex_parts = []
             try:
-                hex_input = "".join(raw for raw, _ in hex_parts).replace(" ", "")
+                # v26: 若為 flex 模式且 context.extra.last_flex_hex 存在，優先使用
+                mode = self.get_input_mode() if hasattr(self, 'get_input_mode') else 'grid'
+                if str(mode) == 'flex_string':
+                    try:
+                        hex_input = ((self.presenter.context or {}).get('extra', {}) or {}).get('last_flex_hex') or ""
+                    except Exception:
+                        hex_input = ""
+                if not hex_input:
+                    hex_input = "".join(raw for raw, _ in hex_parts).replace(" ", "")
             except Exception:
                 hex_input = ""
             # 端序
@@ -1190,6 +1283,38 @@ class StructView(tk.Tk):
     def _on_endianness_change(self):
         if self.presenter:
             self.presenter.on_endianness_change()
+
+    # v26: 輸入模式切換 callback
+    def _on_input_mode_change(self, mode):
+        try:
+            if self.presenter and hasattr(self.presenter, 'set_input_mode'):
+                self.presenter.set_input_mode(str(mode))
+        except Exception:
+            pass
+        # 切換顯示區塊
+        try:
+            if str(mode) == 'flex_string':
+                # 隱藏 grid，顯示 flex
+                try:
+                    self.hex_grid_frame.pack_forget()
+                except Exception:
+                    pass
+                try:
+                    self.flex_frame.pack(fill="x", pady=2)
+                except Exception:
+                    pass
+            else:
+                # 顯示 grid，隱藏 flex
+                try:
+                    self.flex_frame.pack_forget()
+                except Exception:
+                    pass
+                try:
+                    self.hex_grid_frame.pack(fill="x", pady=2)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def get_selected_unit_size(self):
         return int(self.unit_size_var.get().split()[0])
@@ -1249,6 +1374,31 @@ class StructView(tk.Tk):
 
     def get_hex_input_parts(self):
         return [(entry.get().strip(), expected_len) for entry, expected_len in self.hex_entries]
+
+    # v26 flexible input minimal API
+    def get_input_mode(self) -> str:
+        try:
+            return (self.presenter.context or {}).get("extra", {}).get("input_mode", "grid")
+        except Exception:
+            return "grid"
+
+    def get_flexible_input_string(self) -> str:
+        try:
+            return self.flex_input_var.get()
+        except Exception:
+            return ""
+
+    def show_flexible_preview(self, hex_bytes: str, total_len: int, warnings, trunc_info) -> None:
+        # Store for tests; a real UI would update widgets
+        try:
+            self._flex_preview = {
+                "hex_bytes": hex_bytes,
+                "total_len": int(total_len) if isinstance(total_len, (int, float)) else 0,
+                "warnings": list(warnings or []),
+                "trunc_info": list(trunc_info or []),
+            }
+        except Exception:
+            self._flex_preview = {"hex_bytes": "", "total_len": 0, "warnings": [], "trunc_info": []}
 
     def _validate_input(self, event, max_length):
         if event.keysym in ['BackSpace', 'Delete', 'Left', 'Right', 'Home', 'End', 'Tab']:
