@@ -245,45 +245,59 @@ class StructView(tk.Tk):
         _, main_frame = create_scrollable_tab_frame(parent)
         # 單位選擇與 endianness
         control_frame = tk.Frame(main_frame)
-        control_frame.pack(fill="x", pady=(5, 2))
+        control_frame.pack(fill="x", pady=(3, 1))
         self.file_control_frame = control_frame  # 供測試直接存取
+        # 分為 Core 與 Advanced 兩列，減少單列擁擠
+        core_row = tk.Frame(control_frame)
+        core_row.pack(fill="x")
+        adv_toggle_row = tk.Frame(control_frame)
+        adv_toggle_row.pack(fill="x")
+        advanced_row = tk.Frame(control_frame)
+        # 預設隱藏進階列
+        try:
+            advanced_row.pack_forget()
+        except Exception:
+            pass
         from src.config import get_string
         # v26: 將 Input Mode 放在最左側（位於單位大小之前）
         try:
-            tk.Label(control_frame, text="Input Mode").pack(side=tk.LEFT)
+            tk.Label(core_row, text=get_string("label_input_mode")).pack(side=tk.LEFT, padx=1)
         except Exception:
             pass
-        self.input_mode_var = tk.StringVar(value="grid")
+        # 預設為 flex_string，聚焦單一字串輸入體驗
+        self.input_mode_var = tk.StringVar(value="flex_string")
         try:
             mode_options = ["grid", "flex_string"]
-            self.input_mode_menu = tk.OptionMenu(control_frame, self.input_mode_var, *mode_options, command=lambda v: self._on_input_mode_change(v))
+            self.input_mode_menu = tk.OptionMenu(core_row, self.input_mode_var, *mode_options, command=lambda v: self._on_input_mode_change(v))
             self.input_mode_menu.pack(side=tk.LEFT)
         except Exception:
             pass
-        tk.Label(control_frame, text=get_string("label_unit_size")).pack(side=tk.LEFT)
+        # 單位大小（僅在 grid 模式顯示）
+        self._unit_label = tk.Label(core_row, text=get_string("label_unit_size"))
+        self._unit_label.pack(side=tk.LEFT)
         self.unit_size_var = tk.StringVar(value="1 Byte")
         unit_options = ["1 Byte", "4 Bytes", "8 Bytes"]
-        self.unit_menu = tk.OptionMenu(control_frame, self.unit_size_var, *unit_options, command=lambda _: self._on_unit_size_change())
+        self.unit_menu = tk.OptionMenu(core_row, self.unit_size_var, *unit_options, command=lambda _: self._on_unit_size_change())
         self.unit_menu.pack(side=tk.LEFT)
-        tk.Label(control_frame, text=get_string("label_endianness")).pack(side=tk.LEFT)
+        tk.Label(core_row, text=get_string("label_endianness")).pack(side=tk.LEFT, padx=1)
         self.endian_var = tk.StringVar(value="Little Endian")
         endian_options = ["Little Endian", "Big Endian"]
-        self.endian_menu = tk.OptionMenu(control_frame, self.endian_var, *endian_options, command=lambda _: self._on_endianness_change())
+        self.endian_menu = tk.OptionMenu(core_row, self.endian_var, *endian_options, command=lambda _: self._on_endianness_change())
         self.endian_menu.pack(side=tk.LEFT)
-        # 顯示模式切換
-        tk.Label(control_frame, text=get_string("label_display_mode")).pack(side=tk.LEFT)
+        # 顯示模式切換（進階列）
+        tk.Label(advanced_row, text=get_string("label_display_mode")).pack(side=tk.LEFT, padx=1)
         self.display_mode_var = tk.StringVar(value="tree")
         display_mode_options = ["tree", "flat"]
-        self.display_mode_menu = tk.OptionMenu(control_frame, self.display_mode_var, *display_mode_options, command=self._on_display_mode_change)
+        self.display_mode_menu = tk.OptionMenu(advanced_row, self.display_mode_var, *display_mode_options, command=self._on_display_mode_change)
         self.display_mode_menu.pack(side=tk.LEFT)
         # Target Struct 選擇器（v17）
-        tk.Label(control_frame, text=get_string("label_target_struct")).pack(side=tk.LEFT)
+        tk.Label(core_row, text=get_string("label_target_struct")).pack(side=tk.LEFT, padx=4)
         self.target_struct_var = tk.StringVar(value="")
         try:
-            self.target_struct_combo = ttk.Combobox(control_frame, textvariable=self.target_struct_var, width=18, state="readonly")
+            self.target_struct_combo = ttk.Combobox(core_row, textvariable=self.target_struct_var, width=18, state="readonly")
         except Exception:
             # 在無 ttk 時 fallback 使用 Entry
-            self.target_struct_combo = tk.Entry(control_frame, textvariable=self.target_struct_var, width=18)
+            self.target_struct_combo = tk.Entry(core_row, textvariable=self.target_struct_var, width=18)
         self.target_struct_combo.pack(side=tk.LEFT)
         # 綁定選擇事件
         def _on_target_struct_change(*_):
@@ -321,35 +335,49 @@ class StructView(tk.Tk):
             # fallback for Entry：Enter 觸發
             self.target_struct_combo.bind('<Return>', lambda e: _on_target_struct_change())
         # V23: 移除 GUI 版本切換（預設即為 Modern）
-        # 搜尋輸入框
-        tk.Label(control_frame, text=get_string("label_search")).pack(side=tk.LEFT)
+        # 搜尋輸入框（移至進階列）
+        tk.Label(advanced_row, text=get_string("label_search")).pack(side=tk.LEFT, padx=1)
         self.search_var = tk.StringVar()
-        self.search_entry = tk.Entry(control_frame, textvariable=self.search_var, width=16)
+        self.search_entry = tk.Entry(advanced_row, textvariable=self.search_var, width=16)
         self.search_entry.pack(side=tk.LEFT)
         self.search_entry.bind('<KeyRelease>', self._on_search_entry_change)
-        # Filter 輸入框
-        tk.Label(control_frame, text=get_string("label_filter")).pack(side=tk.LEFT)
+        # Filter 輸入框（移至進階列）
+        tk.Label(advanced_row, text=get_string("label_filter")).pack(side=tk.LEFT, padx=1)
         self.filter_var = tk.StringVar()
-        self.filter_entry = tk.Entry(control_frame, textvariable=self.filter_var, width=16)
+        self.filter_entry = tk.Entry(advanced_row, textvariable=self.filter_var, width=16)
         self.filter_entry.pack(side=tk.LEFT)
         self.filter_entry.bind('<KeyRelease>', self._on_filter_entry_change)
-        # 展開全部/收合全部按鈕
+        # 展開全部/收合全部按鈕（進階列）
         from src.config import get_string
-        self.expand_all_btn = tk.Button(control_frame, text=get_string("btn_expand_all"), command=self._on_expand_all)
-        self.expand_all_btn.pack(side=tk.LEFT, padx=2)
-        self.collapse_all_btn = tk.Button(control_frame, text=get_string("btn_collapse_all"), command=self._on_collapse_all)
-        self.collapse_all_btn.pack(side=tk.LEFT, padx=2)
-        # 批次操作按鈕
-        self.batch_expand_btn = tk.Button(control_frame, text=get_string("btn_expand_selected"), command=self._on_batch_expand)
-        self.batch_expand_btn.pack(side=tk.LEFT, padx=2)
-        self.batch_collapse_btn = tk.Button(control_frame, text=get_string("btn_collapse_selected"), command=self._on_batch_collapse)
-        self.batch_collapse_btn.pack(side=tk.LEFT, padx=2)
-        # 批次刪除按鈕
-        self.batch_delete_btn = tk.Button(control_frame, text=get_string("btn_batch_delete"), command=self._on_batch_delete)
-        self.batch_delete_btn.pack(side=tk.LEFT, padx=2)
-        # 32-bit 模式切換
+        self.expand_all_btn = tk.Button(advanced_row, text=get_string("btn_expand_all"), command=self._on_expand_all)
+        self.expand_all_btn.pack(side=tk.LEFT, padx=1)
+        self.collapse_all_btn = tk.Button(advanced_row, text=get_string("btn_collapse_all"), command=self._on_collapse_all)
+        self.collapse_all_btn.pack(side=tk.LEFT, padx=1)
+        # 批次操作按鈕（進階列）
+        self.batch_expand_btn = tk.Button(advanced_row, text=get_string("btn_expand_selected"), command=self._on_batch_expand)
+        self.batch_expand_btn.pack(side=tk.LEFT, padx=1)
+        self.batch_collapse_btn = tk.Button(advanced_row, text=get_string("btn_collapse_selected"), command=self._on_batch_collapse)
+        self.batch_collapse_btn.pack(side=tk.LEFT, padx=1)
+        # 批次刪除按鈕（進階列）
+        self.batch_delete_btn = tk.Button(advanced_row, text=get_string("btn_batch_delete"), command=self._on_batch_delete)
+        self.batch_delete_btn.pack(side=tk.LEFT, padx=1)
+        # 32-bit 模式切換（核心列保留）
         self.file_pointer32_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(control_frame, text=get_string("chk_32bit_mode"), variable=self.file_pointer32_var, command=lambda: self._on_pointer_mode_toggle(self.file_pointer32_var.get())).pack(side=tk.LEFT, padx=6)
+        tk.Checkbutton(core_row, text=get_string("chk_32bit_mode"), variable=self.file_pointer32_var, command=lambda: self._on_pointer_mode_toggle(self.file_pointer32_var.get())).pack(side=tk.LEFT, padx=6)
+        # 進階切換
+        try:
+            self._show_adv_var = tk.BooleanVar(value=False)
+            def _toggle_adv():
+                try:
+                    if self._show_adv_var.get():
+                        advanced_row.pack(fill="x")
+                    else:
+                        advanced_row.pack_forget()
+                except Exception:
+                    pass
+            tk.Checkbutton(adv_toggle_row, text=get_string("label_show_advanced"), variable=self._show_adv_var, command=_toggle_adv).pack(anchor="w")
+        except Exception:
+            pass
         # 檔案選擇按鈕
         tk.Button(main_frame, text=get_string("browse_button"), command=self._on_browse_file).pack(anchor="w", pady=2)
         # 檔案路徑顯示
@@ -365,7 +393,7 @@ class StructView(tk.Tk):
         self.flex_input_var = tk.StringVar(value="")
         self.flex_frame = tk.Frame(main_frame)
         try:
-            tk.Label(self.flex_frame, text="Flexible Hex Input").pack(anchor="w")
+            tk.Label(self.flex_frame, text=get_string("label_flex_input")).pack(anchor="w")
         except Exception:
             pass
         try:
@@ -384,9 +412,10 @@ class StructView(tk.Tk):
             self.flex_preview_label.pack(fill="x")
         except Exception:
             self.flex_preview_label = None
-        # 預設以 grid 模式顯示
+        # 預設以 flex 模式顯示（因 input_mode 預設為 flex_string）
         try:
-            self.flex_frame.pack_forget()
+            self.hex_grid_frame.pack_forget()
+            self.flex_frame.pack(fill="x", pady=2)
         except Exception:
             pass
 
@@ -1334,6 +1363,17 @@ class StructView(tk.Tk):
                     self.flex_frame.pack(fill="x", pady=2)
                 except Exception:
                     pass
+                # 隱藏單位控制
+                try:
+                    if hasattr(self, "_unit_label") and self._unit_label:
+                        self._unit_label.pack_forget()
+                except Exception:
+                    pass
+                try:
+                    if hasattr(self, "unit_menu") and self.unit_menu:
+                        self.unit_menu.pack_forget()
+                except Exception:
+                    pass
             else:
                 # 顯示 grid，隱藏 flex
                 try:
@@ -1342,6 +1382,17 @@ class StructView(tk.Tk):
                     pass
                 try:
                     self.hex_grid_frame.pack(fill="x", pady=2)
+                except Exception:
+                    pass
+                # 顯示單位控制
+                try:
+                    if hasattr(self, "_unit_label") and self._unit_label:
+                        self._unit_label.pack(side=tk.LEFT)
+                except Exception:
+                    pass
+                try:
+                    if hasattr(self, "unit_menu") and self.unit_menu:
+                        self.unit_menu.pack(side=tk.LEFT)
                 except Exception:
                     pass
         except Exception:
