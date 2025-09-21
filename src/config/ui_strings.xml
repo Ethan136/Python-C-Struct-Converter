@@ -50,6 +50,9 @@
     <string name="label_target_struct">  Target Struct：</string>
     <string name="label_search">  搜尋：</string>
     <string name="label_filter">  Filter：</string>
+    <string name="label_input_mode">  輸入模式：</string>
+    <string name="label_flex_input">Flexible Hex Input</string>
+    <string name="label_show_advanced">顯示進階設定</string>
     <string name="label_struct_name">struct 名稱:</string>
     <string name="label_total_size_bytes">結構體總大小 (bytes):</string>
     <string name="layout_col_type">型別</string>
