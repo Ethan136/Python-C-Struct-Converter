@@ -1377,7 +1377,12 @@ class StructView(tk.Tk):
 
     # v26 flexible input minimal API
     def get_input_mode(self) -> str:
+        # Prefer local UI state; fallback to presenter context
         try:
+            if hasattr(self, "input_mode_var") and self.input_mode_var:
+                val = self.input_mode_var.get()
+                if isinstance(val, str) and val:
+                    return val
             return (self.presenter.context or {}).get("extra", {}).get("input_mode", "grid")
         except Exception:
             return "grid"
@@ -1397,6 +1402,18 @@ class StructView(tk.Tk):
                 "warnings": list(warnings or []),
                 "trunc_info": list(trunc_info or []),
             }
+            # Update simple on-screen label for immediate feedback
+            if hasattr(self, "flex_preview_label") and self.flex_preview_label:
+                preview = hex_bytes.upper() if isinstance(hex_bytes, str) else ""
+                warn = "; ".join(self._flex_preview["warnings"]) if self._flex_preview["warnings"] else ""
+                trunc = f" truncated={len(self._flex_preview['trunc_info'])}" if self._flex_preview.get("trunc_info") else ""
+                text = f"Bytes: {preview}  (len={self._flex_preview['total_len']})"
+                if warn or trunc:
+                    text += f"  |  {warn}{trunc}"
+                try:
+                    self.flex_preview_label.config(text=text)
+                except Exception:
+                    pass
         except Exception:
             self._flex_preview = {"hex_bytes": "", "total_len": 0, "warnings": [], "trunc_info": []}
 
