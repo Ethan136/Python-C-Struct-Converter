@@ -220,7 +220,13 @@ class StructModel:
         try:
             if not self.layout:
                 raise ValueError("No struct layout loaded. Please load a struct definition first.")
-            padded_hex = hex_data.zfill(self.total_size * 2)
+            # v26: 將不足長度改為『尾端補 0』以符合 flexible 輸入規格
+            hex_clean = str(hex_data or "").strip()
+            target_chars = self.total_size * 2
+            if len(hex_clean) < target_chars:
+                padded_hex = hex_clean.ljust(target_chars, '0')
+            else:
+                padded_hex = hex_clean
             data_bytes = bytes.fromhex(padded_hex)
             parsed_values = []
             member_value_map = {}

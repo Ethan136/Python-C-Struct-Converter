@@ -154,6 +154,22 @@
 	- 與 `1/4/8-byte` grid 模式對齊：相同數值輸入應輸出一致 bytes；
 	- CSV 匯出流程不因新模式破壞（必要時以 `ParseResult.data.hex()` 提供 `hex_input`）。
 
+## 問題回饋與修正（v26 解析結果異常調查）
+- 現象：GUI 在 `flex_string` 輸入後，解析結果欄位仍顯示全 0 或無更新。
+- 可能原因：
+	1) View 的 `get_input_mode()` 未取用 UI 狀態，導致 Parse Data 走到 grid 分支（已修正：優先讀取 `input_mode_var`）。
+	2) 預覽僅存在於內部狀態，缺少可視回饋（已修正：`show_flexible_preview` 會更新 `flex_preview_label`）。
+	3) Model 端補零規則不一致：`parse_hex_data` 以 `zfill` 在字串左側補 0，與文件規範「不足時尾端補 0」不一致，導致位移錯位（已修正：不足時改用 `ljust` 於尾端補 `0`）。
+- 修正方案：
+	- View：
+		- `get_input_mode()` 優先以 `input_mode_var.get()` 決定模式；
+		- 解析完成後，將 `context.extra.last_flex_hex` 與警告同步到 `flex_preview_label`。
+	- Presenter：維持 `set_input_mode/parse_flexible_hex_input`，不變。
+	- Model：`StructModel.parse_hex_data(...)` 將不足補零改為尾端補零（`ljust`）。
+- 追蹤測試：
+	- 新增 View 測試：偏好 `input_mode_var`、預覽 label 會更新。
+	- 回歸：整合測試 flex vs grid 一致性不受影響；CSV 匯出仍使用 `last_flex_hex`。
+
 ## 整合測試（實作細節）
 - 測試目標：驗證 import .h → model → presenter → view 的完整資料流在 `flex_string` 模式下與 `grid` 模式一致，並確保 CSV 匯出可帶出 `hex_input`。
 
