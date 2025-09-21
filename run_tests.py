@@ -17,10 +17,10 @@ def run_all_tests():
     project_root = os.path.dirname(os.path.abspath(__file__))
     sys.path.insert(0, project_root)
     
-    # Discover and run all tests
+    # Discover and run all tests (ensure proper package top-level)
     loader = unittest.TestLoader()
     start_dir = os.path.join(project_root, 'tests')
-    suite = loader.discover(start_dir, pattern='test_*.py')
+    suite = loader.discover(start_dir=start_dir, pattern='test_*.py', top_level_dir=project_root)
     
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
@@ -39,9 +39,10 @@ def run_specific_test(test_module):
         print(f"Error: Test module '{test_module}' not found at {test_path}")
         return False
     
-    # Load and run the test
+    # Load and run the test (treat tests as a package)
+    pkg_name = f"tests.{test_module}" if not test_module.startswith('tests.') else test_module
     loader = unittest.TestLoader()
-    suite = loader.loadTestsFromName(test_module, [os.path.join(project_root, 'tests')])
+    suite = loader.loadTestsFromName(pkg_name)
     
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
