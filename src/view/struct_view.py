@@ -1389,7 +1389,22 @@ class StructView(tk.Tk):
 
     def get_flexible_input_string(self) -> str:
         try:
-            return self.flex_input_var.get()
+            # Primary: textvariable value
+            s = ""
+            try:
+                s = self.flex_input_var.get()
+            except Exception:
+                s = ""
+            if isinstance(s, str) and s.strip():
+                return s
+            # Fallback: read from Entry widget directly (guard against variable binding issues)
+            if hasattr(self, "flex_input_entry") and self.flex_input_entry:
+                try:
+                    s2 = self.flex_input_entry.get()
+                    return s2 if isinstance(s2, str) else ""
+                except Exception:
+                    return ""
+            return ""
         except Exception:
             return ""
 
