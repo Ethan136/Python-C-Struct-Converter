@@ -371,6 +371,11 @@ class StructView(tk.Tk):
         try:
             self.flex_input_entry = tk.Entry(self.flex_frame, textvariable=self.flex_input_var, width=80)
             self.flex_input_entry.pack(fill="x", pady=2)
+            # v26: Enter 直接觸發解析
+            try:
+                self.flex_input_entry.bind('<Return>', lambda e: self._on_parse_file())
+            except Exception:
+                pass
         except Exception:
             self.flex_input_entry = None
         # 簡易預覽/告警顯示（以 Label 表示，測試可讀取 _flex_preview 狀態）
@@ -948,6 +953,32 @@ class StructView(tk.Tk):
                 warnings = result.get('warnings', [])
                 trunc_info = result.get('trunc_info', [])
                 self.show_flexible_preview(hex_bytes, total_len, warnings, trunc_info)
+                # v26: 同步更新 Debug Bytes
+                try:
+                    # 格式化為每 2 字元加空白，每 32 字元換行
+                    def _format_lines(h):
+                        h = h.upper()
+                        pairs = [h[i:i+2] for i in range(0, len(h), 2)]
+                        lines = []
+                        line = []
+                        for i, p in enumerate(pairs, 1):
+                            line.append(p)
+                            if i % 16 == 0:
+                                lines.append(" ".join(line))
+                                line = []
+                        if line:
+                            lines.append(" ".join(line))
+                        return lines
+                    header = f"Flex Bytes (len={total_len})"
+                    lines = _format_lines(hex_bytes) if hex_bytes else []
+                    # 加上警告摘要
+                    if warnings:
+                        lines.append("Warnings: " + "; ".join([str(w) for w in warnings]))
+                    if trunc_info:
+                        lines.append(f"Truncated: {len(trunc_info)} bytes")
+                    self.show_debug_bytes([header] + lines)
+                except Exception:
+                    pass
             else:
                 from src.config import get_string
                 self.show_error(get_string('dialog_parsing_error'), result.get('message'))
