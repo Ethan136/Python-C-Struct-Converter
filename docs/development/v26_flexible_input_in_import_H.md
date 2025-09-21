@@ -170,6 +170,71 @@
 	- 新增 View 測試：偏好 `input_mode_var`、預覽 label 會更新。
 	- 回歸：整合測試 flex vs grid 一致性不受影響；CSV 匯出仍使用 `last_flex_hex`。
 
+## 顯示語義補充與改進規劃
+- 觀察與可能誤會：
+	- `Struct Layout` 的「Hex Raw」以「高位在右」的顯示順序（big-endian 表示法）呈現欄位的實際記憶體 bytes；在 Little Endian 解析下，整數值會由低位在前寫入，因此例如 4-byte 整數 0xAC8329B4 會顯示為 `b4 | 29 | 83 | ac`。這是顯示約定，並非解析錯誤。
+	- `Debug Bytes` 目前只在 grid 模式提供每個 box 的內容；flex 模式解析後沒有同步更新，易造成「看起來沒反應/還在顯示舊內容」的錯覺。
+- 改進規劃（UI）：
+	1) flex 模式解析成功後，`Debug Bytes` 區改為顯示：
+		- `Flex Bytes (len=N):` + 以 16 bytes 換行的預覽（與 `flex_preview_label` 一致）。
+		- 補零/裁切摘要（沿用 `warnings`/`trunc_info`）。
+	2) grid 模式解析後保留原有 Box 列印。
+	3) `Enter` 於 `Flexible Hex Input` 觸發解析（強化可用性）。
+- 改進規劃（技術點）：
+	- View：在 `flex_string` 分支解析成功後，呼叫 `show_debug_bytes([...])`，內容含：首行 `Flex Bytes (len=N)`、後續每行 16 bytes（以空白分隔，兩位大寫 hex）。
+	- Presenter：不需變更；沿用 `last_flex_hex` 作為來源。
+	- 測試：新增 view 測試驗證 `show_debug_bytes` 被呼叫且內容含 `Flex Bytes (len=...)`。
+
+## 單一 token 很長時「看起來沒被吃進去」的檢查與修正
+- 觀察：當單一 token（例如 `0x1234...9999`）很長且超過結構的 `total_size`，超過部分在小端展開後會被「由尾端（高位）」裁切掉。若 UI 未顯示裁切摘要，會讓人誤判為「沒被 parser 吃進去」。
+- 現行規範：已定義「超長自尾端（高位）裁切」，`flexible_bytes_parser` 已回傳 `trunc_info`（含 token_index/offset），Presenter 也會附帶於 payload。
+- 修正策略：
+	1) UI 顯示：在 Debug Bytes 中新增 `Truncated: X bytes`，後續再擴充為列出 `token_index@offset` 清單（例如 `t#0@2, t#0@3, ...`）。
+	2) 文件補充：在「功能規格/長度規則」下明確加註：
+		- 當輸入長度 > `total_size` 時，僅保留前 `total_size` 個 bytes（低位在前），其餘由「尾端（高位）」裁切；
+		- 若希望改為保留高位（裁切低位），可在未來加上 UI 切換（非本版）。
+	3) 測試：
+		- 單一長 token 例：給定 `total_size=N`，輸入 `N+K` bytes，驗證 `ParseResult.data` 長度 == `N` 且 `trunc_info` 長度 == `K`；
+		- Presenter 回傳包含 `trunc_info`，View 會於 Debug Bytes 顯示 `Truncated: K bytes`。
+- 風險與上限：
+	- 理論上 Python int/bytes 可處理很長的 token，但 UI/效能考量建議保留「可選上限」：單一 token ≤ 4KB，總長度 ≤ 64KB（超過報錯或需要二次確認），以免一次貼入極大字串造成卡頓。此上限目前先不啟用，保留為設定值。
+
+## Debug Bytes 顯示裁切來源清單（規劃）
+- 目標：在 flex 模式解析成功且有裁切時，Debug Bytes 除了 `Truncated: K bytes` 外，顯示來源細節列表，例如：`(t#0@2, t#0@3, t#0@4)`。
+- 技術規劃：
+	- `flexible_bytes_parser.assemble_bytes` 已回傳 `trunc_info: [{global_index, token_index, offset}]`。
+	- Presenter：維持直通，不做轉換。
+	- View：
+		- 於 `_on_parse_file()` 的 flex 分支中，若 `trunc_info` 不為空，轉成列表字串：`t#{token_index}@{offset}`，以逗號分隔，最多列 50 筆，超過以 `... (+N)` 表示。
+		- Debug Bytes 顯示：
+			- `Truncated: {K} bytes`
+			- `Sources: t#0@2, t#0@3, ...`
+- 測試：
+	- 強制製造超長（例如 `total_size=4`，輸入 7 bytes），驗證 Debug Bytes 文字包含 `Truncated: 3 bytes` 與 `Sources:`。
+
+## 可配置輸入上限（規劃）
+- 需求：避免極端長輸入導致 GUI 卡頓，加入可配置上限：
+	- 單一 token 上限（預設 4096 bytes）
+	- 總 bytes 上限（預設 65536 bytes）
+- 技術規劃：
+	- Parser 層（`flexible_bytes_parser`）：
+		- 新增可選參數 `limits: {max_token_bytes: int|None, max_total_bytes: int|None}`；
+		- `tokenize_flexible_hex` 後，在 `parse_token_to_bytes` 與 `assemble_bytes` 前檢查：
+			- 若任何單一 token 展開 bytes 長度 > 上限 → raise `ValueError('token too long (X > limit)')`；
+			- 若所有 token 展開串接後 bytes 長度 > 上限 → raise `ValueError('total input too long (X > limit)')`；
+		- 預設 None 則不限制；在 Presenter 呼叫時提供預設值（可由 env 或設定檔帶入）。
+	- Presenter：
+		- `process_flexible_input` 呼叫時傳入 limits；攔截 `ValueError`，以 i18n 訊息顯示 `token 過長` 或 `總長度過長`。
+	- View：
+		- 顯示錯誤對話框，不更新 Debug Bytes；
+		- 在 Flexible 輸入框下方以提示文案標示預設上限（可由 i18n/設定檔帶入）。
+- 設定來源：
+	- 優先序：環境變數 → 設定檔 `config/custom_types.yaml`（或新增 `config/type_aliases.yaml` 同層級檔）→ 內建預設。
+- 測試：
+	- 單一 token 超限：應報錯並帶出對應訊息；
+	- 總長度超限：應報錯並帶出對應訊息；
+	- 未設上限（None）時，不應限制，回歸既有行為。
+
 ## 整合測試（實作細節）
 - 測試目標：驗證 import .h → model → presenter → view 的完整資料流在 `flex_string` 模式下與 `grid` 模式一致，並確保 CSV 匯出可帶出 `hex_input`。
 

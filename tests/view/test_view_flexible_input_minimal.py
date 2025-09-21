@@ -58,6 +58,26 @@ class TestViewFlexibleInputMinimal(unittest.TestCase):
         self.presenter.context.setdefault('extra', {})['input_mode'] = 'flex_string'
         self.assertEqual(self.view.get_input_mode(), 'flex_string')
 
+    def test_debug_bytes_updated_in_flex_mode(self):
+        # Prepare presenter/view minimal wiring for debug bytes
+        # Monkey-patch show_debug_bytes to capture lines
+        captured = {}
+        def _capture(lines):
+            captured['lines'] = list(lines)
+        setattr(self.view, 'show_debug_bytes', _capture)
+        # Simulate presenter context with last_flex_hex and call view branch directly
+        self.presenter.context.setdefault('extra', {})['last_flex_hex'] = '01020304'
+        # Mock presenter method to return ok + warnings
+        def _mock_parse():
+            return {'type': 'ok', 'parsed_values': [], 'warnings': ['padded 1 byte'], 'trunc_info': []}
+        self.presenter.parse_flexible_hex_input = _mock_parse
+        # Force mode and trigger view parse branch
+        self.view.input_mode_var.set('flex_string')
+        self.view._on_parse_file()
+        self.assertIn('lines', captured)
+        header = captured['lines'][0]
+        self.assertIn('Flex Bytes (len=4)', header)
+
 
 if __name__ == '__main__':
     unittest.main()
